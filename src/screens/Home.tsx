@@ -1,0 +1,140 @@
+import { useMemo } from 'react'
+import { History, LayoutGrid, ArrowLeftRight, Lightbulb, ChevronRight, ChevronLeft, Plus, Minus } from 'lucide-react'
+import { useStore } from '../store.tsx'
+import { Ring, Bar, Avatar, Seg } from '../ui.tsx'
+import { Icon } from '../icons.tsx'
+import { fmt, fmtNum, fmtSigned, pct } from '../lib/money.ts'
+import { periodLabel, shortDayLabel, todayIso, type Period } from '../lib/period.ts'
+import { summarize, netWorth, snapshotAt } from '../lib/calc.ts'
+import type { Tx } from '../lib/types.ts'
+import type { Nav } from '../App.tsx'
+
+export function HomeScreen({ nav, period, setPeriod, scope, setScope, openTx }: {
+  nav: Nav; period: Period; setPeriod: (n: number) => void; scope: 'all' | 'me'; setScope: (s: 'all' | 'me') => void; openTx: (t?: Tx, kind?: 'in' | 'out') => void
+}) {
+  const st = useStore()
+  const today = todayIso()
+  const txs = useMemo(() => (scope === 'me' ? st.txs.filter(t => t.member_id === st.user.id) : st.txs), [st.txs, scope, st.user.id])
+  const sum = useMemo(() => summarize(txs, st.categories, st.settings, period, today), [txs, st.categories, st.settings, period, today])
+  const catById = useMemo(() => new Map(st.categories.map(c => [c.id, c])), [st.categories])
+  const memberName = (id: string) => st.members.find(m => m.user_id === id)?.display_name || '?'
+
+  const nw = netWorth(st.assets, st.rates)
+  const monthAgo = snapshotAt(st.snapshots, new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10))
+  const firstName = (st.members.find(m => m.user_id === st.user.id)?.display_name || st.user.name || '').split(' ')[0]
+
+  const topCats = [...sum.byCat.entries()]
+    .filter(([id]) => catById.get(id)?.grp !== 'economii')
+    .sort((a, b) => b[1] - a[1]).slice(0, 6)
+  const top3 = sum.txs.filter(t => t.kind === 'out' && catById.get(t.category_id)?.grp !== 'economii').sort((a, b) => b.amount - a.amount).slice(0, 3)
+  const over = sum.totalBudget > 0 && sum.left < 0
+  const fast = sum.totalBudget > 0 && sum.elapsedPct < 100 && sum.spentPct > sum.elapsedPct + 10
+
+  return (
+    <div className="screen">
+      <header className="hello">
+        <div>
+          <h1>Salut{firstName ? `, ${firstName}` : ''}!</h1>
+          <p className="muted">Iată situația ta financiară</p>
+        </div>
+      </header>
+
+      {st.members.length > 1 && (
+        <Seg label="Ce vezi" value={scope} onChange={setScope} options={[{ id: 'all', label: 'Familie' }, { id: 'me', label: 'Personal' }]} />
+      )}
+
+      <div className="period">
+        <button type="button" className="icon-btn" aria-label="Perioada anterioară" onClick={() => setPeriod(-1)}><ChevronLeft size={18} /></button>
+        <b>{periodLabel(period, st.settings.payday)}</b>
+        <button type="button" className="icon-btn" aria-label="Perioada următoare" onClick={() => setPeriod(1)}><ChevronRight size={18} /></button>
+      </div>
+
+      <section className="card budget">
+        <div className="eyebrow">Mai ai din buget</div>
+        {sum.totalBudget > 0 ? <>
+          <div className={'big num' + (over ? ' neg' : '')}>{fmt(sum.left)}</div>
+          <div className="muted">{over ? `Ai depășit bugetul cu ${fmt(-sum.left)}` : `din ${fmt(sum.totalBudget)}`}</div>
+          <div className="consum">
+            <div className="consum-head"><span>Consum</span><b className="num">{sum.spentPct}%</b></div>
+            <Bar value={sum.spentPct} color="var(--accent)" over={sum.spentPct > 100} />
+            <Bar value={sum.elapsedPct} color="var(--time)" />
+            <div className="legend"><span><i style={{ background: 'var(--accent)' }} />cheltuit din buget</span><span><i style={{ background: 'var(--time)' }} />zile trecute</span></div>
+            <p className="note">Ai cheltuit {sum.spentPct}% din bugetul total{sum.daysLeft > 0 ? ` și mai sunt ${sum.daysLeft} ${sum.daysLeft === 1 ? 'zi' : 'zile'} până la finalul perioadei.` : '.'}</p>
+            {fast && <p className="note bad">Cheltui mai repede decât trece luna.</p>}
+          </div>
+        </> : <>
+          <div className="big num">–</div>
+          <p className="note">Pune limite pe categorii (sau un buget total) ca să vezi cât mai ai.</p>
+          <button type="button" className="link" onClick={() => nav('finante')}>Setează bugetul <ChevronRight size={15} /></button>
+        </>}
+        <div className="trio">
+          <div><span>Venituri</span><b className="num in">{fmtNum(sum.income)}</b></div>
+          <div><span>Cheltuieli</span><b className="num">{fmtNum(sum.spent)}</b></div>
+          <div><span>Economii</span><b className="num save">{fmtNum(sum.saved)}</b></div>
+        </div>
+      </section>
+
+      <button type="button" className="card nw-line" onClick={() => nav('tab:avere')}>
+        <span className="muted">Averea ta netă</span>
+        <span className="nw-val num">{fmt(nw.net)}</span>
+        {monthAgo && <span className={'num small ' + (nw.net - monthAgo.net >= 0 ? 'in' : 'bad')}>{fmtSigned(nw.net - monthAgo.net)} față de acum o lună</span>}
+        <ChevronRight size={16} className="chev" />
+      </button>
+
+      <div className="add-row">
+        <button type="button" className="add out" onClick={() => openTx(undefined, 'out')}><Minus size={18} />Cheltuială</button>
+        <button type="button" className="add in" onClick={() => openTx(undefined, 'in')}><Plus size={18} />Venit</button>
+      </div>
+
+      <nav className="quick" aria-label="Scurtături">
+        <button type="button" onClick={() => nav('history')}><History size={18} />Istoric</button>
+        <button type="button" onClick={() => nav('categories')}><LayoutGrid size={18} />Pe categorii</button>
+        <button type="button" onClick={() => nav('tab:stats#compara')}><ArrowLeftRight size={18} />Compară</button>
+        <button type="button" onClick={() => nav('tab:stats#recomandari')}><Lightbulb size={18} />Recomandări</button>
+      </nav>
+
+      <section>
+        <h2>Categoriile cu cele mai mari cheltuieli</h2>
+        {topCats.length ? (
+          <div className="cat-grid">
+            {topCats.map(([id, v]) => {
+              const c = catById.get(id)!
+                          const ratio = c.allocated ? v / c.allocated : 0
+              return (
+                <button key={id} type="button" className="cat-card" onClick={() => nav('history', { cat: id })}>
+                  <Ring value={c.allocated ? ratio : 1} color={ratio > 1 ? 'var(--bad)' : ratio >= 0.85 ? 'var(--warn)' : 'var(--accent)'}><Icon name={c.icon} size={20} /></Ring>
+                  <span className="cat-name">{c.name}</span>
+                  <b className="num">{fmt(v)}</b>
+                  <span className="cat-stats">
+                    <span><b className={'num' + (ratio > 1 ? ' bad' : '')}>{c.allocated ? pct(v, c.allocated) + '%' : '–'}</b>din alocat</span>
+                    <span><b className="num">{pct(v, sum.spent)}%</b>din total</span>
+                  </span>
+                </button>
+              )
+            })}
+          </div>
+        ) : <p className="empty-line">Nicio cheltuială în perioada asta.</p>}
+        <button type="button" className="link" onClick={() => nav('categories')}>Toate categoriile <ChevronRight size={15} /></button>
+      </section>
+
+      <section>
+        <h2>Cele mai mari 3 cheltuieli din perioadă</h2>
+        {top3.length ? (
+          <div className="rows">
+            {top3.map(t => {
+              const c = catById.get(t.category_id)
+              return (
+                <button key={t.id} type="button" className="row" onClick={() => openTx(t)}>
+                  <span className="row-icon"><Icon name={c?.icon || 'circle'} size={17} /></span>
+                  <span className="row-main"><b className="num">{fmt(t.amount)}</b><span className="muted small">{c?.name}{t.note ? ' · ' + t.note : ''}</span></span>
+                  <span className="row-side"><span className="muted small">{shortDayLabel(t.date)}</span><Avatar name={memberName(t.member_id)} size={24} /></span>
+                </button>
+              )
+            })}
+          </div>
+        ) : <p className="empty-line">Încă nimic de arătat.</p>}
+        <button type="button" className="link" onClick={() => nav('history', { sort: 'amount' })}>Vezi mai multe <ChevronRight size={15} /></button>
+      </section>
+    </div>
+  )
+}
