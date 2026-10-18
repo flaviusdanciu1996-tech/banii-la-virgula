@@ -169,7 +169,7 @@ export function FamilyScreen({ notify, joinCode }: { notify: (m: string) => void
     } catch (e: any) { setErr(e?.message || 'Codul nu a mers.') }
   }
   async function leave() {
-    try { await st.repo.rpc('leave_household', { h: st.householdId }); location.reload() } catch (e: any) { setErr(e?.message || 'Nu ai putut ieși.') }
+    try { await st.repo.rpc('leave_household', { h: st.householdId }); notify('Ai ieșit din familie'); await st.reload() } catch (e: any) { setErr(e?.message || 'Nu ai putut ieși.') }
   }
   const copy = async (t: string) => { try { await navigator.clipboard.writeText(t); notify('Copiat') } catch { notify('Selectează și copiază manual') } }
 
@@ -209,7 +209,7 @@ export function FamilyScreen({ notify, joinCode }: { notify: (m: string) => void
 
       <section className="card form">
         <h2>Am primit un cod</h2>
-        <p className="hint">Dacă intri în familia altcuiva, datele tale de acum (dacă ești singur în cont) se șterg și vezi datele familiei.</p>
+        <p className="hint">Dacă intri în familia altcuiva, vezi de acum datele familiei. Ce ai trecut până acum singur nu se mai vede în aplicație.</p>
         <label className="field">Cod<input id="join-code" value={code} maxLength={12} placeholder="ex. 7F3A9C21" onChange={e => setCode(e.target.value.toUpperCase())} /></label>
         <ConfirmButton armedText="Sigur intru?" onConfirm={join}>Intră în familie</ConfirmButton>
       </section>
