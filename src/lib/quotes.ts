@@ -4,6 +4,22 @@
 export interface Quote { t: string; a: string }
 
 export const QUOTES: Quote[] = [
+  { t: 'Unde îți merge atenția, acolo îți curge energia.', a: 'Tony Robbins' },
+  { t: 'Drumul spre succes e să treci la acțiune masivă și hotărâtă.', a: 'Tony Robbins' },
+  { t: 'Nu evenimentele ne formează, ci ce credem noi că înseamnă ele.', a: 'Tony Robbins' },
+  { t: 'Să-ți pui obiective e primul pas să transformi invizibilul în vizibil.', a: 'Tony Robbins' },
+  { t: 'Nu te mai teme de ce ar putea merge rău; bucură-te de ce ar putea merge bine.', a: 'Tony Robbins' },
+  { t: 'Secretul vieții este să dăruiești.', a: 'Tony Robbins' },
+  { t: 'Dacă faci ce ai făcut mereu, vei obține ce ai obținut mereu.', a: 'Tony Robbins' },
+  { t: 'Repetiția este mama măiestriei.', a: 'Tony Robbins' },
+  { t: 'Nu contează câți bani faci, ci câți bani păstrezi.', a: 'Robert Kiyosaki' },
+  { t: 'Bogații nu muncesc pentru bani.', a: 'Robert Kiyosaki, „Tată bogat, tată sărac”' },
+  { t: 'Un activ îți pune bani în buzunar. Un pasiv îți scoate bani din buzunar.', a: 'Robert Kiyosaki, „Tată bogat, tată sărac”' },
+  { t: 'Săracii și clasa de mijloc muncesc pentru bani. Bogații pun banii să muncească pentru ei.', a: 'Robert Kiyosaki, „Tată bogat, tată sărac”' },
+  { t: 'Casa ta nu este un activ.', a: 'Robert Kiyosaki, „Tată bogat, tată sărac”' },
+  { t: 'Cel mai puternic activ pe care îl avem cu toții este mintea.', a: 'Robert Kiyosaki' },
+  { t: 'Nu lăsa frica de a pierde să fie mai mare decât entuziasmul de a câștiga.', a: 'Robert Kiyosaki' },
+  { t: 'Libertatea financiară e la îndemâna celor care învață despre ea și muncesc pentru ea.', a: 'Robert Kiyosaki' },
   { t: 'Nu este sărac cel care are puțin, ci cel care își dorește mai mult.', a: 'Seneca' },
   { t: 'Ai grijă de cheltuielile mici: o spărtură mică scufundă o corabie mare.', a: 'Benjamin Franklin' },
   { t: 'Bani albi pentru zile negre.', a: 'Proverb românesc' },
