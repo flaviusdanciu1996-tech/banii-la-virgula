@@ -21,7 +21,7 @@ export function AccountScreen({ nav, onLogout }: { nav: Nav; onLogout: () => voi
     : s === 1 ? 'Ai trecut cheltuieli azi sau ieri. Mâine continui seria.'
     : 'Trece o cheltuială azi ca să pornești o serie de zile.'
   const rows: [string, typeof Users, string][] = [
-    ['familie', Users, 'Familia mea'], ['finante', Wallet, 'Finanțe'], ['recurente', Repeat, 'Plăți recurente'], ['notificari', Bell, 'Memento zilnic'], ['aspect', Palette, 'Aspect'],
+    ['familie', Users, 'Familia mea'], ['finante', Wallet, 'Finanțe'], ['recurente', Repeat, 'Plăți recurente'], ['notificari', Bell, 'Notificări și citate'], ['aspect', Palette, 'Aspect'],
     ['setari', UserCog, 'Setări cont'], ['despre', Info, 'Despre aplicație'],
   ]
   return (

@@ -23,7 +23,7 @@ type Theme = 'system' | 'light' | 'dark'
 
 const SUB_TITLES: Record<string, string> = {
   history: 'Istoric', categories: 'Pe categorii', finante: 'Finanțe', familie: 'Familia mea',
-  aspect: 'Aspect', setari: 'Setări cont', despre: 'Despre aplicație', recurente: 'Plăți recurente', notificari: 'Memento zilnic',
+  aspect: 'Aspect', setari: 'Setări cont', despre: 'Despre aplicație', recurente: 'Plăți recurente', notificari: 'Notificări și citate',
 }
 
 function readTheme(): Theme {

@@ -4,6 +4,8 @@ import { useStore } from '../store.tsx'
 import { Ring, Bar, Seg, CountUp, EmptyArt } from '../ui.tsx'
 import { TxRow, catColor } from '../helpers.tsx'
 import { upcomingList, UpcomingRows, GoalsSection } from './Plans.tsx'
+import { useMyQuotes, asQuotes } from './Reminder.tsx'
+import { quoteFor } from '../lib/quotes.ts'
 import { Icon } from '../icons.tsx'
 import { fmt, fmtNum, fmtSigned, pct } from '../lib/money.ts'
 import { periodLabel, shortDayLabel, todayIso, type Period } from '../lib/period.ts'
@@ -34,6 +36,8 @@ export function HomeScreen({ nav, period, setPeriod, scope, setScope, openTx, op
     return out
   }, [st.txs, st.user.id])
   const upcoming = upcomingList(st.recurring, today, 10)
+  const [mine] = useMyQuotes()
+  const quote = quoteFor(today, asQuotes(mine))
 
   const nw = netWorth(st.assets, st.rates)
   const monthAgo = snapshotAt(st.snapshots, new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10))
@@ -54,6 +58,12 @@ export function HomeScreen({ nav, period, setPeriod, scope, setScope, openTx, op
           <p className="muted">Iată situația ta financiară</p>
         </div>
       </header>
+
+      <button type="button" className="quote-card" onClick={() => nav('notificari')}>
+        <span className="quote-eyebrow">✨ Doza zilei</span>
+        <span className="quote-text">„{quote.t}”</span>
+        <span className="quote-author">— {quote.a}</span>
+      </button>
 
       {st.members.length > 1 && (
         <Seg label="Ce vezi" value={scope} onChange={setScope} options={[{ id: 'all', label: 'Familie' }, { id: 'me', label: 'Personal' }]} />

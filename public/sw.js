@@ -8,7 +8,7 @@ self.addEventListener('push', e => {
   try { d = e.data ? e.data.json() : {} } catch { d = { body: e.data && e.data.text() } }
   e.waitUntil(self.registration.showNotification(d.title || 'Banii la virgulă', {
     body: d.body || 'Ai trecut cheltuielile de azi?',
-    icon: 'icon-192.png', badge: 'icon-192.png', tag: 'daily-reminder', data: { url: d.url || './' },
+    icon: 'icon-192.png', badge: 'icon-192.png', tag: d.tag || 'daily-reminder', data: { url: d.url || './' },
   }))
 })
 

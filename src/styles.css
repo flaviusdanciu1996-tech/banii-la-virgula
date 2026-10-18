@@ -380,3 +380,10 @@ section > h2.grp-h::before { display: none; }
 .switch input:checked::after { transform: translateX(20px); }
 .cur-row { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-top: -6px; }
 .chip[aria-pressed="true"] svg { color: inherit !important; }
+
+/* Quote of the day */
+.quote-card { display: flex; flex-direction: column; gap: 6px; text-align: left; border: 1px solid color-mix(in srgb, var(--g-optional) 30%, var(--line)); border-radius: 20px; padding: 14px 16px;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--g-optional) 16%, var(--surface)), color-mix(in srgb, #C792FF 12%, var(--surface))); box-shadow: var(--shadow); color: var(--ink); }
+.quote-eyebrow { font-size: 11.5px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--g-optional); }
+.quote-text { font-size: 16px; line-height: 1.4; font-weight: 500; font-style: italic; text-wrap: pretty; }
+.quote-author { font-size: 12.5px; color: var(--muted); }
