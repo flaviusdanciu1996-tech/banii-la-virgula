@@ -1,23 +1,39 @@
 import { useMemo } from 'react'
 import { History, LayoutGrid, ArrowLeftRight, Lightbulb, ChevronRight, ChevronLeft, Plus, Minus } from 'lucide-react'
 import { useStore } from '../store.tsx'
-import { Ring, Bar, Avatar, Seg } from '../ui.tsx'
+import { Ring, Bar, Seg, CountUp, EmptyArt } from '../ui.tsx'
+import { TxRow, catColor } from '../helpers.tsx'
+import { upcomingList, UpcomingRows, GoalsSection } from './Plans.tsx'
 import { Icon } from '../icons.tsx'
 import { fmt, fmtNum, fmtSigned, pct } from '../lib/money.ts'
 import { periodLabel, shortDayLabel, todayIso, type Period } from '../lib/period.ts'
 import { summarize, netWorth, snapshotAt } from '../lib/calc.ts'
-import type { Tx } from '../lib/types.ts'
+import type { Tx, Recurring, Goal } from '../lib/types.ts'
+import { CUR_LABEL } from '../lib/money.ts'
 import type { Nav } from '../App.tsx'
 
-export function HomeScreen({ nav, period, setPeriod, scope, setScope, openTx }: {
-  nav: Nav; period: Period; setPeriod: (n: number) => void; scope: 'all' | 'me'; setScope: (s: 'all' | 'me') => void; openTx: (t?: Tx, kind?: 'in' | 'out') => void
+export function HomeScreen({ nav, period, setPeriod, scope, setScope, openTx, openRecurring, openGoal }: {
+  nav: Nav; period: Period; setPeriod: (n: number) => void; scope: 'all' | 'me'; setScope: (s: 'all' | 'me') => void
+  openTx: (t?: Tx, kind?: 'in' | 'out', template?: Partial<Tx>) => void; openRecurring: (r?: Recurring) => void; openGoal: (g?: Goal, add?: boolean) => void
 }) {
   const st = useStore()
   const today = todayIso()
   const txs = useMemo(() => (scope === 'me' ? st.txs.filter(t => t.member_id === st.user.id) : st.txs), [st.txs, scope, st.user.id])
   const sum = useMemo(() => summarize(txs, st.categories, st.settings, period, today), [txs, st.categories, st.settings, period, today])
   const catById = useMemo(() => new Map(st.categories.map(c => [c.id, c])), [st.categories])
-  const memberName = (id: string) => st.members.find(m => m.user_id === id)?.display_name || '?'
+
+  // Quick add: the last few distinct entries (same category + amount + note) as one-tap templates.
+  const templates = useMemo(() => {
+    const seen = new Set<string>(), out: Tx[] = []
+    for (const t of [...st.txs].filter(t => t.member_id === st.user.id && !t.recurring_id).sort((a, b) => b.created_at.localeCompare(a.created_at))) {
+      const k = `${t.kind}|${t.category_id}|${t.orig_currency || 'RON'}|${t.orig_amount ?? t.amount}`
+      if (seen.has(k)) continue
+      seen.add(k); out.push(t)
+      if (out.length >= 6) break
+    }
+    return out
+  }, [st.txs, st.user.id])
+  const upcoming = upcomingList(st.recurring, today, 10)
 
   const nw = netWorth(st.assets, st.rates)
   const monthAgo = snapshotAt(st.snapshots, new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10))
@@ -52,7 +68,7 @@ export function HomeScreen({ nav, period, setPeriod, scope, setScope, openTx }: 
       <section className="card budget">
         <div className="eyebrow">Mai ai din buget</div>
         {sum.totalBudget > 0 ? <>
-          <div className={'big num' + (over ? ' neg' : '')}>{fmt(sum.left)}</div>
+          <div className={'big' + (over ? ' neg' : '')}><CountUp v={sum.left} /></div>
           <div className="muted">{over ? `Ai depășit bugetul cu ${fmt(-sum.left)}` : `din ${fmt(sum.totalBudget)}`}</div>
           <div className="consum">
             <div className="consum-head"><span>Consum</span><b className="num">{sum.spentPct}%</b></div>
@@ -86,12 +102,37 @@ export function HomeScreen({ nav, period, setPeriod, scope, setScope, openTx }: 
         <button type="button" className="add in" onClick={() => openTx(undefined, 'in')}><Plus size={18} />Venit</button>
       </div>
 
+      {templates.length > 0 && (
+        <div className="quick-add" aria-label="Adaugă rapid din ultimele intrări">
+          {templates.map(t => {
+            const c = catById.get(t.category_id)
+            const foreign = t.orig_currency && t.orig_currency !== 'RON' && t.orig_amount
+            return (
+              <button key={t.id} type="button" className="qa" onClick={() => openTx(undefined, t.kind, { kind: t.kind, category_id: t.category_id, amount: t.amount, note: t.note, orig_amount: t.orig_amount, orig_currency: t.orig_currency })}>
+                <span className="cat-icon" style={{ width: 30, height: 30, ['--c' as any]: catColor(c) }}><Icon name={c?.icon || 'circle'} size={15} /></span>
+                <span><b className="num small">{t.kind === 'in' ? '+' : ''}{foreign ? `${fmtNum(t.orig_amount!)} ${CUR_LABEL[t.orig_currency!]}` : fmtNum(t.amount)}</b><small>{t.note || c?.name}</small></span>
+              </button>
+            )
+          })}
+        </div>
+      )}
+
       <nav className="quick" aria-label="Scurtături">
         <button type="button" onClick={() => nav('history')}><History size={18} />Istoric</button>
         <button type="button" onClick={() => nav('categories')}><LayoutGrid size={18} />Pe categorii</button>
         <button type="button" onClick={() => nav('tab:stats#compara')}><ArrowLeftRight size={18} />Compară</button>
         <button type="button" onClick={() => nav('tab:stats#recomandari')}><Lightbulb size={18} />Recomandări</button>
       </nav>
+
+      {upcoming.length > 0 && (
+        <section>
+          <h2>Plăți care urmează</h2>
+          <UpcomingRows items={upcoming} onOpen={openRecurring} limit={4} />
+          <button type="button" className="link" onClick={() => nav('recurente')}>Toate plățile recurente <ChevronRight size={15} /></button>
+        </section>
+      )}
+
+      <GoalsSection openGoal={openGoal} compact nav={nav} />
 
       <section>
         <h2>Categoriile cu cele mai mari cheltuieli</h2>
@@ -101,8 +142,8 @@ export function HomeScreen({ nav, period, setPeriod, scope, setScope, openTx }: 
               const c = catById.get(id)!
                           const ratio = c.allocated ? v / c.allocated : 0
               return (
-                <button key={id} type="button" className="cat-card" onClick={() => nav('history', { cat: id })}>
-                  <Ring value={c.allocated ? ratio : 1} color={ratio > 1 ? 'var(--bad)' : ratio >= 0.85 ? 'var(--warn)' : 'var(--accent)'}><Icon name={c.icon} size={20} /></Ring>
+                <button key={id} type="button" className="cat-card" style={{ ['--c' as any]: catColor(c) }} onClick={() => nav('history', { cat: id })}>
+                  <Ring value={c.allocated ? ratio : 1} color={ratio > 1 ? 'var(--bad)' : catColor(c)}><Icon name={c.icon} size={20} color={catColor(c)} /></Ring>
                   <span className="cat-name">{c.name}</span>
                   <b className="num">{fmt(v)}</b>
                   <span className="cat-stats">
@@ -113,25 +154,14 @@ export function HomeScreen({ nav, period, setPeriod, scope, setScope, openTx }: 
               )
             })}
           </div>
-        ) : <p className="empty-line">Nicio cheltuială în perioada asta.</p>}
-        <button type="button" className="link" onClick={() => nav('categories')}>Toate categoriile <ChevronRight size={15} /></button>
+        ) : <EmptyArt icon="pie-chart" title="Încă nu ai cheltuieli" text="Apasă „Cheltuială” și trece primul ban. Aici vezi pe ce se duc banii, pe categorii." />}
+        {topCats.length > 0 && <button type="button" className="link" onClick={() => nav('categories')}>Toate categoriile <ChevronRight size={15} /></button>}
       </section>
 
       <section>
         <h2>Cele mai mari 3 cheltuieli din perioadă</h2>
         {top3.length ? (
-          <div className="rows">
-            {top3.map(t => {
-              const c = catById.get(t.category_id)
-              return (
-                <button key={t.id} type="button" className="row" onClick={() => openTx(t)}>
-                  <span className="row-icon"><Icon name={c?.icon || 'circle'} size={17} /></span>
-                  <span className="row-main"><b className="num">{fmt(t.amount)}</b><span className="muted small">{c?.name}{t.note ? ' · ' + t.note : ''}</span></span>
-                  <span className="row-side"><span className="muted small">{shortDayLabel(t.date)}</span><Avatar name={memberName(t.member_id)} size={24} /></span>
-                </button>
-              )
-            })}
-          </div>
+          <div className="rows">{top3.map(t => <TxRow key={t.id} t={t} onOpen={openTx} />)}</div>
         ) : <p className="empty-line">Încă nimic de arătat.</p>}
         <button type="button" className="link" onClick={() => nav('history', { sort: 'amount' })}>Vezi mai multe <ChevronRight size={15} /></button>
       </section>

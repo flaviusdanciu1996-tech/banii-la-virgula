@@ -229,7 +229,7 @@ export function AspectScreen({ theme, setTheme }: { theme: 'system' | 'light' | 
     <div className="screen">
       <section className="card form">
         <h2>Temă</h2>
-        <Seg label="Temă" value={theme} onChange={setTheme} options={[{ id: 'light', label: 'Luminos' }, { id: 'dark', label: 'Întunecat' }, { id: 'system', label: 'Ca sistemul' }]} />
+        <Seg label="Temă" value={theme} onChange={setTheme} options={[{ id: 'dark', label: 'Nocturn' }, { id: 'light', label: 'Luminos' }, { id: 'system', label: 'Ca sistemul' }]} />
       </section>
     </div>
   )

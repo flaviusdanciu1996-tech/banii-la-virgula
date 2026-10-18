@@ -90,3 +90,23 @@ test('streak and points', () => {
   const week = Array.from({ length: 7 }, (_, i) => tx('w' + i, 'out', 1, 'food', `2026-10-0${i + 1}`))
   assert.equal(points(week, 'u1'), 7 + 10)
 })
+
+import { occurrences, nextOccurrence, duePostings, monthlyNeeded } from './schedule.ts'
+
+test('recurring dates', () => {
+  assert.deepEqual(occurrences(31, '2026-01-15', '2026-04-30'), ['2026-01-31', '2026-02-28', '2026-03-31', '2026-04-30'])
+  assert.deepEqual(occurrences(5, '2026-10-06', '2026-10-31'), [])
+  assert.equal(nextOccurrence(15, '2026-10-18'), '2026-11-15')
+  assert.equal(nextOccurrence(20, '2026-10-18'), '2026-10-20')
+  assert.equal(nextOccurrence(31, '2026-02-10'), '2026-02-28')
+  assert.deepEqual(duePostings(10, '2026-08-01', '2026-09-10', '2026-10-18'), ['2026-10-10'])
+  assert.deepEqual(duePostings(10, '2026-10-18', null, '2026-10-18'), [])
+  assert.deepEqual(duePostings(18, '2026-10-18', null, '2026-10-18'), ['2026-10-18'])
+})
+
+test('goal maths', () => {
+  assert.equal(monthlyNeeded(5000000, 1000000, '2026-10-18', '2028-10-18'), Math.ceil(4000000 / 24))
+  assert.equal(monthlyNeeded(100000, 100000, '2026-10-18', '2027-01-01'), 0)
+  assert.equal(monthlyNeeded(100000, 0, '2026-10-18', null), null)
+  assert.equal(monthlyNeeded(100000, 0, '2026-10-18', '2026-10-01'), 100000)
+})

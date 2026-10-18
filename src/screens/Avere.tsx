@@ -1,14 +1,16 @@
 import { useMemo } from 'react'
 import { Plus, RefreshCw } from 'lucide-react'
 import { useStore } from '../store.tsx'
-import { Donut, LineChart } from '../ui.tsx'
+import { Donut, LineChart, CatIcon } from '../ui.tsx'
 import { Icon } from '../icons.tsx'
 import { fmt, fmtNum, fmtSigned, toRon, CUR_LABEL } from '../lib/money.ts'
 import { todayIso, diffDays, MONTHS_SHORT } from '../lib/period.ts'
 import { netWorth, snapshotAt, monthlySeries } from '../lib/calc.ts'
-import { SECTIONS, kindOf, type Asset, type AssetSection } from '../lib/types.ts'
+import { SECTIONS, kindOf, type Asset, type AssetSection, type Goal } from '../lib/types.ts'
+import { GoalsSection } from './Plans.tsx'
+import { CountUp, EmptyArt } from '../ui.tsx'
 
-export function AvereScreen({ scope, openAsset }: { scope: 'all' | 'me'; openAsset: (a?: Asset, section?: AssetSection, quick?: boolean) => void }) {
+export function AvereScreen({ scope, openAsset, openGoal }: { scope: 'all' | 'me'; openAsset: (a?: Asset, section?: AssetSection, quick?: boolean) => void; openGoal: (g?: Goal, add?: boolean) => void }) {
   const st = useStore()
   const today = todayIso()
   const assets = useMemo(() => st.assets.filter(a => !a.archived && (scope === 'all' || a.owner_id === st.user.id)), [st.assets, scope, st.user.id])
@@ -28,7 +30,7 @@ export function AvereScreen({ scope, openAsset }: { scope: 'all' | 'me'; openAss
 
       <section className="card budget">
         <div className="eyebrow">Averea netă</div>
-        <div className={'big num' + (nw.net < 0 ? ' neg' : '')}>{fmt(nw.net)}</div>
+        <div className={'big' + (nw.net < 0 ? ' neg' : '')}><CountUp v={nw.net} /></div>
         {monthAgo && <div className={'num small ' + (nw.net - monthAgo.net >= 0 ? 'in' : 'bad')}>{fmtSigned(nw.net - monthAgo.net)} față de acum o lună</div>}
         <div className="nw-split">
           <Donut parts={parts} size={112} />
@@ -42,12 +44,12 @@ export function AvereScreen({ scope, openAsset }: { scope: 'all' | 'me'; openAss
         <p className="note">Curs {st.settings.rates_date ? `din ${st.settings.rates_date.split('-').reverse().join('.')}` : 'manual'}: 1 € = {String(st.rates.EUR).replace('.', ',')} lei · 1 $ = {String(st.rates.USD).replace('.', ',')} lei</p>
       </section>
 
+      <GoalsSection openGoal={openGoal} />
+
       {assets.length === 0 ? (
-        <div className="empty">
-          <b>Adaugă primul lucru pe care îl ai</b>
-          <p>Un cont (Revolut, banca), o investiție (Tradeville, Binance), mașina sau o datorie. Le aduni pe toate și vezi cât valorezi de fapt.</p>
+        <EmptyArt icon="gem" title="Adaugă primul lucru pe care îl ai" text="Un cont (Revolut, banca), o investiție (Tradeville, Binance), mașina sau o datorie. Le aduni pe toate și vezi cât valorezi de fapt.">
           <button type="button" className="primary" onClick={() => openAsset()}><Plus size={17} /> Adaugă</button>
-        </div>
+        </EmptyArt>
       ) : <>
         <section className="card">
           <h2>Evoluția averii</h2>
@@ -89,7 +91,7 @@ function AssetRow({ a, today, onOpen, onQuick }: { a: Asset; today: string; onOp
   return (
     <div className="row asset-row">
       <button type="button" className="asset-main" onClick={onOpen}>
-        <span className="row-icon"><Icon name={k.icon} size={17} /></span>
+        <CatIcon icon={k.icon} color={SECTIONS.find(x => x.id === k.section)!.color} />
         <span className="row-main">
           <b>{a.name}</b>
           <span className="muted small">{[a.platform, k.name].filter(Boolean).join(' · ')}</span>

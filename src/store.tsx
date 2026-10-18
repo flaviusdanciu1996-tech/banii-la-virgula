@@ -1,6 +1,8 @@
 import { createContext, useContext, useEffect, useMemo, useState, useCallback, type ReactNode } from 'react'
 import type { Repo } from './db.ts'
-import type { Category, Tx, Settings, Asset, Snapshot, Member, Invite } from './lib/types.ts'
+import type { Category, Tx, Settings, Asset, Snapshot, Member, Invite, Recurring, Goal } from './lib/types.ts'
+import { duePostings } from './lib/schedule.ts'
+import type { Currency } from './lib/money.ts'
 import { netWorth } from './lib/calc.ts'
 import { todayIso } from './lib/period.ts'
 
@@ -18,6 +20,8 @@ interface State {
   settings: Settings
   members: Member[]
   invites: Invite[]
+  recurring: Recurring[]
+  goals: Goal[]
 }
 
 const DEFAULT_SETTINGS: Settings = { household_id: '', payday: 1, total_budget: null, savings_target_pct: 20, eur_rate: 4.97, usd_rate: 4.3, rates_date: null }
@@ -37,6 +41,11 @@ export interface Store extends State {
   removeMember(userId: string): Promise<void>
   renameMe(name: string): Promise<void>
   refreshRates(force?: boolean): Promise<void>
+  saveRecurring(r: Partial<Recurring>): Promise<void>
+  deleteRecurring(id: string): Promise<void>
+  saveGoal(g: Partial<Goal>): Promise<void>
+  deleteGoal(id: string): Promise<void>
+  toRonNow(minor: number, cur: Currency): number
 }
 
 const Ctx = createContext<Store | null>(null)
@@ -47,26 +56,29 @@ const num = (v: unknown) => (typeof v === 'string' ? Number(v) : (v as number))
 export function StoreProvider({ repo, user, children }: { repo: Repo; user: User; children: ReactNode }) {
   const [s, setS] = useState<State>({
     ready: false, error: null, householdId: '', user, categories: [], txs: [], assets: [], snapshots: [],
-    settings: DEFAULT_SETTINGS, members: [], invites: [],
+    settings: DEFAULT_SETTINGS, members: [], invites: [], recurring: [], goals: [],
   })
 
   const reload = useCallback(async () => {
     try {
       const h = await repo.rpc<string>('ensure_household', { p_name: user.name })
-      const [categories, txs, assets, snapshots, settingsRows, members, invites] = await Promise.all([
+      const [categories, txs, assets, snapshots, settingsRows, members, invites, recurring, goals] = await Promise.all([
         repo.list<Category>('categories', h), repo.list<Tx>('transactions', h), repo.list<Asset>('assets', h),
         repo.list<Snapshot>('snapshots', h), repo.list<Settings>('settings', h), repo.list<Member>('members', h),
-        repo.list<Invite>('invites', h),
+        repo.list<Invite>('invites', h), repo.list<Recurring>('recurring', h).catch(() => []), repo.list<Goal>('goals', h).catch(() => []),
       ])
       const st = settingsRows[0] ? { ...settingsRows[0], eur_rate: num(settingsRows[0].eur_rate), usd_rate: num(settingsRows[0].usd_rate) } : { ...DEFAULT_SETTINGS, household_id: h }
       setS(p => ({
         ...p, ready: true, error: null, householdId: h, settings: st,
         categories: categories.map(c => ({ ...c, allocated: num(c.allocated) })).sort((a, b) => a.sort - b.sort),
-        txs: txs.map(t => ({ ...t, amount: num(t.amount) })),
+        txs: txs.map(t => ({ ...t, amount: num(t.amount), orig_amount: t.orig_amount == null ? null : num(t.orig_amount) })),
+        recurring: recurring.map(r => ({ ...r, amount: num(r.amount) })),
+        goals: goals.map(g => ({ ...g, target: num(g.target), saved: num(g.saved) })),
         assets: assets.map(a => ({ ...a, value: num(a.value), invested: num(a.invested) })),
         snapshots: snapshots.map(x => ({ ...x, liquid: num(x.liquid), invest: num(x.invest), goods: num(x.goods), debts: num(x.debts), net: num(x.net) })),
         members, invites,
       }))
+      setRecurringRan(false)
     } catch (e: any) {
       setS(p => ({ ...p, ready: true, error: e?.message || 'Nu s-au putut încărca datele.' }))
     }
@@ -74,6 +86,7 @@ export function StoreProvider({ repo, user, children }: { repo: Repo; user: User
 
   useEffect(() => { reload() }, [reload])
 
+  const [recurringRan, setRecurringRan] = useState(false)
   const rates = useMemo(() => ({ EUR: s.settings.eur_rate || 4.97, USD: s.settings.usd_rate || 4.3 }), [s.settings])
 
   // Keep one net-worth snapshot per day, written only when today's totals change.
@@ -145,6 +158,31 @@ export function StoreProvider({ repo, user, children }: { repo: Repo; user: User
       const saved = await repo.update<Member>('members', { household_id: s.householdId, user_id: user.id }, { display_name: name })
       setS(p => ({ ...p, members: p.members.map(m => (m.user_id === user.id ? saved : m)) }))
     },
+    toRonNow(minor, cur) {
+      if (cur === 'RON') return minor
+      return Math.round(minor * (cur === 'EUR' ? rates.EUR : rates.USD))
+    },
+    async saveRecurring(r) {
+      const row = { ...r, household_id: s.householdId }
+      const saved = r.id ? await repo.update<Recurring>('recurring', { id: r.id }, row) : await repo.insert<Recurring>('recurring', { member_id: user.id, ...row })
+      saved.amount = num(saved.amount)
+      setS(p => ({ ...p, recurring: [...p.recurring.filter(x => x.id !== saved.id), saved] }))
+      setRecurringRan(false)
+    },
+    async deleteRecurring(id) {
+      await repo.remove('recurring', { id })
+      setS(p => ({ ...p, recurring: p.recurring.filter(x => x.id !== id) }))
+    },
+    async saveGoal(g) {
+      const row = { ...g, household_id: s.householdId }
+      const saved = g.id ? await repo.update<Goal>('goals', { id: g.id }, row) : await repo.insert<Goal>('goals', row)
+      saved.target = num(saved.target); saved.saved = num(saved.saved)
+      setS(p => ({ ...p, goals: [...p.goals.filter(x => x.id !== saved.id), saved] }))
+    },
+    async deleteGoal(id) {
+      await repo.remove('goals', { id })
+      setS(p => ({ ...p, goals: p.goals.filter(x => x.id !== id) }))
+    },
     async refreshRates(force = false) {
       const today = todayIso()
       if (!force && s.settings.rates_date === today) return
@@ -168,6 +206,38 @@ export function StoreProvider({ repo, user, children }: { repo: Repo; user: User
     if (s.ready && !s.error && s.householdId) store.refreshRates().catch(() => {})
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [s.ready, s.householdId])
+
+  // Post automatic recurring entries that fell due since the last run (idempotent: one per item per date).
+  useEffect(() => {
+    if (!s.ready || s.error || !s.householdId || recurringRan) return
+    setRecurringRan(true)
+    ;(async () => {
+      const today = todayIso()
+      for (const r of s.recurring) {
+        if (!r.active || !r.auto) continue
+        const dates = duePostings(r.day, r.start_date, r.last_run, today)
+        if (!dates.length) continue
+        for (const date of dates) {
+          if (s.txs.some(t => t.recurring_id === r.id && t.date === date)) continue
+          const ron = store.toRonNow(r.amount, r.currency)
+          try {
+            const t = await repo.insert<Tx>('transactions', {
+              household_id: s.householdId, member_id: r.member_id, kind: r.kind, amount: ron, category_id: r.category_id,
+              note: r.name, date, recurring_id: r.id, asset_id: null,
+              ...(r.currency !== 'RON' ? { orig_amount: r.amount, orig_currency: r.currency } : {}),
+            } as Partial<Tx>)
+            t.amount = num(t.amount)
+            setS(p => ({ ...p, txs: [...p.txs.filter(x => x.id !== t.id), t] }))
+          } catch { /* already posted by another device */ }
+        }
+        try {
+          const u = await repo.update<Recurring>('recurring', { id: r.id }, { last_run: today })
+          setS(p => ({ ...p, recurring: p.recurring.map(x => (x.id === r.id ? { ...x, last_run: u.last_run } : x)) }))
+        } catch { /* retry next open */ }
+      }
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [s.ready, s.householdId, recurringRan])
 
   return <Ctx.Provider value={store}>{children}</Ctx.Provider>
 }

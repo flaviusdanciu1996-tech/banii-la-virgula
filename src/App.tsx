@@ -3,7 +3,7 @@ import { Home, PieChart, ReceiptText, Gem, User, ChevronLeft, Download, X } from
 import { supabase, supabaseRepo, demoRepo, DEMO, type Repo } from './db.ts'
 import { StoreProvider, useStore, type User as AppUser } from './store.tsx'
 import { demoSeed, DEMO_USER } from './demo.ts'
-import { useToast } from './ui.tsx'
+import { useToast, Confetti } from './ui.tsx'
 import { TxSheet, CategorySheet, AssetSheet } from './sheets.tsx'
 import { HomeScreen } from './screens/Home.tsx'
 import { ExpensesTab, HistoryScreen, CategoriesScreen } from './screens/Expenses.tsx'
@@ -11,8 +11,10 @@ import { StatsScreen } from './screens/Stats.tsx'
 import { AvereScreen } from './screens/Avere.tsx'
 import { AccountScreen, FinanteScreen, FamilyScreen, AspectScreen, AccountSettingsScreen, AboutScreen } from './screens/Account.tsx'
 import { AuthScreen, NewPasswordScreen } from './screens/Auth.tsx'
+import { RecurringScreen, RecurringSheet, GoalSheet } from './screens/Plans.tsx'
+import { summarize, recordDays, streak } from './lib/calc.ts'
 import { periodFor, shiftPeriod, todayIso, type Period } from './lib/period.ts'
-import type { Tx, Category, Asset, AssetSection, Kind } from './lib/types.ts'
+import type { Tx, Category, Asset, AssetSection, Kind, Recurring, Goal } from './lib/types.ts'
 
 export type Nav = (route: string, params?: Record<string, string>) => void
 type Tab = 'home' | 'stats' | 'exp' | 'avere' | 'cont'
@@ -20,11 +22,11 @@ type Theme = 'system' | 'light' | 'dark'
 
 const SUB_TITLES: Record<string, string> = {
   history: 'Istoric', categories: 'Pe categorii', finante: 'Finanțe', familie: 'Familia mea',
-  aspect: 'Aspect', setari: 'Setări cont', despre: 'Despre aplicație',
+  aspect: 'Aspect', setari: 'Setări cont', despre: 'Despre aplicație', recurente: 'Plăți recurente', notificari: 'Memento zilnic',
 }
 
 function readTheme(): Theme {
-  try { return (localStorage.getItem('theme') as Theme) || 'system' } catch { return 'system' }
+  try { return (localStorage.getItem('theme') as Theme) || 'dark' } catch { return 'dark' }
 }
 
 export default function App() {
@@ -72,7 +74,11 @@ function Shell({ theme, setTheme }: { theme: Theme; setTheme: (t: Theme) => void
   const [anchor, setAnchor] = useState<string | undefined>()
   const [scope, setScope] = useState<'all' | 'me'>('all')
   const [offset, setOffset] = useState(0)
-  const [txSheet, setTxSheet] = useState<{ tx?: Tx; kind?: Kind } | null>(null)
+  const [txSheet, setTxSheet] = useState<{ tx?: Tx; kind?: Kind; template?: Partial<Tx> } | null>(null)
+  const [recSheet, setRecSheet] = useState<{ r?: Recurring } | null>(null)
+  const [goalSheet, setGoalSheet] = useState<{ g?: Goal; add?: boolean } | null>(null)
+  const [party, setParty] = useState<string | null>(null)
+  const celebrate = useCallback((m: string) => setParty(m), [])
   const [catSheet, setCatSheet] = useState<{ cat?: Category; kind?: Kind } | null>(null)
   const [assetSheet, setAssetSheet] = useState<{ a?: Asset; section?: AssetSection; quick?: boolean } | null>(null)
   const [joinCode, setJoinCode] = useState<string | undefined>()
@@ -84,12 +90,12 @@ function Shell({ theme, setTheme }: { theme: Theme; setTheme: (t: Theme) => void
   useEffect(() => {
     const onPop = () => {
       if (skipPop.current) { skipPop.current = false; return }
-      if (txSheet || catSheet || assetSheet) { setTxSheet(null); setCatSheet(null); setAssetSheet(null); return }
+      if (txSheet || catSheet || assetSheet || recSheet || goalSheet) { setTxSheet(null); setCatSheet(null); setAssetSheet(null); setRecSheet(null); setGoalSheet(null); return }
       setSub(null)
     }
     window.addEventListener('popstate', onPop)
     return () => window.removeEventListener('popstate', onPop)
-  }, [txSheet, catSheet, assetSheet])
+  }, [txSheet, catSheet, assetSheet, recSheet, goalSheet])
   const pushState = () => { try { history.pushState({ x: 1 }, '') } catch { /* ignore */ } }
 
   // Invite links: …#join-CODE
@@ -109,7 +115,33 @@ function Shell({ theme, setTheme }: { theme: Theme; setTheme: (t: Theme) => void
     setSub({ id: route, params })
   }, [])
 
-  const openTx = (tx?: Tx, kind?: Kind) => { pushState(); setTxSheet({ tx, kind }) }
+  const openTx = (tx?: Tx, kind?: Kind, template?: Partial<Tx>) => { pushState(); setTxSheet({ tx, kind, template }) }
+  const openRecurring = (r?: Recurring) => { pushState(); setRecSheet({ r }) }
+  const openGoal = (g?: Goal, add?: boolean) => { pushState(); setGoalSheet({ g, add }) }
+
+  // Celebrate a finished period that ended under budget (once per period).
+  useEffect(() => {
+    if (!st.ready || st.error) return
+    const prev = shiftPeriod(periodFor(todayIso(), st.settings.payday), -1, st.settings.payday)
+    const sum = summarize(st.txs, st.categories, st.settings, prev, todayIso())
+    if (sum.totalBudget > 0 && sum.txs.length > 3 && sum.spent <= sum.totalBudget) {
+      const key = 'celebrated-' + prev.start
+      try { if (!localStorage.getItem(key)) { localStorage.setItem(key, '1'); setParty('Ai încheiat luna trecută sub buget! 🎉') } } catch { /* ignore */ }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [st.ready])
+
+  // Celebrate every 7 days in a row of recorded entries.
+  const afterSave = () => {
+    const days = recordDays(st.txs, st.user.id)
+    const today = todayIso()
+    if (!days.includes(today)) days.push(today)
+    const n = streak(days, today)
+    if (n > 0 && n % 7 === 0) {
+      const key = 'streak-party-' + today
+      try { if (!localStorage.getItem(key)) { localStorage.setItem(key, '1'); setParty(`${n} zile la rând! 🔥 +10 puncte`) } } catch { /* ignore */ }
+    }
+  }
   const openCategory = (cat?: Category, kind?: Kind) => { pushState(); setCatSheet({ cat, kind }) }
   const openAsset = (a?: Asset, section?: AssetSection, quick?: boolean) => { pushState(); setAssetSheet({ a, section, quick }) }
   const closeSheet = (fn: () => void) => () => { fn(); try { if (history.state?.x) { skipPop.current = true; history.back() } } catch { /* ignore */ } }
@@ -141,6 +173,7 @@ function Shell({ theme, setTheme }: { theme: Theme; setTheme: (t: Theme) => void
       case 'familie': inner = <FamilyScreen notify={notify} joinCode={joinCode} />; break
       case 'aspect': inner = <AspectScreen theme={theme} setTheme={setTheme} />; break
       case 'setari': inner = <AccountSettingsScreen notify={notify} />; break
+      case 'recurente': inner = <RecurringScreen openRecurring={openRecurring} />; break
       default: inner = <AboutScreen />
     }
     body = (
@@ -154,10 +187,10 @@ function Shell({ theme, setTheme }: { theme: Theme; setTheme: (t: Theme) => void
       </>
     )
   } else {
-    body = tab === 'home' ? <HomeScreen nav={nav} period={period} setPeriod={n => setOffset(o => o + n)} scope={scope} setScope={setScope} openTx={openTx} />
+    body = tab === 'home' ? <HomeScreen nav={nav} period={period} setPeriod={n => setOffset(o => o + n)} scope={scope} setScope={setScope} openTx={openTx} openRecurring={openRecurring} openGoal={openGoal} />
       : tab === 'stats' ? <StatsScreen period={period} anchor={anchor} />
       : tab === 'exp' ? <ExpensesTab nav={nav} openTx={openTx} />
-      : tab === 'avere' ? <AvereScreen scope={scope} openAsset={openAsset} />
+      : tab === 'avere' ? <AvereScreen scope={scope} openAsset={openAsset} openGoal={openGoal} />
       : <AccountScreen nav={nav} onLogout={logout} />
   }
 
@@ -178,7 +211,10 @@ function Shell({ theme, setTheme }: { theme: Theme; setTheme: (t: Theme) => void
           </button>
         ))}
       </nav>
-      {txSheet && <TxSheet tx={txSheet.tx} kind={txSheet.kind} notify={notify} onClose={closeSheet(() => setTxSheet(null))} />}
+      {txSheet && <TxSheet tx={txSheet.tx} kind={txSheet.kind} template={txSheet.template} notify={notify} onSaved={afterSave} onClose={closeSheet(() => setTxSheet(null))} />}
+      {recSheet && <RecurringSheet rec={recSheet.r} notify={notify} onClose={closeSheet(() => setRecSheet(null))} />}
+      {goalSheet && <GoalSheet goal={goalSheet.g} addMode={goalSheet.add} notify={notify} celebrate={celebrate} onClose={closeSheet(() => setGoalSheet(null))} />}
+      {party && <><Confetti onDone={() => setTimeout(() => setParty(null), 800)} /><div className="celebrate" role="status">{party}</div></>}
       {catSheet && <CategorySheet cat={catSheet.cat} kind={catSheet.kind} notify={notify} onClose={closeSheet(() => setCatSheet(null))} />}
       {assetSheet && <AssetSheet asset={assetSheet.a} section={assetSheet.section} quick={assetSheet.quick} notify={notify} onClose={closeSheet(() => setAssetSheet(null))} />}
       {toast}

@@ -2,20 +2,25 @@ import { useState } from 'react'
 import { useStore } from './store.tsx'
 import { Sheet, Seg, MoneyField, ConfirmButton } from './ui.tsx'
 import { Icon } from './icons.tsx'
-import { parseMoney, fmtNum, CUR_LABEL, type Currency } from './lib/money.ts'
+import { parseMoney, fmt, fmtNum, CUR_LABEL, type Currency } from './lib/money.ts'
+import { Repeat } from 'lucide-react'
 import { todayIso } from './lib/period.ts'
 import { GROUPS, ASSET_KINDS, SECTIONS, PLATFORMS, kindOf, type Tx, type Kind, type Category, type Group, type Asset, type AssetSection } from './lib/types.ts'
 import { ICON_CHOICES } from './icons.tsx'
 
 /* ---------------- Transaction ---------------- */
 
-export function TxSheet({ tx, kind: initialKind = 'out', onClose, notify }: { tx?: Tx; kind?: Kind; onClose: () => void; notify: (m: string) => void }) {
+export function TxSheet({ tx, kind: initialKind = 'out', template, onClose, notify, onSaved }: {
+  tx?: Tx; kind?: Kind; template?: Partial<Tx>; onClose: () => void; notify: (m: string) => void; onSaved?: () => void
+}) {
   const st = useStore()
-  const [kind, setKind] = useState<Kind>(tx?.kind ?? initialKind)
-  const [amount, setAmount] = useState(tx ? fmtNum(tx.amount) : '')
-  const [cat, setCat] = useState<string | null>(tx?.category_id ?? null)
+  const src = tx ?? template
+  const [kind, setKind] = useState<Kind>(src?.kind ?? initialKind)
+  const [currency, setCurrency] = useState<Currency>((src?.orig_currency as Currency) || 'RON')
+  const [amount, setAmount] = useState(src ? fmtNum(src.orig_currency && src.orig_currency !== 'RON' && src.orig_amount ? src.orig_amount : (src.amount || 0)) : '')
+  const [cat, setCat] = useState<string | null>(src?.category_id ?? null)
   const [date, setDate] = useState(tx?.date ?? todayIso())
-  const [note, setNote] = useState(tx?.note ?? '')
+  const [note, setNote] = useState(src?.note ?? '')
   const [member, setMember] = useState(tx?.member_id ?? st.user.id)
   const [assetId, setAssetId] = useState<string>(tx?.asset_id ?? '')
   const [err, setErr] = useState('')
@@ -26,24 +31,43 @@ export function TxSheet({ tx, kind: initialKind = 'out', onClose, notify }: { tx
   const linkable = kind === 'out' && chosen?.grp === 'economii'
   const assetOpts = st.assets.filter(a => !a.archived && kindOf(a.kind).section !== 'debt' && kindOf(a.kind).section !== 'goods')
 
-  async function save() {
+  // Most recently used categories of this kind, for one-tap picking.
+  const recent: Category[] = []
+  for (const t of [...st.txs].sort((a, b) => b.created_at.localeCompare(a.created_at))) {
+    if (t.kind !== kind) continue
+    const c = st.categories.find(x => x.id === t.category_id)
+    if (c && !c.archived && !recent.includes(c)) recent.push(c)
+    if (recent.length >= 5) break
+  }
+
+  const parsed = parseMoney(amount)
+  const ron = parsed && parsed > 0 ? st.toRonNow(parsed, currency) : null
+
+  async function save(asNew = false) {
     const v = parseMoney(amount)
     if (v === null || v <= 0) return setErr('Scrie o sumă mai mare ca zero, cu virgulă și cel mult două zecimale (ex. 23,50).')
     if (!cat) return setErr('Alege o categorie.')
     if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return setErr('Alege data.')
     setBusy(true); setErr('')
     try {
+      const unchanged = tx && !asNew && (tx.orig_currency || 'RON') === currency && (currency === 'RON' ? tx.amount : tx.orig_amount) === v
+      const amountRon = unchanged ? tx!.amount : st.toRonNow(v, currency)
       const link = linkable && assetId ? assetId : null
-      await st.saveTx({ id: tx?.id, kind, amount: v, category_id: cat, date, note: note.trim(), member_id: member, asset_id: link })
-      // New money put into an investment/savings item increases its value and invested amount.
-      if (link && !tx) {
+      const editing = tx && !asNew
+      await st.saveTx({
+        id: editing ? tx!.id : undefined, kind, amount: amountRon, category_id: cat, date: asNew ? todayIso() : date, note: note.trim(),
+        member_id: editing ? member : st.user.id, asset_id: link,
+        orig_amount: currency === 'RON' ? null : v, orig_currency: currency === 'RON' ? null : currency,
+      })
+      if (link && !editing) {
         const a = st.assets.find(x => x.id === link)
         if (a) {
-          const inCur = a.currency === 'RON' ? v : Math.round(v / (a.currency === 'EUR' ? st.rates.EUR : st.rates.USD))
+          const inCur = a.currency === 'RON' ? amountRon : Math.round(amountRon / (a.currency === 'EUR' ? st.rates.EUR : st.rates.USD))
           await st.saveAsset({ id: a.id, value: a.value + inCur, invested: (a.invested || 0) + inCur, updated_on: todayIso() })
         }
       }
-      notify(tx ? 'Modificat' : kind === 'in' ? 'Venit adăugat' : 'Cheltuială adăugată')
+      notify(asNew ? 'Repetat azi' : tx ? 'Modificat' : kind === 'in' ? 'Venit adăugat' : 'Cheltuială adăugată')
+      onSaved?.()
       onClose()
     } catch (e: any) { setErr(e?.message || 'Nu s-a putut salva. Încearcă din nou.') }
     finally { setBusy(false) }
@@ -52,9 +76,17 @@ export function TxSheet({ tx, kind: initialKind = 'out', onClose, notify }: { tx
   return (
     <Sheet title={tx ? 'Modifică' : kind === 'in' ? 'Venit nou' : 'Cheltuială nouă'} onClose={onClose}>
       <Seg label="Tip" value={kind} onChange={k => { setKind(k); setCat(null) }} options={[{ id: 'out', label: 'Cheltuială' }, { id: 'in', label: 'Venit' }]} />
-      <MoneyField id="tx-amount" big value={amount} onChange={setAmount} suffix="lei" autoFocus={!tx} />
-      <p className="hint">Scrie cu virgulă, de ex. 23,50</p>
+      <MoneyField id="tx-amount" big value={amount} onChange={setAmount} suffix={CUR_LABEL[currency]} autoFocus={!tx} />
+      <div className="cur-row">
+        <div className="cur-seg" role="group" aria-label="Moneda">
+          {(['RON', 'EUR', 'USD'] as Currency[]).map(c => (
+            <button key={c} type="button" aria-pressed={c === currency} onClick={() => setCurrency(c)}>{c === 'RON' ? 'lei' : CUR_LABEL[c]}</button>
+          ))}
+        </div>
+        <span className="hint">{currency !== 'RON' && ron ? `≈ ${fmt(ron)} la cursul de azi` : 'Scrie cu virgulă, de ex. 23,50'}</span>
+      </div>
       <div className="chip-groups">
+        {recent.length > 0 && <ChipGroup label="Folosite recent" color="var(--accent-2)" cats={recent} cat={cat} setCat={setCat} />}
         {kind === 'in' ? (
           <ChipGroup label="Venit" color="var(--in)" cats={cats} cat={cat} setCat={setCat} />
         ) : GROUPS.map(g => (
@@ -73,7 +105,7 @@ export function TxSheet({ tx, kind: initialKind = 'out', onClose, notify }: { tx
         <label className="field">Data<input id="tx-date" type="date" value={date} onChange={e => setDate(e.target.value)} /></label>
         <label className="field">Notă<input id="tx-note" maxLength={80} placeholder="opțional" value={note} onChange={e => setNote(e.target.value)} /></label>
       </div>
-      {st.members.length > 1 && (
+      {tx && st.members.length > 1 && (
         <label className="field">Cine
           <select id="tx-member" value={member} onChange={e => setMember(e.target.value)}>
             {st.members.map(m => <option key={m.user_id} value={m.user_id}>{m.display_name}{m.user_id === st.user.id ? ' (eu)' : ''}</option>)}
@@ -83,7 +115,8 @@ export function TxSheet({ tx, kind: initialKind = 'out', onClose, notify }: { tx
       {err && <p className="err">{err}</p>}
       <div className="actions">
         {tx && <ConfirmButton onConfirm={async () => { await st.deleteTx(tx.id); notify('Șters'); onClose() }} />}
-        <button type="button" className="primary" disabled={busy} onClick={save}>{busy ? 'Se salvează…' : 'Salvează'}</button>
+        {tx && <button type="button" className="ghost-btn" disabled={busy} onClick={() => save(true)}><Repeat size={16} />Repetă azi</button>}
+        <button type="button" className="primary" disabled={busy} onClick={() => save()}>{busy ? 'Se salvează…' : 'Salvează'}</button>
       </div>
     </Sheet>
   )
@@ -97,7 +130,7 @@ function ChipGroup({ label, color, cats, cat, setCat }: { label: string; color: 
       <div className="chips">
         {cats.map(c => (
           <button key={c.id} type="button" className="chip" aria-pressed={c.id === cat} onClick={() => setCat(c.id)}>
-            <Icon name={c.icon} size={15} />{c.name}
+            <Icon name={c.icon} size={15} color={c.kind === 'in' ? 'var(--in)' : (GROUPS.find(g => g.id === c.grp)?.color)} />{c.name}
           </button>
         ))}
       </div>

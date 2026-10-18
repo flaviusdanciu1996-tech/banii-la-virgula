@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from 'react'
 import { X } from 'lucide-react'
 import { fmtNum } from './lib/money.ts'
+import { Icon as IconBy } from './icons.tsx'
 
 export function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: ReactNode }) {
   useEffect(() => {
@@ -70,13 +71,13 @@ export function ConfirmButton({ onConfirm, children = 'Șterge', armedText = 'Si
 
 export function Ring({ value, color, size = 54, children }: { value: number; color: string; size?: number; children?: ReactNode }) {
   const r = (size - 6) / 2, c = 2 * Math.PI * r
-  const v = Math.max(0, Math.min(1, value))
+  const v = useGrow(Math.max(0, Math.min(1, value)))
   return (
     <span className="ring" style={{ width: size, height: size }}>
       <svg width={size} height={size} viewBox={`0 0 ${size} ${size}`} aria-hidden="true">
         <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--track)" strokeWidth="5" />
-        <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth="5" strokeLinecap="round"
-          strokeDasharray={`${c * v} ${c}`} transform={`rotate(-90 ${size / 2} ${size / 2})`} />
+        <circle className="ring-arc" cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth="5" strokeLinecap="round"
+          strokeDasharray={`${c * v} ${c}`} transform={`rotate(-90 ${size / 2} ${size / 2})`} style={{ filter: `drop-shadow(0 0 4px ${color})` }} />
       </svg>
       <span className="ring-in">{children}</span>
     </span>
@@ -84,6 +85,7 @@ export function Ring({ value, color, size = 54, children }: { value: number; col
 }
 
 export function Bar({ value, color, over }: { value: number; color: string; over?: boolean }) {
+  value = useGrow(value)
   return (
     <div className="bar"><i style={{ width: `${Math.max(0, Math.min(100, value))}%`, background: over ? 'var(--bad)' : color }} /></div>
   )
@@ -194,4 +196,97 @@ export function useToast(): [ReactNode, (m: string) => void] {
   const [msg, setMsg] = useState('')
   useEffect(() => { if (!msg) return; const t = setTimeout(() => setMsg(''), 2600); return () => clearTimeout(t) }, [msg])
   return [msg ? <div className="toast" role="status">{msg}</div> : null, setMsg]
+}
+
+/* ---------------- Nocturn helpers ---------------- */
+
+/** Category icon inside a tinted circle in its group's colour. */
+export function CatIcon({ icon, color, size = 38 }: { icon: string; color: string; size?: number }) {
+  return (
+    <span className="cat-icon" style={{ width: size, height: size, ['--c' as any]: color }}>
+      <IconBy name={icon} size={Math.round(size * 0.47)} />
+    </span>
+  )
+}
+
+/** Number that counts up to its value on first show (respects reduced motion). */
+export function useCountUp(target: number, ms = 700): number {
+  const [v, setV] = useState(() => (reducedMotion() ? target : 0))
+  const from = useRef(v)
+  useEffect(() => {
+    if (reducedMotion()) { setV(target); return }
+    const start = performance.now(), a = from.current, b = target
+    let raf = 0
+    const tick = (t: number) => {
+      const k = Math.min(1, (t - start) / ms)
+      const e = 1 - Math.pow(1 - k, 3)
+      const cur = Math.round(a + (b - a) * e)
+      setV(cur); from.current = cur
+      if (k < 1) raf = requestAnimationFrame(tick)
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [target, ms])
+  return v
+}
+
+export function CountUp({ v, cur = 'lei', className = '' }: { v: number; cur?: string; className?: string }) {
+  const n = useCountUp(v)
+  return <span className={'num ' + className}>{fmtNum(n)}{cur ? ' ' + cur : ''}</span>
+}
+
+export function reducedMotion(): boolean {
+  try { return window.matchMedia('(prefers-reduced-motion: reduce)').matches } catch { return false }
+}
+
+/** Value that starts at 0 and moves to `v` after mount, so CSS transitions animate it. */
+export function useGrow(v: number): number {
+  const [x, setX] = useState(reducedMotion() ? v : 0)
+  useEffect(() => { const r = requestAnimationFrame(() => setX(v)); return () => cancelAnimationFrame(r) }, [v])
+  return x
+}
+
+/** Friendly illustration for empty states: an icon in a glowing blob. */
+export function EmptyArt({ icon, title, text, children }: { icon: string; title: string; text: string; children?: ReactNode }) {
+  return (
+    <div className="empty art">
+      <div className="art-blob" aria-hidden="true">
+        <span className="spark s1" /><span className="spark s2" /><span className="spark s3" />
+        <IconBy name={icon} size={34} />
+      </div>
+      <b>{title}</b>
+      <p>{text}</p>
+      {children}
+    </div>
+  )
+}
+
+/** Full-screen confetti burst; calls onDone when finished. */
+export function Confetti({ onDone }: { onDone: () => void }) {
+  const ref = useRef<HTMLCanvasElement>(null)
+  useEffect(() => {
+    if (reducedMotion()) { const t = setTimeout(onDone, 1200); return () => clearTimeout(t) }
+    const c = ref.current!, ctx = c.getContext('2d')!
+    const dpr = window.devicePixelRatio || 1
+    c.width = innerWidth * dpr; c.height = innerHeight * dpr; ctx.scale(dpr, dpr)
+    const colors = ['#FF7A66', '#6EA8FF', '#FFC24B', '#4FD1A1', '#C792FF', '#ffffff']
+    const ps = Array.from({ length: 140 }, () => ({
+      x: innerWidth / 2 + (Math.random() - .5) * 80, y: innerHeight * .35,
+      vx: (Math.random() - .5) * 11, vy: -Math.random() * 13 - 4, r: Math.random() * 6 + 3,
+      rot: Math.random() * 6, vr: (Math.random() - .5) * .3, c: colors[(Math.random() * colors.length) | 0],
+    }))
+    let raf = 0; const start = performance.now()
+    const tick = (t: number) => {
+      ctx.clearRect(0, 0, innerWidth, innerHeight)
+      for (const p of ps) {
+        p.vy += .32; p.vx *= .99; p.x += p.vx; p.y += p.vy; p.rot += p.vr
+        ctx.save(); ctx.translate(p.x, p.y); ctx.rotate(p.rot); ctx.fillStyle = p.c
+        ctx.fillRect(-p.r / 2, -p.r / 4, p.r, p.r / 2); ctx.restore()
+      }
+      if (t - start < 2600) raf = requestAnimationFrame(tick); else onDone()
+    }
+    raf = requestAnimationFrame(tick)
+    return () => cancelAnimationFrame(raf)
+  }, [onDone])
+  return <canvas ref={ref} className="confetti" aria-hidden="true" />
 }

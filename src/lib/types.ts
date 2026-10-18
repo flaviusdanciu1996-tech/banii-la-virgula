@@ -26,6 +26,9 @@ export interface Tx {
   date: string // YYYY-MM-DD
   created_at: string
   asset_id: string | null
+  orig_amount?: number | null
+  orig_currency?: Currency | null
+  recurring_id?: string | null
 }
 
 export interface Settings {
@@ -118,3 +121,30 @@ export const SECTIONS: { id: AssetSection; name: string; color: string }[] = [
 
 export const kindOf = (id: string) => ASSET_KINDS.find(k => k.id === id) ?? ASSET_KINDS[ASSET_KINDS.length - 1]
 export const PLATFORMS = ['Revolut', 'Tradeville', 'Binance', 'Bancă', 'Numerar']
+
+export interface Recurring {
+  id: string
+  household_id: string
+  member_id: string
+  kind: Kind
+  name: string
+  amount: number // minor units in `currency`
+  currency: Currency
+  category_id: string
+  day: number
+  auto: boolean
+  start_date: string
+  last_run: string | null
+  active: boolean
+}
+
+export interface Goal {
+  id: string
+  household_id: string
+  name: string
+  icon: string
+  target: number
+  saved: number
+  deadline: string | null
+  archived: boolean
+}

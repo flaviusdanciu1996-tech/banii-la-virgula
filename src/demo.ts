@@ -47,6 +47,7 @@ export function demoSeed(): Record<Table, any[]> {
     add(m + 6, 'Îngrijire personală & sport', 9000)
   }
   add(1, 'Distracție', 26000, 'Concert')
+  transactions.push({ id: 'teur', household_id: H, member_id: U, kind: 'out', amount: 6221, category_id: id('Restaurante & cafenele'), note: 'Prânz în parcare, DE', date: addDays(today, -1), created_at: addDays(today, -1) + 'T13:00:00', asset_id: null, orig_amount: 1250, orig_currency: 'EUR' })
   add(2, 'Băuturi alcoolice', 7350)
   add(0, 'Mâncare acasă', 304, 'Pâine')
   const assets = [
@@ -66,7 +67,17 @@ export function demoSeed(): Record<Table, any[]> {
     households: [{ id: H, name: 'Familia mea', owner_id: U }],
     members: [{ household_id: H, user_id: U, display_name: 'Flavius Danciu', role: 'owner' }, { household_id: H, user_id: U2, display_name: 'Ana Pop', role: 'member' }],
     settings: [{ household_id: H, payday: 1, total_budget: null, savings_target_pct: 20, eur_rate: 4.9768, usd_rate: 4.2851, rates_date: today }],
-    categories, transactions, assets, snapshots, invites: [],
+    categories, transactions, assets, snapshots, invites: [], push_subs: [],
+    recurring: [
+      { id: 'r1', household_id: H, member_id: U, kind: 'out', name: 'Chirie', amount: 150000, currency: 'RON', category_id: id('Chirie / rată'), day: 16, auto: true, start_date: addDays(today, -90), last_run: today, active: true },
+      { id: 'r2', household_id: H, member_id: U, kind: 'out', name: 'Netflix + Spotify', amount: 6999, currency: 'RON', category_id: id('Abonamente'), day: 4, auto: true, start_date: addDays(today, -90), last_run: today, active: true },
+      { id: 'r3', household_id: H, member_id: U, kind: 'out', name: 'Rată leasing', amount: 32000, currency: 'EUR', category_id: id('Chirie / rată'), day: 25, auto: false, start_date: addDays(today, -90), last_run: today, active: true },
+      { id: 'r4', household_id: H, member_id: U, kind: 'out', name: 'Asigurare RCA', amount: 18000, currency: 'RON', category_id: id('Asigurări'), day: 22, auto: false, start_date: addDays(today, -90), last_run: today, active: true },
+    ],
+    goals: [
+      { id: 'g1', household_id: H, name: 'Cabana de la munte', icon: 'trees', target: 5000000, saved: 1250000, deadline: addDays(today, 730), archived: false },
+      { id: 'g2', household_id: H, name: 'Fond de urgență', icon: 'life-buoy', target: 1500000, saved: 1120000, deadline: null, archived: false },
+    ],
   }
 }
 

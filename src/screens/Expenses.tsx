@@ -1,29 +1,14 @@
 import { useMemo, useState } from 'react'
-import { ChevronRight, Plus, Minus, Settings2, ChevronLeft, Search } from 'lucide-react'
+import { ChevronRight, Plus, Minus, Settings2, ChevronLeft, Search, Repeat } from 'lucide-react'
 import { useStore } from '../store.tsx'
-import { Avatar, Ring } from '../ui.tsx'
+import { Ring, EmptyArt } from '../ui.tsx'
+import { TxRow, catColor } from '../helpers.tsx'
 import { Icon } from '../icons.tsx'
 import { fmt, fmtNum, pct } from '../lib/money.ts'
 import { dayLabel, shortDayLabel, periodLabel, periodFor, shiftPeriod, todayIso, inPeriod, type Period } from '../lib/period.ts'
 import { summarize } from '../lib/calc.ts'
 import { GROUPS, type Tx } from '../lib/types.ts'
 import type { Nav } from '../App.tsx'
-
-function TxRow({ t, onOpen }: { t: Tx; onOpen: (t: Tx) => void }) {
-  const st = useStore()
-  const c = st.categories.find(x => x.id === t.category_id)
-  const name = st.members.find(m => m.user_id === t.member_id)?.display_name || '?'
-  return (
-    <button type="button" className="row" onClick={() => onOpen(t)}>
-      <span className={'row-icon ' + (t.kind === 'in' ? 'in-bg' : '')}><Icon name={c?.icon || 'circle'} size={17} /></span>
-      <span className="row-main">
-        <b className={'num' + (t.kind === 'in' ? ' in' : '')}>{t.kind === 'in' ? '+' : '−'}{fmt(t.amount)}</b>
-        <span className="muted small">{c?.name}{t.note ? ' · ' + t.note : ''}</span>
-      </span>
-      <span className="row-side"><span className="muted small">{shortDayLabel(t.date)}</span>{st.members.length > 1 && <Avatar name={name} size={24} />}</span>
-    </button>
-  )
-}
 
 export function ExpensesTab({ nav, openTx }: { nav: Nav; openTx: (t?: Tx, kind?: 'in' | 'out') => void }) {
   const st = useStore()
@@ -41,10 +26,13 @@ export function ExpensesTab({ nav, openTx }: { nav: Nav; openTx: (t?: Tx, kind?:
       <section>
         <h2>Ultimele intrări</h2>
         {latest.length ? <div className="rows">{latest.map(t => <TxRow key={t.id} t={t} onOpen={openTx} />)}</div>
-          : <div className="empty"><b>Începe cu primul ban</b><p>Trece venitul lunii și apoi fiecare cheltuială. Aici apar ultimele 10.</p></div>}
+          : <EmptyArt icon="wallet" title="Începe cu primul ban" text="Trece venitul lunii și apoi fiecare cheltuială. Aici apar ultimele 10." />}
         <button type="button" className="link" onClick={() => nav('history')}>Vezi tot istoricul <ChevronRight size={15} /></button>
       </section>
-      <button type="button" className="card menu-row" onClick={() => nav('finante')}><Settings2 size={18} />Setări finanțe<ChevronRight size={16} className="chev" /></button>
+      <div className="menu">
+        <button type="button" className="menu-row" onClick={() => nav('recurente')}><Repeat size={18} />Plăți recurente<ChevronRight size={16} className="chev" /></button>
+        <button type="button" className="menu-row" onClick={() => nav('finante')}><Settings2 size={18} />Setări finanțe<ChevronRight size={16} className="chev" /></button>
+      </div>
     </div>
   )
 }
@@ -101,7 +89,7 @@ export function HistoryScreen({ openTx, initial }: { openTx: (t?: Tx) => void; i
         </div>
       </div>
       <p className="muted small">{list.length} intrări · net <b className="num">{total > 0 ? '+' : ''}{fmtNum(total)} lei</b></p>
-      {!list.length && <div className="empty"><b>Nimic aici</b><p>Schimbă filtrele sau perioada.</p></div>}
+      {!list.length && <EmptyArt icon="search" title="Nimic aici" text="Schimbă filtrele sau perioada." />}
       {byAmount ? (
         <div className="rows">{[...list].sort((a, b) => b.amount - a.amount).map(t => <TxRow key={t.id} t={t} onOpen={openTx} />)}</div>
       ) : days.map(([d, items]) => {
@@ -137,7 +125,7 @@ export function CategoriesScreen({ period, nav }: { period: Period; nav: Nav }) 
                 const r = c.allocated ? v / c.allocated : 0
                 return (
                   <button key={c.id} type="button" className="row" onClick={() => nav('history', { cat: c.id })}>
-                    <Ring value={c.allocated ? r : v ? 1 : 0} size={40} color={r > 1 ? 'var(--bad)' : r >= 0.85 ? 'var(--warn)' : 'var(--accent)'}><Icon name={c.icon} size={16} /></Ring>
+                    <Ring value={c.allocated ? r : v ? 1 : 0} size={40} color={r > 1 ? 'var(--bad)' : catColor(c)}><Icon name={c.icon} size={16} color={catColor(c)} /></Ring>
                     <span className="row-main"><b>{c.name}</b><span className="muted small">{c.allocated ? `${pct(v, c.allocated)}% din ${fmtNum(c.allocated)}` : 'fără limită'} · {pct(v, sum.spent)}% din total</span></span>
                     <span className={'num row-amt' + (r > 1 ? ' bad' : '')}>{fmtNum(v)}</span>
                   </button>

@@ -3,7 +3,7 @@ import {
   Utensils, Wine, Dumbbell, PartyPopper, Repeat, ShoppingBag, PiggyBank, TrendingUp, LifeBuoy, Wallet, Truck,
   Sparkles, CirclePlus, Circle, Landmark, Banknote, LineChart, Bitcoin, Scroll, PieChart, Car, Trees, Package,
   FileText, CreditCard, HandCoins, Baby, Dog, Plane, Coffee, Cigarette, Gamepad2, Wrench, Book, Music, Pill,
-  Scissors, Hammer, Briefcase, Tv, Bike, Droplets, Flame, Zap, Wifi, Receipt, Building2, type LucideIcon,
+  Scissors, Hammer, Briefcase, Tv, Bike, Droplets, Flame, Zap, Wifi, Receipt, Building2, Target, Mountain, CalendarClock, Inbox, Sparkle, Search, Bell, Gem, type LucideIcon,
 } from 'lucide-react'
 
 export const ICONS: Record<string, LucideIcon> = {
@@ -17,7 +17,7 @@ export const ICONS: Record<string, LucideIcon> = {
   'credit-card': CreditCard, 'hand-coins': HandCoins, baby: Baby, dog: Dog, plane: Plane, coffee: Coffee,
   cigarette: Cigarette, gamepad: Gamepad2, wrench: Wrench, book: Book, music: Music, pill: Pill,
   scissors: Scissors, hammer: Hammer, briefcase: Briefcase, tv: Tv, bike: Bike, droplets: Droplets,
-  flame: Flame, zap: Zap, wifi: Wifi, receipt: Receipt, building: Building2,
+  flame: Flame, zap: Zap, wifi: Wifi, receipt: Receipt, building: Building2, target: Target, mountain: Mountain, 'calendar-clock': CalendarClock, inbox: Inbox, sparkle: Sparkle, search: Search, bell: Bell, gem: Gem,
 }
 
 export const ICON_CHOICES = Object.keys(ICONS)
