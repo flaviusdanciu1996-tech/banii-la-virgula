@@ -279,3 +279,37 @@ test('yearly return with money in and out (XIRR) and the road to a target', () =
   assert.equal(monthsToTarget(633000, 100000, 7, 30000000), 170) // 6.330 € + 1.000 €/month at 7% → ~14 years
   assert.equal(safeMonthly(30000000), 100000) // 300.000 € → 1.000 €/month at 4%
 })
+
+import { score, backtest, parseBvbIndicators, indicators, type StockData } from './radar.ts'
+
+function fakeStock(symbol: string, f: (k: number) => number, days = 900): StockData {
+  const t: number[] = [], c: number[] = []
+  for (let k = 0; k < days; k++) { t.push(19000 + k); c.push(Math.round(f(k) * 100) / 100) }
+  return { symbol, t, c, a: [...c], v: c.map(() => 10000), divs: [] }
+}
+
+test('radar: uptrend with a calm pullback scores higher than a falling stock', () => {
+  const up = fakeStock('UP', k => 10 + k * 0.02 + Math.sin(k / 5) * 0.3)
+  const down = fakeStock('DN', k => 40 - k * 0.03 + Math.sin(k / 5) * 0.3)
+  const su = score({ ...up, divy: 7, per: 8, pbv: 1.1 }), sd = score({ ...down, divy: 1, per: 30, pbv: 4 })
+  assert.ok(su.total > sd.total + 25, `${su.total} vs ${sd.total}`)
+  assert.ok(su.ind.ma200! < su.ind.price)
+  assert.equal(sd.label, 'avoid')
+  assert.ok(su.reasons.some(r => r.text.startsWith('Dividend 7,0%')))
+  const ind = indicators(up)
+  assert.ok(ind.rsi! > 0 && ind.rsi! < 100 && ind.vol! > 0)
+})
+
+test('radar backtest invests monthly without looking ahead', () => {
+  const a = fakeStock('A', k => 10 + k * 0.02), b = fakeStock('B', k => 30 - k * 0.01)
+  const r = backtest([a, b], 19300, 19899, 1000, 1)
+  assert.ok(r.months >= 18 && r.months <= 21)
+  assert.equal(r.invested, r.months * 1000)
+  assert.ok(r.radar.value > r.equal.value) // picks the rising one
+})
+
+test('BVB indicators table', () => {
+  const html = '<title> BVB - Actiuni TLV BANCA TRANSILVANIA S.A. </title><tr> <td style="white-space:nowrap;">Capitalizare</td><td align="right" style="font-weight:bold;">44.888.167.667,00</td> </tr><tr> <td>PER</td><td align="right" style="font-weight:bold;">8,65</td> </tr><tr> <td>P/BV</td><td align="right">1,92</td> </tr><tr> <td>DIVY</td><td align="right">3,12</td> </tr>'
+  const x = parseBvbIndicators(html)
+  assert.equal(x.per, 8.65); assert.equal(x.pbv, 1.92); assert.equal(x.divy, 3.12); assert.equal(x.mcap, 44888167667); assert.equal(x.name, 'BANCA TRANSILVANIA S.A.')
+})

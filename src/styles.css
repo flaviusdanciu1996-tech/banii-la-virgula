@@ -560,3 +560,47 @@ section > h2.grp-h::before { display: none; }
 .fi-calc .chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 0 16px; }
 .fi-when { font-size: 16px; padding: 10px 12px; border-radius: 12px; background: color-mix(in srgb, var(--accent) 12%, var(--surface)); }
 .fi-facts p { margin: 4px 0; font-size: 13.5px; }
+
+/* Radar BVB */
+.radar-note { display: flex; gap: 6px; align-items: flex-start; }
+.radar-note svg { flex: none; margin-top: 2px; }
+.radar-filter { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 0 16px; }
+.radar-row { align-items: center; }
+.radar-meta { color: var(--muted); }
+.score-badge { position: relative; display: inline-grid; place-items: center; flex: none; }
+.score-badge svg { position: absolute; inset: 0; }
+.score-badge b { font-size: 14px; font-variant-numeric: tabular-nums; }
+.tag { font-size: 10.5px; font-weight: 700; background: color-mix(in srgb, var(--accent) 20%, transparent); color: var(--accent); border-radius: 6px; padding: 1px 5px; margin-left: 6px; vertical-align: 2px; }
+.star { color: #F59E0B; margin-left: 5px; vertical-align: -1px; }
+.stock-head { display: flex; gap: 14px; align-items: center; }
+.stock-head > div { display: flex; flex-direction: column; gap: 3px; }
+.stock-head .score-badge b { font-size: 19px; }
+.sc-parts { display: flex; flex-direction: column; gap: 6px; }
+.sc-part { display: grid; grid-template-columns: 92px 1fr 46px; gap: 8px; align-items: center; font-size: 13px; }
+.sc-bar { height: 8px; border-radius: 99px; background: var(--track); overflow: hidden; }
+.sc-bar i { display: block; height: 100%; background: var(--accent); border-radius: inherit; }
+.reasons { margin: 0; padding: 0; list-style: none; display: flex; flex-direction: column; gap: 5px; font-size: 13.5px; }
+.reasons li.good { color: var(--good, #22C55E); }
+.reasons li.bad { color: var(--bad, #EF4444); }
+.bt-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.bt-grid > div { display: flex; flex-direction: column; gap: 2px; }
+.bt-grid span { font-size: 12px; color: var(--muted); }
+.bt-grid em { font-style: normal; color: var(--muted); }
+.form .two, .card .two { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+
+/* Assistant chat */
+.chat { padding-bottom: 8px; }
+.chat-intro { align-items: center; text-align: center; color: var(--accent); }
+.chat-intro p { margin: 0; }
+.msgs { display: flex; flex-direction: column; gap: 10px; }
+.msg { max-width: 88%; padding: 10px 13px; border-radius: 16px; font-size: 14.5px; line-height: 1.45; }
+.msg.user { align-self: flex-end; background: var(--accent); color: var(--accent-ink); border-bottom-right-radius: 5px; }
+.msg.model { align-self: flex-start; background: var(--surface); border: 1px solid var(--line); border-bottom-left-radius: 5px; }
+.msg.model p { margin: 0 0 6px; }
+.msg.model ul { margin: 2px 0 8px; padding-left: 18px; }
+.msg.model h4 { margin: 8px 0 4px; font-size: 14.5px; }
+.msg.typing { color: var(--muted); }
+.chat-sugg { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 0 16px; }
+.chat-box { display: flex; gap: 8px; position: sticky; bottom: 84px; background: var(--bg, transparent); padding-top: 4px; }
+.chat-box input { flex: 1; min-width: 0; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; font: inherit; }
+.chat-box .primary { flex: none; width: 50px; padding: 0; }

@@ -51,6 +51,8 @@ export interface Settings {
   fi_monthly?: number | null // planned monthly investment, minor units in fi_currency
   fi_return?: number // assumed yearly return, %
   fi_include_liquid?: boolean
+  // BVB Radar: followed stocks, own rules, alerts (last = zone already announced per stock)
+  radar?: { watch?: string[]; rules?: { minDiv?: number | null; maxPer?: number | null; maxPbv?: number | null; aboveMa200?: boolean; maxRsi?: number | null; minScore?: number | null }; alerts?: boolean; last?: Record<string, string> }
 }
 
 export type AssetSection = 'liquid' | 'invest' | 'goods' | 'debt'
