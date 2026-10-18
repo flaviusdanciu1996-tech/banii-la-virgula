@@ -5,6 +5,8 @@ import { Icon } from './icons.tsx'
 import { parseMoney, fmt, fmtNum, CUR_LABEL, type Currency } from './lib/money.ts'
 import { Repeat } from 'lucide-react'
 import { ReceiptPhoto } from './screens/Receipt.tsx'
+import { DepreciationFields, AssetValuePanel } from './screens/AssetValue.tsx'
+import { DEFAULT_DEP, estimateOn } from './lib/valuation.ts'
 import { todayIso } from './lib/period.ts'
 import { GROUPS, ASSET_KINDS, SECTIONS, PLATFORMS, kindOf, type Tx, type Kind, type Category, type Group, type Asset, type AssetSection } from './lib/types.ts'
 import { ICON_CHOICES } from './icons.tsx'
@@ -198,17 +200,52 @@ export function AssetSheet({ asset, section = 'liquid', quick, onClose, notify }
   const [invested, setInvested] = useState(asset?.invested ? fmtNum(asset.invested) : '')
   const [note, setNote] = useState(asset?.note ?? '')
   const [err, setErr] = useState('')
+  const [dep, setDepState] = useState({
+    price: asset?.purchase_price ? fmtNum(asset.purchase_price) : '',
+    date: asset?.purchase_date ?? '',
+    rate: String(asset?.dep_rate ?? DEFAULT_DEP[kind] ?? ''),
+    marketOn: asset?.market_on ?? kind === 'electronice',
+    query: asset?.market_query ?? '',
+    discount: String(asset?.market_discount ?? 10),
+  })
+  const [rateTouched, setRateTouched] = useState(!!asset?.dep_rate)
+  const setDep = (p: Partial<typeof dep>) => { if (p.rate !== undefined) setRateTouched(true); setDepState(d => ({ ...d, ...p })) }
+  function changeKind(k: string) {
+    setKind(k)
+    if (!rateTouched) setDepState(d => ({ ...d, rate: String(DEFAULT_DEP[k] ?? ''), marketOn: asset ? d.marketOn : k === 'electronice' }))
+  }
+  const depKind = sec === 'goods' && kind !== 'casa' && kind !== 'teren'
 
   async function save() {
-    const v = parseMoney(value)
+    let v = parseMoney(value)
+    if (!value.trim() && !quick && depKind) {
+      // No current value typed: use the estimate from the purchase price.
+      const pp = parseMoney(dep.price)
+      if (pp && dep.date) v = estimateOn(todayIso(), Number(dep.rate) || 0, { day: dep.date, value: pp, source: 'purchase' })
+    }
     if (v === null || v < 0) return setErr(sec === 'debt' ? 'Scrie cât mai ai de dat (ex. 15.000,00).' : 'Scrie valoarea actuală (ex. 15.000,00).')
     const inv = sec === 'invest' ? (invested.trim() ? parseMoney(invested) : 0) : 0
     if (inv === null || inv < 0) return setErr('Suma investită nu e validă.')
     if (!quick && !name.trim()) return setErr('Scrie un nume, de ex. „Revolut” sau „Dacia Logan”.')
+    let extra: Partial<Asset> = {}
+    if (!quick && depKind) {
+      const pp = dep.price.trim() ? parseMoney(dep.price) : null
+      if (dep.price.trim() && (pp === null || pp <= 0)) return setErr('Prețul de cumpărare nu e valid.')
+      if (pp && !dep.date) return setErr('Alege și data când l-ai cumpărat.')
+      const rate = dep.rate ? Math.min(90, Number(dep.rate)) : null
+      if (dep.marketOn && !dep.query.trim()) return setErr('Scrie modelul exact, ca să-l pot căuta online.')
+      extra = {
+        purchase_price: pp, purchase_date: pp ? dep.date : null, dep_rate: rate || null,
+        market_on: dep.marketOn, market_query: dep.marketOn ? dep.query.trim() : (dep.query.trim() || null),
+        market_discount: Math.min(50, Number(dep.discount) || 0),
+      }
+    }
+    const changed = !asset || asset.value !== v
     try {
       await st.saveAsset(quick && asset
-        ? { id: asset.id, value: v, updated_on: todayIso() }
-        : { id: asset?.id, name: name.trim(), kind, platform: platform.trim(), currency, value: v, invested: inv, note: note.trim(), updated_on: todayIso(), archived: false })
+        ? { id: asset.id, value: v, updated_on: todayIso(), value_source: 'manual' }
+        : { id: asset?.id, name: name.trim(), kind, platform: platform.trim(), currency, value: v, invested: inv, note: note.trim(), archived: false, ...extra,
+            ...(changed ? { updated_on: todayIso(), value_source: 'manual' as const } : {}) })
       notify('Valoare actualizată'); onClose()
     } catch (e: any) { setErr(e?.message || 'Nu s-a putut salva.') }
   }
@@ -227,7 +264,7 @@ export function AssetSheet({ asset, section = 'liquid', quick, onClose, notify }
   return (
     <Sheet title={asset ? 'Modifică' : 'Adaugă în Avere'} onClose={onClose}>
       <label className="field">Tip
-        <select id="asset-kind" value={kind} onChange={e => setKind(e.target.value)}>
+        <select id="asset-kind" value={kind} onChange={e => changeKind(e.target.value)}>
           {SECTIONS.map(s => (
             <optgroup key={s.id} label={s.name}>
               {ASSET_KINDS.filter(k => k.section === s.id).map(k => <option key={k.id} value={k.id}>{k.name}</option>)}
@@ -235,7 +272,7 @@ export function AssetSheet({ asset, section = 'liquid', quick, onClose, notify }
           ))}
         </select>
       </label>
-      <label className="field">Nume<input id="asset-name" maxLength={50} placeholder={sec === 'goods' ? 'ex. Dacia Logan 2019' : sec === 'debt' ? 'ex. Leasing mașină' : 'ex. Revolut'} value={name} onChange={e => setName(e.target.value)} /></label>
+      <label className="field">Nume<input id="asset-name" maxLength={50} placeholder={kind === 'electronice' ? 'ex. Samsung S25 Ultra' : sec === 'goods' ? 'ex. Dacia Logan 2019' : sec === 'debt' ? 'ex. Leasing mașină' : 'ex. Revolut'} value={name} onChange={e => { setName(e.target.value); if (!asset && kind === 'electronice' && (!dep.query || dep.query === name)) setDepState(d => ({ ...d, query: e.target.value })) }} /></label>
       {(sec === 'liquid' || sec === 'invest') && <>
         <label className="field">Unde (aplicație / bancă)<input id="asset-platform" maxLength={40} value={platform} onChange={e => setPlatform(e.target.value)} /></label>
         <div className="chips">{PLATFORMS.map(p => <button key={p} type="button" className="chip" aria-pressed={p === platform} onClick={() => setPlatform(p)}>{p}</button>)}</div>
@@ -243,7 +280,9 @@ export function AssetSheet({ asset, section = 'liquid', quick, onClose, notify }
       <Seg label="Moneda" value={currency} onChange={setCurrency} options={[{ id: 'RON', label: 'Lei' }, { id: 'EUR', label: 'Euro' }, { id: 'USD', label: 'Dolari' }]} />
       <label className="field">{sec === 'debt' ? 'Cât mai ai de dat' : 'Valoare actuală'}</label>
       <MoneyField id="asset-value" big value={value} onChange={setValue} suffix={CUR_LABEL[currency]} />
-      {sec === 'goods' && <p className="hint">Pune cât ai lua pe el dacă l-ai vinde azi (caută anunțuri cu ceva asemănător). Actualizează-l o dată la câteva luni.</p>}
+      {sec === 'goods' && !depKind && <p className="hint">Pune cât ai lua pe el dacă l-ai vinde azi (caută anunțuri cu ceva asemănător). Actualizează-l o dată la câteva luni.</p>}
+      {depKind && <DepreciationFields v={dep} set={setDep} currency={currency} onUseEstimate={x => setValue(fmtNum(x))} />}
+      {depKind && asset && (asset.market_on || asset.dep_rate || asset.purchase_price) ? <AssetValuePanel asset={st.assets.find(x => x.id === asset.id) ?? asset} notify={notify} /> : null}
       {sec === 'invest' && <>
         <label className="field">Cât ai băgat în total (opțional)</label>
         <MoneyField id="asset-invested" value={invested} onChange={setInvested} suffix={CUR_LABEL[currency]} />

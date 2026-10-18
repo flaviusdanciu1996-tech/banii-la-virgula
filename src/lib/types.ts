@@ -62,6 +62,25 @@ export interface Asset {
   note: string
   updated_on: string
   archived: boolean
+  // Things that lose value (phone, car): price paid, yearly loss and the monthly online check.
+  purchase_price?: number | null // minor units in `currency`
+  purchase_date?: string | null
+  dep_rate?: number | null // % per year
+  market_query?: string | null // exact model searched online, e.g. "Samsung Galaxy S25 Ultra 512GB"
+  market_on?: boolean
+  market_discount?: number // % taken off the median asking price
+  market_checked_on?: string | null
+  market_offers?: { title: string; price: number; currency: string; source: string; url: string; used?: boolean }[] | null
+  value_source?: 'manual' | 'market' | 'depreciation' | 'purchase'
+}
+
+export interface AssetValue {
+  id: string
+  household_id: string
+  asset_id: string
+  day: string
+  value: number
+  source: 'purchase' | 'manual' | 'market' | 'depreciation'
 }
 
 export interface Snapshot {
@@ -109,6 +128,7 @@ export const ASSET_KINDS: { id: string; name: string; section: AssetSection; ico
   { id: 'fonduri', name: 'Fonduri de investiții', section: 'invest', icon: 'pie-chart' },
   { id: 'alte_inv', name: 'Alte investiții', section: 'invest', icon: 'trending-up' },
   { id: 'masina', name: 'Mașină / vehicul', section: 'goods', icon: 'car' },
+  { id: 'electronice', name: 'Telefon / electronice', section: 'goods', icon: 'smartphone' },
   { id: 'casa', name: 'Casă / apartament', section: 'goods', icon: 'home' },
   { id: 'teren', name: 'Teren', section: 'goods', icon: 'trees' },
   { id: 'alte_bunuri', name: 'Alte bunuri', section: 'goods', icon: 'package' },

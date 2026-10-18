@@ -55,6 +55,16 @@ export function demoSeed(): Record<Table, any[]> {
     { id: 'a2', household_id: H, owner_id: U, name: 'Portofoliu ETF', kind: 'actiuni', platform: 'Tradeville', currency: 'RON', value: 1248000, invested: 1100000, note: '', updated_on: addDays(today, -5), archived: false },
     { id: 'a3', household_id: H, owner_id: U, name: 'Bitcoin', kind: 'crypto', platform: 'Binance', currency: 'USD', value: 241000, invested: 300000, note: '', updated_on: addDays(today, -40), archived: false },
     { id: 'a4', household_id: H, owner_id: U, name: 'Dacia Logan', kind: 'masina', platform: '', currency: 'EUR', value: 850000, invested: 0, note: '', updated_on: addDays(today, -60), archived: false },
+    { id: 'a7', household_id: H, owner_id: U, name: 'Samsung S25 Ultra', kind: 'electronice', platform: '', currency: 'RON', value: 333000, invested: 0, note: '', updated_on: addDays(today, -3), archived: false,
+      purchase_price: 400000, purchase_date: addDays(today, -95), dep_rate: 35, market_query: 'Samsung Galaxy S25 Ultra 512GB', market_on: true, market_discount: 10, market_checked_on: addDays(today, -3), value_source: 'market',
+      market_offers: [
+        { title: 'Samsung S25 Ultra 512GB Titanium Black, garanție', price: 3900, currency: 'RON', source: 'OLX', url: 'https://www.olx.ro/', used: true },
+        { title: 'Galaxy S25 Ultra 512 GB impecabil, cutie completă', price: 3650, currency: 'RON', source: 'OLX', url: 'https://www.olx.ro/', used: true },
+        { title: 'S25 Ultra 512GB Silverblue', price: 740, currency: 'EUR', source: 'Publi24', url: 'https://www.publi24.ro/', used: true },
+        { title: 'Samsung Galaxy S25 Ultra 512GB resigilat', price: 4100, currency: 'RON', source: 'eMAG', url: 'https://www.emag.ro/', used: true },
+        { title: 'S25 Ultra 512 ca nou', price: 3600, currency: 'RON', source: 'Lajumate', url: 'https://lajumate.ro/', used: true },
+        { title: 'S25 Ultra 512GB display spart', price: 1500, currency: 'RON', source: 'OLX', url: 'https://www.olx.ro/', used: false },
+      ] },
     { id: 'a5', household_id: H, owner_id: U, name: 'Numerar acasă', kind: 'numerar', platform: 'Numerar', currency: 'RON', value: 150000, invested: 0, note: '', updated_on: today, archived: false },
     { id: 'a6', household_id: H, owner_id: U, name: 'Leasing mașină', kind: 'leasing', platform: '', currency: 'EUR', value: 320000, invested: 0, note: '', updated_on: addDays(today, -10), archived: false },
   ]
@@ -68,6 +78,12 @@ export function demoSeed(): Record<Table, any[]> {
     members: [{ household_id: H, user_id: U, display_name: 'Flavius Danciu', role: 'owner' }, { household_id: H, user_id: U2, display_name: 'Ana Pop', role: 'member' }],
     settings: [{ household_id: H, payday: 1, total_budget: null, savings_target_pct: 20, eur_rate: 4.9768, usd_rate: 4.2851, rates_date: today }],
     categories, transactions, assets, snapshots, invites: [], push_subs: [], import_rules: [],
+    asset_values: [
+      { id: 'v1', household_id: H, asset_id: 'a7', day: addDays(today, -95), value: 400000, source: 'purchase' },
+      { id: 'v2', household_id: H, asset_id: 'a7', day: addDays(today, -64), value: 380000, source: 'depreciation' },
+      { id: 'v3', household_id: H, asset_id: 'a7', day: addDays(today, -33), value: 355000, source: 'market' },
+      { id: 'v4', household_id: H, asset_id: 'a7', day: addDays(today, -3), value: 333000, source: 'market' },
+    ],
     recurring: [
       { id: 'r1', household_id: H, member_id: U, kind: 'out', name: 'Chirie', amount: 150000, currency: 'RON', category_id: id('Chirie / rată'), day: 16, auto: true, start_date: addDays(today, -90), last_run: today, active: true },
       { id: 'r2', household_id: H, member_id: U, kind: 'out', name: 'Netflix + Spotify', amount: 6999, currency: 'RON', category_id: id('Abonamente'), day: 4, auto: true, start_date: addDays(today, -90), last_run: today, active: true },

@@ -163,3 +163,70 @@ test('receipts: matching and splitting', () => {
   assert.equal(receiptForImport({ date: '2026-10-10', amount: 401, currency: 'EUR', original: '30.00 DKK' }, pend)?.receipt_id, 'rc')
   assert.deepEqual(groupItems([{ name: 'WC', amount: 1, category: 'WC & dușuri' }, { name: 'Kaffee', amount: 2.5, category: 'Restaurante & cafenele' }, { name: 'Dusche', amount: 4, category: 'WC & dușuri' }]).map(g => [g.category, g.amount]), [['WC & dușuri', 500], ['Restaurante & cafenele', 250]])
 })
+
+import { depreciate, marketValue, anchorPoint, estimateOn, checkDue, monthsBetween } from './valuation.ts'
+
+test('phone loses ~35%/year: 4.000 lei in July 2026 → ~2.500 in August 2027', () => {
+  const a = anchorPoint([], { value: 400000, day: '2026-07-15' })
+  assert.ok(Math.abs(estimateOn('2027-08-15', 35, a)! - 250000) <= 2000)
+  assert.equal(depreciate(400000, 0, 12), 400000)
+  assert.ok(Math.abs(monthsBetween('2026-07-15', '2027-01-15') - 6) < 0.01)
+})
+
+test('manual correction becomes the new starting point', () => {
+  const a = anchorPoint([{ day: '2026-12-01', value: 350000, source: 'manual' }, { day: '2027-01-01', value: 340000, source: 'depreciation' }], { value: 400000, day: '2026-07-15' })
+  assert.equal(a!.value, 350000)
+})
+
+test('market value: median of ≥5 listings, outliers dropped, minus discount', () => {
+  const o = (price: number, currency = 'RON') => ({ title: 'S25 Ultra', price, currency, source: 'OLX', url: 'https://x' })
+  const r = marketValue([o(3500), o(3600), o(3700), o(3800), o(760, 'EUR'), o(900), o(9000)], 'RON', { EUR: 5 }, 10)!
+  assert.equal(r.count, 5)
+  assert.equal(r.median, 370000)
+  assert.equal(r.value, 333000)
+  assert.equal(marketValue([o(3500), o(3600), o(3700)], 'RON', {}, 10), null)
+})
+
+test('monthly check is due one month after the last one', () => {
+  assert.equal(checkDue(null, '2026-10-18'), true)
+  assert.equal(checkDue('2026-10-01', '2026-10-31'), false)
+  assert.equal(checkDue('2026-10-01', '2026-11-01'), true)
+})
+
+import { matchesQuery, pickOffers } from './valuation.ts'
+
+test('listing titles: same model, variant and memory only', () => {
+  const q = 'Samsung Galaxy S25 Ultra 512GB'
+  assert.equal(matchesQuery('Samsung Galaxy S25 ULTRA 5G 512Gb/Baterie99%', q), true)
+  assert.equal(matchesQuery('Samsung S25 Ultra 512 GB Titanium, 12GB RAM', q), true)
+  assert.equal(matchesQuery('Samsung S25 Ultra 256GB', q), false)
+  assert.equal(matchesQuery('Samsung S25+ 512GB', q), false)
+  assert.equal(matchesQuery('Samsung S24 Ultra 512GB', q), false)
+  assert.equal(matchesQuery('S25 Ultra 512GB display spart', q), false)
+  assert.equal(matchesQuery('Samsung S25 Ultra impecabil', q, 'Memorie 512 GB, baterie 98%'), true)
+  assert.equal(matchesQuery('iPhone 15 Pro Max 256GB', 'iPhone 15 Pro 256GB'), false)
+  assert.equal(matchesQuery('Husa Samsung S25 Ultra 512GB', q), false)
+  assert.equal(matchesQuery('Samsung Galaxy S 25 Ultra 512 GB', q), true)
+  assert.equal(matchesQuery('S25 Ultra 512GB display impecabil', q), true)
+  const offers = pickOffers([
+    { title: 'S25 Ultra 512GB', price: 3700, currency: 'RON', source: 'OLX', url: 'u1', extra: '', isNew: false },
+    { title: 'S25 Ultra 512GB', price: 3700, currency: 'RON', source: 'OLX', url: 'u1', extra: '', isNew: false },
+    { title: 'S25 Ultra 512GB sigilat', price: 5200, currency: 'RON', source: 'OLX', url: 'u2', extra: '', isNew: true },
+  ], q)
+  assert.equal(offers.length, 1)
+})
+
+import { parseOlx, parsePubli24 } from './valuation.ts'
+
+test('reads OLX and Publi24 result pages', () => {
+  const state = { listing: { listing: { ads: [
+    { title: 'Samsung Galaxy S25 Ultra 512GB', url: 'https://www.olx.ro/d/1', price: { regularPrice: { value: 3500, currencyCode: 'RON' } }, params: [{ key: 'state', value: 'Utilizat', normalizedValue: 'used' }] },
+    { title: 'Produs Nou Samsung S25 Ultra 512GB', url: 'https://www.olx.ro/d/2', price: { regularPrice: { value: 4700, currencyCode: 'RON' } }, params: [{ key: 'state', value: 'Nou' }] },
+  ] } } }
+  const html = `<script>window.__PRERENDERED_STATE__= ${JSON.stringify(JSON.stringify(state))};</script>`
+  const o = parseOlx(html)
+  assert.equal(o.length, 2); assert.equal(o[0].price, 3500); assert.equal(o[0].isNew, false); assert.equal(o[1].isNew, true)
+  const p24 = '<script type="application/ld+json">{"itemListElement":[{"name":"S25 Ultra 512GB","description":"linia 1\nlinia 2","url":"anunturi/x.html","offers":{"price":"3750.00","priceCurrency":"RON"}}]}</script>'
+  const p = parsePubli24(p24.replace('\\n', '\n'))
+  assert.equal(p.length, 1); assert.equal(p[0].price, 3750); assert.equal(p[0].url, 'https://www.publi24.ro/anunturi/x.html')
+})

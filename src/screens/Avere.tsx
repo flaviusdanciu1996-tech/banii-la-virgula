@@ -85,7 +85,11 @@ function AssetRow({ a, today, onOpen, onQuick }: { a: Asset; today: string; onOp
   const st = useStore()
   const k = kindOf(a.kind)
   const age = diffDays(a.updated_on, today)
-  const stale = age > 30
+  const auto = k.section === 'goods' && (a.market_on || !!a.dep_rate)
+  const stale = age > 30 && !auto
+  const lost = a.purchase_price ? Math.round((1 - a.value / a.purchase_price) * 100) : null
+  const how = a.value_source === 'market' ? `preț online · ${(a.market_offers ?? []).filter(o => o.used).length} oferte`
+    : a.value_source === 'depreciation' ? `estimat · −${a.dep_rate}%/an` : null
   const ron = toRon(a.value, a.currency, st.rates)
   const profitPct = k.section === 'invest' && a.invested ? Math.round(((a.value - a.invested) / a.invested) * 1000) / 10 : null
   return (
@@ -95,15 +99,16 @@ function AssetRow({ a, today, onOpen, onQuick }: { a: Asset; today: string; onOp
         <span className="row-main">
           <b>{a.name}</b>
           <span className="muted small">{[a.platform, k.name].filter(Boolean).join(' · ')}</span>
-          <span className={'small upd ' + (stale ? 'warn' : 'muted')}>{age <= 0 ? 'actualizat azi' : `actualizat acum ${age} ${age === 1 ? 'zi' : 'zile'}`}</span>
+          <span className={'small upd ' + (stale ? 'warn' : 'muted')}>{how ? how + ' · ' : ''}{age <= 0 ? 'actualizat azi' : `acum ${age} ${age === 1 ? 'zi' : 'zile'}`}{auto && !how ? ' · se actualizează lunar' : ''}</span>
         </span>
         <span className="row-side">
           <b className={'num' + (k.section === 'debt' ? ' bad' : '')}>{k.section === 'debt' ? '−' : ''}{fmtNum(a.value)} {CUR_LABEL[a.currency]}</b>
           {a.currency !== 'RON' && <span className="num muted small">≈ {fmt(ron)}</span>}
+          {lost !== null && lost > 0 && <span className="num small bad">−{lost}% din preț</span>}
           {profitPct !== null && <span className={'num small ' + (profitPct >= 0 ? 'in' : 'bad')}>{profitPct >= 0 ? '+' : ''}{String(profitPct).replace('.', ',')}%</span>}
         </span>
       </button>
-      <button type="button" className={'icon-btn refresh' + (stale ? ' stale' : '')} aria-label={`Actualizează valoarea pentru ${a.name}`} onClick={onQuick}><RefreshCw size={16} /></button>
+      <button type="button" className={'icon-btn refresh' + (stale ? ' stale' : '')} style={auto ? { opacity: .55 } : undefined} aria-label={`Actualizează valoarea pentru ${a.name}`} onClick={onQuick}><RefreshCw size={16} /></button>
     </div>
   )
 }

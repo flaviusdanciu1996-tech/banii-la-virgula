@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState, useCallback, type ReactNode } from 'react'
-import { supabase, type Repo } from './db.ts'
-import type { Category, Tx, Settings, Asset, Snapshot, Member, Invite, Recurring, Goal } from './lib/types.ts'
+import { supabase, DEMO, type Repo } from './db.ts'
+import type { Category, Tx, Settings, Asset, AssetValue, Snapshot, Member, Invite, Recurring, Goal } from './lib/types.ts'
 import { duePostings } from './lib/schedule.ts'
 import type { Currency } from './lib/money.ts'
 import { netWorth } from './lib/calc.ts'
@@ -16,6 +16,7 @@ interface State {
   categories: Category[]
   txs: Tx[]
   assets: Asset[]
+  assetValues: AssetValue[]
   snapshots: Snapshot[]
   settings: Settings
   members: Member[]
@@ -36,6 +37,7 @@ export interface Store extends State {
   saveSettings(p: Partial<Settings>): Promise<void>
   saveAsset(a: Partial<Asset>): Promise<void>
   deleteAsset(id: string): Promise<void>
+  checkAssetOnline(id: string): Promise<{ value: number | null; source: string; count: number; found: number; error?: string }>
   createInvite(email: string): Promise<Invite>
   deleteInvite(id: string): Promise<void>
   removeMember(userId: string): Promise<void>
@@ -52,20 +54,22 @@ const Ctx = createContext<Store | null>(null)
 export const useStore = () => useContext(Ctx)!
 
 const num = (v: unknown) => (typeof v === 'string' ? Number(v) : (v as number))
+const normAsset = (a: Asset): Asset => ({ ...a, value: num(a.value), invested: num(a.invested), purchase_price: a.purchase_price == null ? null : num(a.purchase_price) })
 
 export function StoreProvider({ repo, user, children }: { repo: Repo; user: User; children: ReactNode }) {
   const [s, setS] = useState<State>({
-    ready: false, error: null, householdId: '', user, categories: [], txs: [], assets: [], snapshots: [],
+    ready: false, error: null, householdId: '', user, categories: [], txs: [], assets: [], assetValues: [], snapshots: [],
     settings: DEFAULT_SETTINGS, members: [], invites: [], recurring: [], goals: [],
   })
 
   const reload = useCallback(async () => {
     try {
       const h = await repo.rpc<string>('ensure_household', { p_name: user.name })
-      const [categories, txs, assets, snapshots, settingsRows, members, invites, recurring, goals] = await Promise.all([
+      const [categories, txs, assets, snapshots, settingsRows, members, invites, recurring, goals, assetValues] = await Promise.all([
         repo.list<Category>('categories', h), repo.list<Tx>('transactions', h), repo.list<Asset>('assets', h),
         repo.list<Snapshot>('snapshots', h), repo.list<Settings>('settings', h), repo.list<Member>('members', h),
         repo.list<Invite>('invites', h), repo.list<Recurring>('recurring', h).catch(() => []), repo.list<Goal>('goals', h).catch(() => []),
+        repo.list<AssetValue>('asset_values', h).catch(() => [] as AssetValue[]),
       ])
       const st = settingsRows[0] ? { ...settingsRows[0], eur_rate: num(settingsRows[0].eur_rate), usd_rate: num(settingsRows[0].usd_rate) } : { ...DEFAULT_SETTINGS, household_id: h }
       setS(p => ({
@@ -74,7 +78,8 @@ export function StoreProvider({ repo, user, children }: { repo: Repo; user: User
         txs: txs.map(t => ({ ...t, amount: num(t.amount), orig_amount: t.orig_amount == null ? null : num(t.orig_amount) })),
         recurring: recurring.map(r => ({ ...r, amount: num(r.amount) })),
         goals: goals.map(g => ({ ...g, target: num(g.target), saved: num(g.saved) })),
-        assets: assets.map(a => ({ ...a, value: num(a.value), invested: num(a.invested) })),
+        assets: assets.map(normAsset),
+        assetValues: assetValues.map(v => ({ ...v, value: num(v.value) })),
         snapshots: snapshots.map(x => ({ ...x, liquid: num(x.liquid), invest: num(x.invest), goods: num(x.goods), debts: num(x.debts), net: num(x.net) })),
         members, invites,
       }))
@@ -137,13 +142,40 @@ export function StoreProvider({ repo, user, children }: { repo: Repo; user: User
     },
     async saveAsset(a) {
       const row = { ...a, household_id: s.householdId }
-      const saved = a.id ? await repo.update<Asset>('assets', { id: a.id }, row) : await repo.insert<Asset>('assets', { owner_id: user.id, ...row })
-      saved.value = num(saved.value); saved.invested = num(saved.invested)
+      const before = a.id ? s.assets.find(x => x.id === a.id) : undefined
+      const saved = normAsset(a.id ? await repo.update<Asset>('assets', { id: a.id }, row) : await repo.insert<Asset>('assets', { owner_id: user.id, ...row }))
       setS(p => ({ ...p, assets: [...p.assets.filter(x => x.id !== saved.id), saved] }))
+      // Value history (for things that lose value): purchase point + every value set by hand.
+      const points: Partial<AssetValue>[] = []
+      if (saved.purchase_price && saved.purchase_date && (!before || before.purchase_price !== saved.purchase_price || before.purchase_date !== saved.purchase_date))
+        points.push({ day: saved.purchase_date, value: saved.purchase_price, source: 'purchase' })
+      if (a.value !== undefined && (!before || before.value !== saved.value) && saved.value_source !== 'depreciation' && (saved.dep_rate || saved.market_on || before))
+        points.push({ day: todayIso(), value: saved.value, source: (a.value_source as any) === 'purchase' ? 'purchase' : 'manual' })
+      for (const pt of points) {
+        try {
+          const v = await repo.upsert<AssetValue>('asset_values', { household_id: s.householdId, asset_id: saved.id, ...pt }, 'asset_id,day')
+          setS(p => ({ ...p, assetValues: [...p.assetValues.filter(x => !(x.asset_id === saved.id && x.day === v.day)), { ...v, value: num(v.value) }] }))
+        } catch { /* history is a nice-to-have */ }
+      }
     },
     async deleteAsset(id) {
       await repo.remove('assets', { id })
-      setS(p => ({ ...p, assets: p.assets.filter(x => x.id !== id) }))
+      setS(p => ({ ...p, assets: p.assets.filter(x => x.id !== id), assetValues: p.assetValues.filter(v => v.asset_id !== id) }))
+    },
+    async checkAssetOnline(id) {
+      if (DEMO || !supabase) throw new Error('În modul demo nu se caută online.')
+      const { data, error } = await supabase.functions.invoke('asset-value', { body: { asset_id: id } })
+      if (error) throw new Error('Nu am putut căuta acum. Încearcă din nou mai târziu.')
+      const [a, vals] = await Promise.all([
+        supabase.from('assets').select('*').eq('id', id).single(),
+        supabase.from('asset_values').select('*').eq('asset_id', id),
+      ])
+      setS(p => ({
+        ...p,
+        assets: a.data ? [...p.assets.filter(x => x.id !== id), normAsset(a.data as Asset)] : p.assets,
+        assetValues: [...p.assetValues.filter(v => v.asset_id !== id), ...((vals.data ?? []) as AssetValue[]).map(v => ({ ...v, value: num(v.value) }))],
+      }))
+      return data
     },
     async createInvite(email) {
       const inv = await repo.insert<Invite>('invites', { household_id: s.householdId, email, created_by: user.id } as any)
