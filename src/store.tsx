@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useMemo, useState, useCallback, type ReactNode } from 'react'
-import type { Repo } from './db.ts'
+import { supabase, type Repo } from './db.ts'
 import type { Category, Tx, Settings, Asset, Snapshot, Member, Invite, Recurring, Goal } from './lib/types.ts'
 import { duePostings } from './lib/schedule.ts'
 import type { Currency } from './lib/money.ts'
@@ -118,7 +118,11 @@ export function StoreProvider({ repo, user, children }: { repo: Repo; user: User
       setS(p => ({ ...p, txs: [...p.txs.filter(x => x.id !== saved.id), saved] }))
     },
     async deleteTx(id) {
+      const t = s.txs.find(x => x.id === id)
       await repo.remove('transactions', { id })
+      if (t?.receipt_path && supabase && !s.txs.some(x => x.id !== id && x.receipt_path === t.receipt_path)) {
+        supabase.storage.from('receipts').remove([t.receipt_path]).catch(() => {})
+      }
       setS(p => ({ ...p, txs: p.txs.filter(x => x.id !== id) }))
     },
     async saveCategory(c) {

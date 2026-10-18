@@ -422,3 +422,12 @@ section > h2.grp-h::before { display: none; }
 .match.new { background: color-mix(in srgb, var(--accent-2) 14%, transparent); }
 .match.new svg { color: var(--accent-2); }
 .receipt-item select { margin-top: 6px; font-size: 14px; color: var(--ink); background: var(--surface-2); border: 1px solid var(--line); border-radius: 10px; padding: 7px 8px; max-width: 100%; }
+
+.receipt-thumb { display: block; width: 100%; max-height: 220px; object-fit: cover; object-position: top; border-radius: 14px; border: 1px solid var(--line); background: var(--surface-2); }
+.receipt-thumb.loading { height: 120px; }
+.receipt-thumb-btn { display: flex; flex-direction: column; gap: 6px; background: none; border: 0; padding: 0; text-align: left; color: var(--muted); font-size: 12.5px; }
+.receipt-thumb-btn span { display: inline-flex; align-items: center; gap: 6px; }
+.photo-view { position: fixed; inset: 0; z-index: 90; background: rgba(0,0,0,.92); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px;
+  padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+.photo-view img { max-width: 100%; max-height: 82vh; object-fit: contain; border-radius: 10px; }
+.photo-view .ghost-btn { color: var(--ink); text-decoration: none; }

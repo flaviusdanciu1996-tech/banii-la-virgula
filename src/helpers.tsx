@@ -20,7 +20,7 @@ export function TxRow({ t, onOpen }: { t: Tx; onOpen: (t: Tx) => void }) {
           {t.kind === 'in' ? '+' : '−'}{foreign ? `${fmtNum(t.orig_amount!)} ${CUR_LABEL[t.orig_currency!]}` : fmt(t.amount)}
         </b>
         {foreign && <span className="orig num">≈ {fmt(t.amount)}</span>}
-        <span className="muted small">{c?.name}{t.note ? ' · ' + t.note : ''}</span>
+        <span className="muted small">{t.receipt_path ? '🧾 ' : ''}{c?.name}{t.note ? ' · ' + t.note : ''}</span>
       </span>
       <span className="row-side"><span className="muted small">{shortDayLabel(t.date)}</span>{st.members.length > 1 && <Avatar name={name} size={24} />}</span>
     </button>

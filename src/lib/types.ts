@@ -34,6 +34,7 @@ export interface Tx {
   receipt_id?: string | null
   receipt_total?: number | null
   receipt_currency?: string | null
+  receipt_path?: string | null
 }
 
 export interface Settings {

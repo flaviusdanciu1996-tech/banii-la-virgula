@@ -1,5 +1,5 @@
-import { useRef, useState } from 'react'
-import { Camera, Link2, Plus } from 'lucide-react'
+import { useEffect, useRef, useState } from 'react'
+import { Camera, Link2, Plus, Receipt } from 'lucide-react'
 import { useStore } from '../store.tsx'
 import { Sheet, CatIcon } from '../ui.tsx'
 import { catColor } from '../helpers.tsx'
@@ -10,7 +10,7 @@ import { matchReceipt, groupItems, splitProportional, toMinor, type ReadReceipt,
 import { GROUPS, type Tx } from '../lib/types.ts'
 
 /** Shrink the photo (max 1600 px, JPEG) so it uploads fast on mobile data. */
-async function compress(file: File): Promise<{ data: string; mime: string }> {
+async function compress(file: File): Promise<{ data: string; mime: string; blob: Blob }> {
   try {
     const bmp = await createImageBitmap(file)
     const k = Math.min(1, 1600 / Math.max(bmp.width, bmp.height))
@@ -18,11 +18,12 @@ async function compress(file: File): Promise<{ data: string; mime: string }> {
     c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k)
     c.getContext('2d')!.drawImage(bmp, 0, 0, c.width, c.height)
     const url = c.toDataURL('image/jpeg', 0.82)
-    return { data: url.split(',')[1], mime: 'image/jpeg' }
+    const blob = await new Promise<Blob>(res => c.toBlob(b => res(b!), 'image/jpeg', 0.82))
+    return { data: url.split(',')[1], mime: 'image/jpeg', blob }
   } catch {
     const buf = new Uint8Array(await file.arrayBuffer())
     let bin = ''; for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode(...buf.subarray(i, i + 0x8000))
-    return { data: btoa(bin), mime: file.type || 'image/jpeg' }
+    return { data: btoa(bin), mime: file.type || 'image/jpeg', blob: file }
   }
 }
 
@@ -34,15 +35,17 @@ export function ReceiptButton({ notify, className = 'add receipt' }: { notify: (
   const input = useRef<HTMLInputElement>(null)
   const [busy, setBusy] = useState(false)
   const [result, setResult] = useState<ReadReceipt | null>(null)
+  const [photo, setPhoto] = useState<{ blob: Blob; mime: string } | null>(null)
 
   async function onPick(f?: File) {
     if (!f) return
     setBusy(true)
     try {
       let r: any
+      const img = await compress(f)
+      setPhoto({ blob: img.blob, mime: img.mime })
       if (DEMO || !supabase) r = DEMO_RECEIPT
       else {
-        const img = await compress(f)
         const names = st.categories.filter(c => c.kind === 'out' && !c.archived).map(c => c.name)
         const { data, error } = await supabase.functions.invoke('read-receipt', { body: { image: img.data, mime: img.mime, categories: names } })
         if (error) {
@@ -67,12 +70,12 @@ export function ReceiptButton({ notify, className = 'add receipt' }: { notify: (
         <Camera size={18} />{busy ? 'Citesc bonul…' : 'Bon'}
         <input ref={input} type="file" accept="image/*" capture="environment" disabled={busy} onChange={e => onPick(e.target.files?.[0])} />
       </label>
-      {result && <ReceiptSheet r={result} notify={notify} onClose={() => setResult(null)} />}
+      {result && <ReceiptSheet r={result} photo={photo} notify={notify} onClose={() => { setResult(null); setPhoto(null) }} />}
     </>
   )
 }
 
-function ReceiptSheet({ r, onClose, notify }: { r: ReadReceipt; onClose: () => void; notify: (m: string) => void }) {
+function ReceiptSheet({ r, photo, onClose, notify }: { r: ReadReceipt; photo: { blob: Blob; mime: string } | null; onClose: () => void; notify: (m: string) => void }) {
   const st = useStore()
   const outCats = st.categories.filter(c => c.kind === 'out' && !c.archived)
   const byName = (n: string) => outCats.find(c => c.name.toLowerCase() === (n || '').toLowerCase())
@@ -103,7 +106,16 @@ function ReceiptSheet({ r, onClose, notify }: { r: ReadReceipt; onClose: () => v
       const origParts = splitProportional(total, groups.map(g => g.amount))
       const rid = (crypto as any).randomUUID ? crypto.randomUUID() : String(Date.now())
       const note = (i: number) => `${r.merchant} · ${groups[i].names.join(', ')}`.slice(0, 80)
-      const common = { receipt_id: rid, receipt_total: total, receipt_currency: r.currency }
+      // Keep the photo, private to the household: <household>/<receipt>.jpg
+      let receipt_path: string | null = null
+      if (photo && supabase && !DEMO) {
+        const ext = photo.mime === 'image/png' ? 'png' : photo.mime.includes('heic') || photo.mime.includes('heif') ? 'heic' : 'jpg'
+        const path = `${st.householdId}/${rid}.${ext}`
+        const { error } = await supabase.storage.from('receipts').upload(path, photo.blob, { contentType: photo.mime, upsert: false })
+        if (!error) receipt_path = path
+        else notify('Poza bonului nu s-a putut salva, dar cheltuiala da.')
+      }
+      const common = { receipt_id: rid, receipt_total: total, receipt_currency: r.currency, receipt_path }
       if (match) {
         // Re-categorise (and if needed split) the bank entry that this receipt explains.
         const mOrig = match.orig_amount != null ? splitProportional(match.orig_amount, groups.map(g => g.amount)) : null
@@ -127,6 +139,7 @@ function ReceiptSheet({ r, onClose, notify }: { r: ReadReceipt; onClose: () => v
 
   return (
     <Sheet title={`Bon: ${r.merchant}`} onClose={onClose}>
+      {photo && <PhotoThumb blob={photo.blob} />}
       <div className="receipt-head">
         <div><span className="muted small">Total pe bon</span><b className="num" style={{ fontSize: 24 }}>{fmtNum(total)} {CUR_LABEL[r.currency]}</b></div>
         <label className="field" style={{ minWidth: 140 }}>Data<input id="rc-date" type="date" value={date} onChange={e => setDate(e.target.value)} /></label>
@@ -164,3 +177,40 @@ function ReceiptSheet({ r, onClose, notify }: { r: ReadReceipt; onClose: () => v
 }
 
 export type { Tx }
+
+function PhotoThumb({ blob }: { blob: Blob }) {
+  const [url] = useState(() => URL.createObjectURL(blob))
+  return <img className="receipt-thumb" src={url} alt="Poza bonului" />
+}
+
+/** Saved receipt photo for an entry: small preview, tap to see it full screen. */
+export function ReceiptPhoto({ path }: { path: string }) {
+  const [url, setUrl] = useState<string | null>(null)
+  const [open, setOpen] = useState(false)
+  const [failed, setFailed] = useState(false)
+  useEffect(() => {
+    let live = true
+    if (!supabase) return
+    supabase.storage.from('receipts').createSignedUrl(path, 3600).then(({ data, error }) => {
+      if (!live) return
+      if (error || !data) setFailed(true); else setUrl(data.signedUrl)
+    })
+    return () => { live = false }
+  }, [path])
+  if (failed) return <p className="muted small">Poza bonului nu se poate încărca acum.</p>
+  if (!url) return <div className="receipt-thumb loading" aria-label="Se încarcă poza bonului" />
+  return (
+    <>
+      <button type="button" className="receipt-thumb-btn" onClick={() => setOpen(true)} aria-label="Vezi poza bonului">
+        <img className="receipt-thumb" src={url} alt="Poza bonului" />
+        <span><Receipt size={14} /> Bonul salvat · apasă ca să-l mărești</span>
+      </button>
+      {open && (
+        <div className="photo-view" role="dialog" aria-label="Poza bonului" onClick={() => setOpen(false)}>
+          <img src={url} alt="Poza bonului" />
+          <a className="ghost-btn" href={url} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}>Deschide separat</a>
+        </div>
+      )}
+    </>
+  )
+}

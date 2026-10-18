@@ -4,6 +4,7 @@ import { Sheet, Seg, MoneyField, ConfirmButton } from './ui.tsx'
 import { Icon } from './icons.tsx'
 import { parseMoney, fmt, fmtNum, CUR_LABEL, type Currency } from './lib/money.ts'
 import { Repeat } from 'lucide-react'
+import { ReceiptPhoto } from './screens/Receipt.tsx'
 import { todayIso } from './lib/period.ts'
 import { GROUPS, ASSET_KINDS, SECTIONS, PLATFORMS, kindOf, type Tx, type Kind, type Category, type Group, type Asset, type AssetSection } from './lib/types.ts'
 import { ICON_CHOICES } from './icons.tsx'
@@ -112,6 +113,7 @@ export function TxSheet({ tx, kind: initialKind = 'out', template, onClose, noti
           </select>
         </label>
       )}
+      {tx?.receipt_path && <ReceiptPhoto path={tx.receipt_path} />}
       {err && <p className="err">{err}</p>}
       <div className="actions">
         {tx && <ConfirmButton onConfirm={async () => { await st.deleteTx(tx.id); notify('Șters'); onClose() }} />}
