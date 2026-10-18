@@ -5,6 +5,7 @@ import { Ring, Bar, Seg, CountUp, EmptyArt } from '../ui.tsx'
 import { TxRow, catColor } from '../helpers.tsx'
 import { upcomingList, UpcomingRows, GoalsSection } from './Plans.tsx'
 import { useMyQuotes, asQuotes } from './Reminder.tsx'
+import { ReceiptButton } from './Receipt.tsx'
 import { quoteFor } from '../lib/quotes.ts'
 import { Icon } from '../icons.tsx'
 import { fmt, fmtNum, fmtSigned, pct } from '../lib/money.ts'
@@ -14,9 +15,9 @@ import type { Tx, Recurring, Goal } from '../lib/types.ts'
 import { CUR_LABEL } from '../lib/money.ts'
 import type { Nav } from '../App.tsx'
 
-export function HomeScreen({ nav, period, setPeriod, scope, setScope, openTx, openRecurring, openGoal }: {
+export function HomeScreen({ nav, period, setPeriod, scope, setScope, openTx, openRecurring, openGoal, notify }: {
   nav: Nav; period: Period; setPeriod: (n: number) => void; scope: 'all' | 'me'; setScope: (s: 'all' | 'me') => void
-  openTx: (t?: Tx, kind?: 'in' | 'out', template?: Partial<Tx>) => void; openRecurring: (r?: Recurring) => void; openGoal: (g?: Goal, add?: boolean) => void
+  openTx: (t?: Tx, kind?: 'in' | 'out', template?: Partial<Tx>) => void; openRecurring: (r?: Recurring) => void; openGoal: (g?: Goal, add?: boolean) => void; notify: (m: string) => void
 }) {
   const st = useStore()
   const today = todayIso()
@@ -110,6 +111,7 @@ export function HomeScreen({ nav, period, setPeriod, scope, setScope, openTx, op
       <div className="add-row">
         <button type="button" className="add out" onClick={() => openTx(undefined, 'out')}><Minus size={18} />Cheltuială</button>
         <button type="button" className="add in" onClick={() => openTx(undefined, 'in')}><Plus size={18} />Venit</button>
+        <ReceiptButton notify={notify} />
       </div>
 
       {templates.length > 0 && (

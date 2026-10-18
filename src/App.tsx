@@ -191,9 +191,9 @@ function Shell({ theme, setTheme }: { theme: Theme; setTheme: (t: Theme) => void
       </>
     )
   } else {
-    body = tab === 'home' ? <HomeScreen nav={nav} period={period} setPeriod={n => setOffset(o => o + n)} scope={scope} setScope={setScope} openTx={openTx} openRecurring={openRecurring} openGoal={openGoal} />
+    body = tab === 'home' ? <HomeScreen nav={nav} period={period} setPeriod={n => setOffset(o => o + n)} scope={scope} setScope={setScope} openTx={openTx} openRecurring={openRecurring} openGoal={openGoal} notify={notify} />
       : tab === 'stats' ? <StatsScreen period={period} anchor={anchor} />
-      : tab === 'exp' ? <ExpensesTab nav={nav} openTx={openTx} />
+      : tab === 'exp' ? <ExpensesTab nav={nav} openTx={openTx} notify={notify} />
       : tab === 'avere' ? <AvereScreen scope={scope} openAsset={openAsset} openGoal={openGoal} />
       : <AccountScreen nav={nav} onLogout={logout} />
   }

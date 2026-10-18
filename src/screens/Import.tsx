@@ -7,8 +7,9 @@ import { fmt, fmtNum } from '../lib/money.ts'
 import { shortDayLabel } from '../lib/period.ts'
 import { parseBT, categorize, merchantKey, type ParsedTx, type PdfItem, type Rule } from '../lib/btImport.ts'
 import { GROUPS } from '../lib/types.ts'
+import { pendingReceipts, receiptForImport, type PendingReceipt } from '../lib/receipt.ts'
 
-interface Row { tx: ParsedTx; include: boolean; cat: string; suggested: string; dup: boolean }
+interface Row { tx: ParsedTx; include: boolean; cat: string; suggested: string; dup: boolean; receipt: PendingReceipt | null }
 
 async function readPdf(file: File): Promise<PdfItem[]> {
   const pdfjs = await import('pdfjs-dist')
@@ -40,10 +41,13 @@ export function ImportScreen({ notify }: { notify: (m: string) => void }) {
       if (!txs.length) throw new Error('N-am găsit tranzacții în fișier. E un extras de cont BT (Banca Transilvania)?')
       const rules = await st.repo.list<Rule>('import_rules', st.householdId).catch(() => [] as Rule[])
       const known = new Set(st.txs.map(t => t.import_ref).filter(Boolean))
+      const pending = pendingReceipts(st.txs)
       setRows(txs.map(tx => {
         const c = categorize(tx, rules, st.categories) || ''
         const dup = known.has(tx.ref)
-        return { tx, cat: c, suggested: c, include: !dup, dup }
+        const receipt = dup || tx.kind === 'in' ? null : receiptForImport(tx, pending)
+        if (receipt) pending.splice(pending.indexOf(receipt), 1)
+        return { tx, cat: c, suggested: c, include: !dup && !receipt, dup, receipt }
       }))
     } catch (e: any) { setErr(e?.message || 'Nu am putut citi fișierul.') }
     finally { setBusy(false) }
@@ -63,6 +67,11 @@ export function ImportScreen({ notify }: { notify: (m: string) => void }) {
     setErr(''); setBusy(true)
     let n = 0
     try {
+      // Bank lines already covered by a photographed receipt: link them so they never import twice.
+      for (const r of rows.filter(x => x.receipt && !x.include)) {
+        const first = r.receipt!.txs[0]
+        try { await st.saveTx({ id: first.id, import_ref: r.tx.ref, orig_note: r.tx.original || null }) } catch { /* retry next import */ }
+      }
       for (const r of chosen) {
         const cur = r.tx.currency
         const known = cur === 'RON' || cur === 'EUR' || cur === 'USD'
@@ -71,7 +80,7 @@ export function ImportScreen({ notify }: { notify: (m: string) => void }) {
           await st.saveTx({
             kind: r.tx.kind, amount: ron, category_id: r.cat, date: r.tx.date, note: r.tx.merchant.slice(0, 80), asset_id: null,
             orig_amount: cur !== 'RON' && known ? r.tx.amount : null, orig_currency: cur !== 'RON' && known ? (cur as any) : null,
-            import_ref: r.tx.ref,
+            import_ref: r.tx.ref, orig_note: r.tx.original || null,
           })
           n++
         } catch (e: any) { if (!/duplicate|unique/i.test(e?.message || '')) throw e }
@@ -122,7 +131,7 @@ export function ImportScreen({ notify }: { notify: (m: string) => void }) {
                 </label>
                 <span className="row-main">
                   <b>{r.tx.merchant || r.tx.title}</b>
-                  <span className="muted small">{shortDayLabel(r.tx.date)}{r.tx.original ? ` · ${r.tx.original}` : ''}{r.dup ? ' · deja importată' : ''}</span>
+                  <span className="muted small">{shortDayLabel(r.tx.date)}{r.tx.original ? ` · ${r.tx.original}` : ''}{r.dup ? ' · deja importată' : ''}{r.receipt ? ' · acoperită de bon 🧾' : ''}</span>
                   <span className="imp-cat">
                     <CatIcon icon={c?.icon || 'circle'} color={catColor(c)} size={26} />
                     <select aria-label="Categoria" value={r.cat} onChange={e => set(i, { cat: e.target.value, include: true })}>

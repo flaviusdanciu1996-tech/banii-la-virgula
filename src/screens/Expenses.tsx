@@ -3,6 +3,7 @@ import { ChevronRight, Plus, Minus, Settings2, ChevronLeft, Search, Repeat, File
 import { useStore } from '../store.tsx'
 import { Ring, EmptyArt } from '../ui.tsx'
 import { TxRow, catColor } from '../helpers.tsx'
+import { ReceiptButton } from './Receipt.tsx'
 import { Icon } from '../icons.tsx'
 import { fmt, fmtNum, pct } from '../lib/money.ts'
 import { dayLabel, shortDayLabel, periodLabel, periodFor, shiftPeriod, todayIso, inPeriod, type Period } from '../lib/period.ts'
@@ -10,7 +11,7 @@ import { summarize } from '../lib/calc.ts'
 import { GROUPS, type Tx } from '../lib/types.ts'
 import type { Nav } from '../App.tsx'
 
-export function ExpensesTab({ nav, openTx }: { nav: Nav; openTx: (t?: Tx, kind?: 'in' | 'out') => void }) {
+export function ExpensesTab({ nav, openTx, notify }: { nav: Nav; openTx: (t?: Tx, kind?: 'in' | 'out') => void; notify: (m: string) => void }) {
   const st = useStore()
   const latest = [...st.txs].sort((a, b) => (b.date + b.created_at).localeCompare(a.date + a.created_at)).slice(0, 10)
   return (
@@ -21,6 +22,7 @@ export function ExpensesTab({ nav, openTx }: { nav: Nav; openTx: (t?: Tx, kind?:
         <div className="add-row">
           <button type="button" className="add out" onClick={() => openTx(undefined, 'out')}><Minus size={18} />Cheltuială</button>
           <button type="button" className="add in" onClick={() => openTx(undefined, 'in')}><Plus size={18} />Venit</button>
+          <ReceiptButton notify={notify} />
         </div>
       </section>
       <section>

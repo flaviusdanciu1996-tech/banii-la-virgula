@@ -147,3 +147,19 @@ test('BT statement parsing and categories', () => {
   assert.deepEqual(txs.map(t => categorize(t, [], cats)), ['f', 'm', 'd'])
   assert.equal(categorize(txs[1], [{ pattern: 'city gross', category_id: 'f' }], cats), 'f') // learned rule wins
 })
+
+import { matchReceipt, splitProportional, receiptForImport, pendingReceipts, groupItems } from './receipt.ts'
+
+test('receipts: matching and splitting', () => {
+  const base = (o: Partial<Tx>): Tx => ({ id: 'x', household_id: 'h', member_id: 'u', kind: 'out', amount: 1601, category_id: 'fuel', note: 'Aral', date: '2026-10-14', created_at: '', asset_id: null, ...o })
+  const aral = base({ id: 'a', orig_amount: 300, orig_currency: 'EUR', orig_note: '3.00 EUR', import_ref: 'R1' })
+  const shell = base({ id: 's', amount: 2140, orig_amount: 401, orig_currency: 'EUR', orig_note: '30.00 DKK', import_ref: 'R2', date: '2026-10-10' })
+  assert.equal(matchReceipt({ total: 300, currency: 'EUR', date: '2026-10-14' }, [aral, shell])?.id, 'a')
+  assert.equal(matchReceipt({ total: 3000, currency: 'DKK', date: '2026-10-11' }, [aral, shell])?.id, 's')
+  assert.equal(matchReceipt({ total: 300, currency: 'EUR', date: '2026-10-25' }, [aral]), null)
+  assert.deepEqual(splitProportional(1601, [100, 200]), [534, 1067])
+  assert.equal(splitProportional(999, [1, 1, 1]).reduce((a, b) => a + b, 0), 999)
+  const pend = pendingReceipts([base({ id: 'p1', receipt_id: 'rc', receipt_total: 3000, receipt_currency: 'DKK', date: '2026-10-10' })])
+  assert.equal(receiptForImport({ date: '2026-10-10', amount: 401, currency: 'EUR', original: '30.00 DKK' }, pend)?.receipt_id, 'rc')
+  assert.deepEqual(groupItems([{ name: 'WC', amount: 1, category: 'WC & dușuri' }, { name: 'Kaffee', amount: 2.5, category: 'Restaurante & cafenele' }, { name: 'Dusche', amount: 4, category: 'WC & dușuri' }]).map(g => [g.category, g.amount]), [['WC & dușuri', 500], ['Restaurante & cafenele', 250]])
+})

@@ -10,7 +10,7 @@ const CATS: [string, 'in' | 'out', string | null, string, number][] = [
   ['Chirie / rată', 'out', 'critic', 'home', 150000], ['Utilități', 'out', 'critic', 'plug', 60000],
   ['Mâncare acasă', 'out', 'critic', 'shopping-cart', 180000], ['Transport', 'out', 'critic', 'bus', 20000],
   ['Combustibil', 'out', 'critic', 'fuel', 80000], ['Sănătate', 'out', 'critic', 'heart-pulse', 20000],
-  ['Telefon & internet', 'out', 'critic', 'smartphone', 15000], ['Haine', 'out', 'important', 'shirt', 30000],
+  ['Telefon & internet', 'out', 'critic', 'smartphone', 15000], ['WC & dușuri', 'out', 'critic', 'droplets', 5000], ['Haine', 'out', 'important', 'shirt', 30000],
   ['Casă', 'out', 'important', 'sofa', 30000], ['Educație', 'out', 'important', 'graduation-cap', 0],
   ['Familie & cadouri', 'out', 'important', 'gift', 20000], ['Asigurări', 'out', 'important', 'shield', 25000],
   ['Restaurante & cafenele', 'out', 'optional', 'utensils', 40000], ['Băuturi alcoolice', 'out', 'optional', 'wine', 10000],

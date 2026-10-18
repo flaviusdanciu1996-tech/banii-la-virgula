@@ -2,7 +2,7 @@
 
 export type Currency = 'RON' | 'EUR' | 'USD'
 
-export const CUR_LABEL: Record<Currency, string> = { RON: 'lei', EUR: '€', USD: '$' }
+export const CUR_LABEL: Record<string, string> = new Proxy({ RON: 'lei', EUR: '€', USD: '$' } as Record<string, string>, { get: (t, k: string) => t[k] ?? k })
 
 /** Parse Romanian-style input: "23,50", "1.234,50", "12", "1 234,5". Returns minor units or null. */
 export function parseMoney(input: string): number | null {

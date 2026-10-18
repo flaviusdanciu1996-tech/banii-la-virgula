@@ -27,9 +27,13 @@ export interface Tx {
   created_at: string
   asset_id: string | null
   orig_amount?: number | null
-  orig_currency?: Currency | null
+  orig_currency?: string | null
   recurring_id?: string | null
   import_ref?: string | null
+  orig_note?: string | null
+  receipt_id?: string | null
+  receipt_total?: number | null
+  receipt_currency?: string | null
 }
 
 export interface Settings {
