@@ -175,4 +175,18 @@ export interface Goal {
   archived: boolean
   photo_path?: string | null // dream board photo (private storage, bucket "dreams")
   note?: string | null // why you want it
+  category?: string // dream board section, see DREAM_CATS
+  done_on?: string | null // ticked as achieved
 }
+
+export const DREAM_CATS: { id: string; name: string; color: string; icon: string }[] = [
+  { id: 'familie', name: 'Familie', color: '#F472B6', icon: 'heart' },
+  { id: 'casa', name: 'Casă', color: '#F59E0B', icon: 'home' },
+  { id: 'masini', name: 'Mașini', color: '#60A5FA', icon: 'car' },
+  { id: 'calatorii', name: 'Călătorii', color: '#22D3EE', icon: 'plane' },
+  { id: 'oameni', name: 'Oameni de cunoscut', color: '#A78BFA', icon: 'users' },
+  { id: 'experiente', name: 'Experiențe', color: '#FB7185', icon: 'sparkles' },
+  { id: 'bani', name: 'Bani', color: '#34D399', icon: 'piggy-bank' },
+  { id: 'altele', name: 'Altele', color: '#94A3B8', icon: 'star' },
+]
+export const dreamCat = (id?: string) => DREAM_CATS.find(c => c.id === id) ?? DREAM_CATS[DREAM_CATS.length - 1]

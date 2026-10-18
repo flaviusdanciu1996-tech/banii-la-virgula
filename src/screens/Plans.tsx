@@ -7,7 +7,7 @@ import { catColor } from '../helpers.tsx'
 import { fmt, fmtNum, parseMoney, CUR_LABEL, pct, type Currency } from '../lib/money.ts'
 import { todayIso, diffDays, shortDayLabel, MONTHS } from '../lib/period.ts'
 import { nextOccurrence, monthlyNeeded } from '../lib/schedule.ts'
-import { GROUPS, type Recurring, type Goal, type Kind } from '../lib/types.ts'
+import { GROUPS, DREAM_CATS, type Recurring, type Goal, type Kind } from '../lib/types.ts'
 import { DreamImage, DreamPhotoField, saveDreamPhoto, removeDreamPhoto } from './Dreams.tsx'
 import type { Nav } from '../App.tsx'
 
@@ -172,6 +172,8 @@ export function GoalSheet({ goal, addMode, onClose, notify, celebrate }: { goal?
   const [saved, setSaved] = useState(goal ? fmtNum(goal.saved) : '')
   const [deadline, setDeadline] = useState(goal?.deadline ?? '')
   const [note, setNote] = useState(goal?.note ?? '')
+  const [cat, setCat] = useState(goal?.category ?? 'altele')
+  const [done, setDone] = useState(!!goal?.done_on)
   const [photo, setPhoto] = useState<{ blob: Blob; preview: string } | null | 'remove'>(null)
   const [busy, setBusy] = useState(false)
   const [add, setAdd] = useState('')
@@ -197,12 +199,15 @@ export function GoalSheet({ goal, addMode, onClose, notify, celebrate }: { goal?
 
   async function save() {
     const t = target.trim() ? parseMoney(target) : 0, sv = saved.trim() ? parseMoney(saved) : 0
-    if (!name.trim()) return setErr('Scrie visul, de ex. „Cabana A-frame”.')
+    const hasPhoto = photo ? photo !== 'remove' : !!goal?.photo_path
+    if (!name.trim() && !hasPhoto) return setErr('Pune o poză sau scrie visul, de ex. „Cabana A-frame”.')
     if (t === null || t < 0) return setErr('Suma nu e validă (ex. 50.000).')
     if (sv === null || sv < 0) return setErr('Suma strânsă nu e validă.')
     setBusy(true); setErr('')
     try {
-      const g = await st.saveGoal({ id: goal?.id, name: name.trim(), icon, target: t, saved: sv, deadline: deadline || null, note: note.trim() || null, archived: false })
+      const g = await st.saveGoal({ id: goal?.id, name: name.trim(), icon, target: t, saved: sv, deadline: deadline || null, note: note.trim() || null, archived: false,
+        category: cat, done_on: done ? (goal?.done_on || todayIso()) : null })
+      if (done && !goal?.done_on) celebrate(`Realizat: ${name.trim() || 'visul tău'}! 🎉`)
       if (photo === 'remove') {
         await removeDreamPhoto(goal?.photo_path)
         await st.saveGoal({ id: g.id, photo_path: null })
@@ -210,7 +215,8 @@ export function GoalSheet({ goal, addMode, onClose, notify, celebrate }: { goal?
         const path = await saveDreamPhoto(st.householdId, g.id, photo.blob, goal?.photo_path)
         await st.saveGoal({ id: g.id, photo_path: path })
       }
-      notify(goal ? 'Vis salvat' : 'Vis adăugat ✨'); onClose()
+      if (!(done && !goal?.done_on)) notify(goal ? 'Vis salvat' : 'Vis adăugat ✨')
+      onClose()
     } catch (e: any) { setErr(e?.message || 'Nu s-a putut salva.') }
     finally { setBusy(false) }
   }
@@ -230,6 +236,10 @@ export function GoalSheet({ goal, addMode, onClose, notify, celebrate }: { goal?
   return (
     <Sheet title={goal ? 'Visul tău' : 'Vis nou'} onClose={onClose}>
       <DreamPhotoField current={goal?.photo_path} value={photo} onChange={setPhoto} />
+      <div className="field">Rubrica</div>
+      <div className="chips">
+        {DREAM_CATS.map(c => <button key={c.id} type="button" className="chip" aria-pressed={cat === c.id} onClick={() => setCat(c.id)}><i className="dot" style={{ background: c.color }} />{c.name}</button>)}
+      </div>
       <label className="field">Ce visezi<input id="goal-name" maxLength={40} placeholder="ex. Cabana A-frame, BMW X5, Islanda" value={name} onChange={e => setName(e.target.value)} /></label>
       <label className="field">De ce îl vrei (opțional)<input id="goal-note" maxLength={90} placeholder="ex. Liniște la munte, cu vedere spre Cheile Ordâncușii" value={note} onChange={e => setNote(e.target.value)} /></label>
       <label className="field">De câți bani ai nevoie (opțional)</label>
@@ -239,6 +249,7 @@ export function GoalSheet({ goal, addMode, onClose, notify, celebrate }: { goal?
         <MoneyField id="goal-saved" value={saved} onChange={setSaved} suffix="lei" />
         <label className="field">Până când (opțional)<input id="goal-deadline" type="date" value={deadline} onChange={e => setDeadline(e.target.value)} /></label>
       </> : <p className="hint">Fără sumă rămâne doar poza, ca inspirație. O poți pune oricând.</p>}
+      <label className="switch">Realizat ✓<input id="goal-done" type="checkbox" checked={done} onChange={e => setDone(e.target.checked)} /></label>
       {!photo && !goal?.photo_path && <>
         <div className="field">Iconiță (dacă n-ai poză)</div>
         <div className="icon-grid">

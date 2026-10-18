@@ -3,10 +3,11 @@ import {
   Utensils, Wine, Dumbbell, PartyPopper, Repeat, ShoppingBag, PiggyBank, TrendingUp, LifeBuoy, Wallet, Truck,
   Sparkles, CirclePlus, Circle, Landmark, Banknote, LineChart, Bitcoin, Scroll, PieChart, Car, Trees, Package,
   FileText, CreditCard, HandCoins, Baby, Dog, Plane, Coffee, Cigarette, Gamepad2, Wrench, Book, Music, Pill,
-  Scissors, Hammer, Briefcase, Tv, Bike, Droplets, Flame, Zap, Wifi, Receipt, Building2, Target, Mountain, CalendarClock, Inbox, Sparkle, Search, Bell, Gem, type LucideIcon,
+  Scissors, Hammer, Briefcase, Tv, Bike, Droplets, Flame, Zap, Wifi, Receipt, Building2, Target, Mountain, CalendarClock, Inbox, Sparkle, Search, Bell, Gem, Heart, Users, Star, type LucideIcon,
 } from 'lucide-react'
 
 export const ICONS: Record<string, LucideIcon> = {
+  heart: Heart, users: Users, star: Star,
   home: Home, plug: Plug, 'shopping-cart': ShoppingCart, bus: Bus, fuel: Fuel, 'heart-pulse': HeartPulse,
   smartphone: Smartphone, shirt: Shirt, sofa: Sofa, 'graduation-cap': GraduationCap, gift: Gift, shield: Shield,
   utensils: Utensils, wine: Wine, dumbbell: Dumbbell, 'party-popper': PartyPopper, repeat: Repeat,

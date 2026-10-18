@@ -486,3 +486,31 @@ section > h2.grp-h::before { display: none; }
 .dream-field .add-row .ghost-btn { flex: 1; display: inline-flex; gap: 6px; align-items: center; justify-content: center; }
 .goal-thumb { position: static; width: 46px; height: 46px; border-radius: 12px; flex: none; }
 .goal-thumb.dream-ph { display: grid; }
+
+/* Dream collage */
+.dream-top { display: flex; flex-direction: column; gap: 10px; }
+.dream-filter { flex-wrap: nowrap; overflow-x: auto; margin: 0 -16px; padding: 0 16px 2px; scrollbar-width: none; }
+.dream-filter::-webkit-scrollbar { display: none; }
+.dream-filter .chip, .chips .chip { white-space: nowrap; display: inline-flex; align-items: center; gap: 6px; }
+.chip .dot { width: 8px; height: 8px; border-radius: 50%; display: inline-block; }
+.collage { display: grid; grid-template-columns: repeat(3, 1fr); grid-auto-flow: dense; gap: 4px; margin: 0 -10px; }
+.collage-tile { position: relative; aspect-ratio: 1; border: 0; padding: 0; border-radius: 10px; overflow: hidden; background: var(--surface-2); box-shadow: inset 0 -3px 0 var(--c); }
+.collage-tile.big { grid-column: span 2; grid-row: span 2; }
+.collage-tile .dream-img { border-radius: 0; }
+.collage-tile.done { box-shadow: inset 0 0 0 3px #22C55E; }
+.collage-tile.done .dream-img { filter: saturate(.75) brightness(.85); }
+.collage-name { position: absolute; left: 6px; right: 34px; bottom: 6px; color: #fff; font-size: 12px; font-weight: 600; text-align: left; text-shadow: 0 1px 3px rgba(0,0,0,.8); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.collage-tile.big .collage-name { font-size: 15px; }
+.tick { position: absolute; top: 6px; right: 6px; width: 24px; height: 24px; border-radius: 6px; background: rgba(255,255,255,.92); border: 1.5px solid rgba(0,0,0,.15); display: grid; place-items: center; color: #fff; cursor: pointer; z-index: 2; }
+.tick::after { content: ""; position: absolute; inset: -10px; }
+.tick.on { background: #22C55E; border-color: #22C55E; }
+.tick.static { cursor: default; }
+.dream-card .tick { top: 12px; right: 12px; width: 30px; height: 30px; }
+.dream-chip { position: absolute; top: 12px; left: 12px; color: #0b1220; font-size: 12px; font-weight: 700; padding: 4px 9px; border-radius: 99px; }
+.dream-card.done .dream-img, .dream-tile.done .dream-img { filter: saturate(.8); }
+.dream-actions { display: flex; gap: 10px; }
+.dream-actions .ghost-btn { flex: 1; }
+.ghost-btn.wide { width: 100%; }
+.dream-empty { align-items: center; text-align: center; padding: 28px 18px; color: var(--accent); }
+.dream-empty p { margin: 0; }
+.bulk-progress { display: flex; flex-direction: column; gap: 8px; }

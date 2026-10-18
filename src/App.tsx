@@ -179,7 +179,7 @@ function Shell({ theme, setTheme }: { theme: Theme; setTheme: (t: Theme) => void
       case 'recurente': inner = <RecurringScreen openRecurring={openRecurring} />; break
       case 'notificari': inner = <ReminderScreen notify={notify} />; break
       case 'import': inner = <ImportScreen notify={notify} />; break
-      case 'visuri': inner = <DreamsScreen openGoal={openGoal} />; break
+      case 'visuri': inner = <DreamsScreen openGoal={openGoal} notify={notify} celebrate={celebrate} />; break
       default: inner = <AboutScreen />
     }
     body = (
