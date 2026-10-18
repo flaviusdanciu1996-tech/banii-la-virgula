@@ -30,6 +30,33 @@ export interface Indicators {
   ret3m: number | null
   divYield: number | null // % (BVB value, or last 12 months of dividends / price)
   turnover: number | null // average daily value traded, lei (last 3 months)
+  macd: { line: number; signal: number; hist: number; rising: boolean } | null // 12/26/9, in % of price
+  boll: { mid: number; up: number; low: number; pctB: number; width: number } | null // 20 days, ±2 deviations
+  volRatio: number | null // volume of the last 20 days ÷ the last 3 months (1 = normal)
+  roe: number | null // % — return on equity, = P/BV ÷ P/E
+  beta: number | null // how strongly it moves with the whole market (1 = like the market)
+}
+
+/** Daily average return of all stocks (an equal-weight "market"), used for beta. */
+export type Market = Map<number, number>
+export function marketReturns(stocks: StockData[]): Market {
+  const sum = new Map<number, { s: number; n: number }>()
+  for (const st of stocks) for (let k = 1; k < st.t.length; k++) {
+    if (!(st.a[k - 1] > 0) || st.t[k] - st.t[k - 1] > 5) continue
+    const r = st.a[k] / st.a[k - 1] - 1
+    if (Math.abs(r) > 0.4) continue
+    const x = sum.get(st.t[k]) ?? { s: 0, n: 0 }; x.s += r; x.n++; sum.set(st.t[k], x)
+  }
+  const out: Market = new Map()
+  for (const [d, x] of sum) if (x.n >= 3) out.set(d, x.s / x.n)
+  return out
+}
+
+function emaSeries(xs: number[], from: number, to: number, n: number): number[] {
+  const k = 2 / (n + 1), out: number[] = []
+  let e = xs[from]
+  for (let i = from; i <= to; i++) { e = i === from ? xs[i] : xs[i] * k + e * (1 - k); out.push(e) }
+  return out
 }
 
 export type Label = 'buy' | 'neutral' | 'hot' | 'avoid'
@@ -104,8 +131,57 @@ export function indicators(s: StockData, i = s.t.length - 1, useBvbFundamentals 
     price: c[i], ma50: sma(a, i, 50), ma200: sma(a, i, 200), rsi: rsi(a, i),
     hi52: y !== null ? hi : null, lo52: y !== null ? lo : null, pos52: y !== null && hi > lo ? (a[i] - lo) / (hi - lo) : null,
     vol, dd: y !== null ? dd * 100 : null, ret1y: y !== null ? (a[i] / a[y] - 1) * 100 : null, ret3m: q !== null ? (a[i] / a[q] - 1) * 100 : null,
-    divYield, turnover,
+    divYield, turnover, ...extraIndicators(s, i, useBvbFundamentals),
   }
+}
+
+let MARKET: Market | null = null
+/** Set once with all stocks so beta can be computed. */
+export function setMarket(m: Market | null) { MARKET = m }
+
+function extraIndicators(s: StockData, i: number, useBvbFundamentals: boolean) {
+  const a = s.a
+  let macd: Indicators['macd'] = null
+  if (i >= 60) {
+    const from = Math.max(0, i - 300)
+    const e12 = emaSeries(a, from, i, 12), e26 = emaSeries(a, from, i, 26)
+    const line = e12.map((x, k) => x - e26[k])
+    const sig = emaSeries(line, 0, line.length - 1, 9)
+    const L = line.length - 1, p = a[i]
+    const hist = line[L] - sig[L], prevHist = line[L - 1] - sig[L - 1]
+    macd = { line: (line[L] / p) * 100, signal: (sig[L] / p) * 100, hist: (hist / p) * 100, rising: hist > prevHist }
+  }
+  let boll: Indicators['boll'] = null
+  if (i >= 19) {
+    let m = 0; for (let k = i - 19; k <= i; k++) m += a[k]; m /= 20
+    let v = 0; for (let k = i - 19; k <= i; k++) v += (a[k] - m) ** 2
+    const sd = Math.sqrt(v / 20), up = m + 2 * sd, low = m - 2 * sd
+    boll = { mid: m, up, low, pctB: up > low ? (a[i] - low) / (up - low) : 0.5, width: m ? ((up - low) / m) * 100 : 0 }
+  }
+  let volRatio: number | null = null
+  if (s.v && i >= 63) {
+    let a20 = 0, a63 = 0
+    for (let k = i - 19; k <= i; k++) a20 += s.v[k] ?? 0
+    for (let k = i - 62; k <= i; k++) a63 += s.v[k] ?? 0
+    volRatio = a63 > 0 && a20 > 0 ? (a20 / 20) / (a63 / 63) : null
+  }
+  const roe = useBvbFundamentals && s.per != null && s.pbv != null && s.per > 0 && s.pbv > 0 ? (s.pbv / s.per) * 100 : null
+  let beta: number | null = null
+  if (MARKET && i >= 120) {
+    const xs: number[] = [], ys: number[] = []
+    for (let k = Math.max(1, i - 250); k <= i; k++) {
+      const m = MARKET.get(s.t[k])
+      if (m == null || !(a[k - 1] > 0) || s.t[k] - s.t[k - 1] > 5) continue
+      xs.push(m); ys.push(a[k] / a[k - 1] - 1)
+    }
+    if (xs.length > 80) {
+      const mx = xs.reduce((p, q) => p + q, 0) / xs.length, my = ys.reduce((p, q) => p + q, 0) / ys.length
+      let cov = 0, vx = 0
+      for (let k = 0; k < xs.length; k++) { cov += (xs[k] - mx) * (ys[k] - my); vx += (xs[k] - mx) ** 2 }
+      beta = vx > 0 ? cov / vx : null
+    }
+  }
+  return { macd, boll, volRatio, roe, beta }
 }
 
 /**
@@ -122,7 +198,7 @@ export function score(s: StockData, i = s.t.length - 1, useBvbFundamentals = tru
   let div = 0
   const dy = ind.divYield
   if (dy != null) {
-    div = dy >= 8 ? 15 : dy >= 6 ? 12 : dy >= 4 ? 8 : dy >= 2 ? 4 : 0
+    div = dy >= 8 ? 12 : dy >= 6 ? 10 : dy >= 4 ? 7 : dy >= 2 ? 3 : 0
     reasons.push({ good: dy >= 6 ? true : dy >= 3 ? null : false, text: `Dividend ${fmt(dy)}% pe an${dy >= 6 ? ' — generos' : dy < 3 ? ' — mic' : ''}` })
   }
   let fund: number
@@ -133,17 +209,21 @@ export function score(s: StockData, i = s.t.length - 1, useBvbFundamentals = tru
     reasons.push({ good: null, text: 'ETF: fundamentalele sunt ale firmelor din indice — risc împărțit pe multe firme' })
   } else if (useBvbFundamentals) {
     const per = s.per, pbv = s.pbv
-    let p = 7, b = 5
+    let p = 6, b = 4, q = 4
     if (per != null) {
-      p = per <= 0 ? 0 : per <= 6 ? 15 : per <= 10 ? 12 : per <= 15 ? 8 : per <= 20 ? 4 : 0
+      p = per <= 0 ? 0 : per <= 6 ? 12 : per <= 10 ? 10 : per <= 15 ? 6 : per <= 20 ? 3 : 0
       reasons.push({ good: per > 0 && per <= 10 ? true : per <= 0 || per > 20 ? false : null, text: per <= 0 ? 'Firma e pe pierdere (P/E negativ)' : `P/E ${fmt(per)} — ${per <= 10 ? 'ieftină față de profit' : per <= 15 ? 'preț corect' : 'scumpă față de profit'}` })
     } else reasons.push({ good: null, text: 'P/E indisponibil pe BVB (pierdere sau firmă listată din străinătate)' })
     if (pbv != null) {
-      b = pbv <= 1 ? 10 : pbv <= 1.5 ? 7 : pbv <= 2.5 ? 4 : 1
+      b = pbv <= 1 ? 8 : pbv <= 1.5 ? 6 : pbv <= 2.5 ? 3 : 1
       reasons.push({ good: pbv <= 1.2 ? true : pbv > 2.5 ? false : null, text: `P/BV ${fmt(pbv, 2)} — ${pbv <= 1 ? 'sub valoarea din bilanț' : pbv <= 2.5 ? 'normal' : 'mult peste valoarea din bilanț'}` })
     }
-    fund = div + p + b
-  } else fund = Math.round(div * (40 / 15))
+    if (ind.roe != null) {
+      q = ind.roe >= 20 ? 8 : ind.roe >= 15 ? 6 : ind.roe >= 10 ? 4 : ind.roe >= 5 ? 2 : 0
+      reasons.push({ good: ind.roe >= 15 ? true : ind.roe < 8 ? false : null, text: `ROE ${fmt(ind.roe)}% — ${ind.roe >= 15 ? 'firma face profit bun din banii ei' : ind.roe >= 8 ? 'profitabilitate medie' : 'profitabilitate slabă'}` })
+    }
+    fund = div + p + b + q
+  } else fund = Math.round(div * (40 / 12))
 
   // Technical
   let tech = 0
@@ -167,6 +247,12 @@ export function score(s: StockData, i = s.t.length - 1, useBvbFundamentals = tru
     reasons.push({ good: ind.pos52 <= 0.4 ? true : ind.pos52 > 0.85 ? false : null, text: `E la ${Math.round(ind.pos52 * 100)}% din drumul dintre minimul și maximul pe un an` })
   }
 
+  // Extra signals — shown, not scored (they get points only after they prove themselves in the backtest)
+  if (ind.macd) reasons.push({ good: ind.macd.hist > 0 && ind.macd.rising ? true : ind.macd.hist < 0 && !ind.macd.rising ? false : null, text: `MACD ${ind.macd.hist > 0 ? 'peste' : 'sub'} semnal${ind.macd.rising ? ', în accelerare' : ', încetinește'} — ${ind.macd.hist > 0 ? 'impuls de creștere' : 'impuls de scădere'}` })
+  if (ind.boll) reasons.push({ good: ind.boll.pctB < 0.15 ? true : ind.boll.pctB > 0.95 ? false : null, text: ind.boll.pctB < 0.15 ? 'Lângă banda de jos Bollinger — ieftină față de ultimele 20 de zile' : ind.boll.pctB > 0.95 ? 'Lângă banda de sus Bollinger — a urcat repede' : `În interiorul benzilor Bollinger (${Math.round(ind.boll.pctB * 100)}%)` })
+  if (ind.volRatio != null && (ind.volRatio > 1.5 || ind.volRatio < 0.6)) reasons.push({ good: null, text: ind.volRatio > 1.5 ? `Volum de ${fmt(ind.volRatio)}× peste normal — interes mare acum` : 'Volum sub normal — puțin interes acum' })
+  if (ind.beta != null) reasons.push({ good: ind.beta < 0.8 ? true : ind.beta > 1.3 ? false : null, text: `Beta ${fmt(ind.beta, 2)} — ${ind.beta < 0.8 ? 'mai calmă decât bursa' : ind.beta > 1.3 ? 'amplifică mișcările bursei' : 'se mișcă cam ca bursa'}` })
+
   // Risk
   let risk = 0
   if (ind.vol != null) {
@@ -186,7 +272,7 @@ export function score(s: StockData, i = s.t.length - 1, useBvbFundamentals = tru
 
 /* ---------- Your own rules ---------- */
 
-export interface Rules { minDiv?: number | null; maxPer?: number | null; maxPbv?: number | null; aboveMa200?: boolean; maxRsi?: number | null; minScore?: number | null }
+export interface Rules { minDiv?: number | null; maxPer?: number | null; maxPbv?: number | null; aboveMa200?: boolean; maxRsi?: number | null; minScore?: number | null; minRoe?: number | null; maxBeta?: number | null; macdUp?: boolean; nearLowBand?: boolean }
 export function passesRules(s: StockData, sc: Score, r: Rules): { ok: boolean; fails: string[] } {
   const f: string[] = []
   if (r.minDiv != null && !((sc.ind.divYield ?? 0) >= r.minDiv)) f.push(`dividend sub ${r.minDiv}%`)
@@ -195,6 +281,10 @@ export function passesRules(s: StockData, sc: Score, r: Rules): { ok: boolean; f
   if (r.aboveMa200 && !(sc.ind.ma200 != null && s.a[s.a.length - 1] > sc.ind.ma200)) f.push('sub media de 200 de zile')
   if (r.maxRsi != null && !(sc.ind.rsi != null && sc.ind.rsi <= r.maxRsi)) f.push(`RSI peste ${r.maxRsi}`)
   if (r.minScore != null && sc.total < r.minScore) f.push(`scor sub ${r.minScore}`)
+  if (r.minRoe != null && !(sc.ind.roe != null && sc.ind.roe >= r.minRoe)) f.push(`ROE sub ${r.minRoe}%`)
+  if (r.maxBeta != null && !(sc.ind.beta != null && sc.ind.beta <= r.maxBeta)) f.push(`beta peste ${r.maxBeta}`)
+  if (r.macdUp && !(sc.ind.macd && sc.ind.macd.hist > 0)) f.push('MACD sub semnal')
+  if (r.nearLowBand && !(sc.ind.boll && sc.ind.boll.pctB < 0.25)) f.push('nu e lângă banda de jos Bollinger')
   return { ok: f.length === 0, fails: f }
 }
 

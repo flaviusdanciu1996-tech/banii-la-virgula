@@ -313,3 +313,15 @@ test('BVB indicators table', () => {
   const x = parseBvbIndicators(html)
   assert.equal(x.per, 8.65); assert.equal(x.pbv, 1.92); assert.equal(x.divy, 3.12); assert.equal(x.mcap, 44888167667); assert.equal(x.name, 'BANCA TRANSILVANIA S.A.')
 })
+
+import { readFileSync as rf } from 'node:fs'
+test('server radar score matches the app score', async () => {
+  const srv = await import('../../supabase/functions/market-radar/radar.ts')
+  const k = (n: number) => 10 + n * 0.02 + Math.sin(n / 5) * 0.3
+  const st = fakeStock('X', k)
+  for (const extra of [{ per: 8, pbv: 1.1, divy: 7 }, { per: null, pbv: null, divy: 1 }, { per: 25, pbv: 3, divy: null }]) {
+    const s = { ...st, ...extra }
+    assert.equal(srv.score(s).total, score(s).total)
+  }
+  void rf
+})

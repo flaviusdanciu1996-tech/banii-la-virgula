@@ -49,7 +49,8 @@ export function AssistantScreen({ initial }: { initial?: string }) {
       return { simbol: s.symbol, nume: s.name, scor: sc.total, zona: LABELS[sc.label].text, fundamental: sc.fund, tehnic: sc.tech, risc: sc.risk,
         pret: i.price, pe: s.per, pbv: s.pbv, eps: s.eps, dividend_pct: i.divYield && Math.round(i.divYield * 10) / 10, rsi: i.rsi && Math.round(i.rsi),
         media50: i.ma50 && +i.ma50.toFixed(3), media200: i.ma200 && +i.ma200.toFixed(3), min_1an: i.lo52, max_1an: i.hi52,
-        randament_1an_pct: i.ret1y && Math.round(i.ret1y), randament_3luni_pct: i.ret3m && Math.round(i.ret3m), volatilitate_pct: i.vol && Math.round(i.vol), cadere_max_1an_pct: i.dd && Math.round(i.dd),
+        randament_1an_pct: i.ret1y && Math.round(i.ret1y), roe_pct: i.roe && Math.round(i.roe * 10) / 10, beta: i.beta && +i.beta.toFixed(2),
+        macd: i.macd && { histograma_pct: +i.macd.hist.toFixed(2), accelereaza: i.macd.rising }, bollinger_pozitie_pct: i.boll && Math.round(i.boll.pctB * 100), volum_fata_de_normal: i.volRatio && +i.volRatio.toFixed(2), randament_3luni_pct: i.ret3m && Math.round(i.ret3m), volatilitate_pct: i.vol && Math.round(i.vol), cadere_max_1an_pct: i.dd && Math.round(i.dd),
         trece_regulile: passesRules(s, sc, rules).ok, motive: sc.reasons.map(r => (r.good === true ? '+ ' : r.good === false ? '- ' : '· ') + r.text) }
     }).sort((a, b) => b.scor - a.scor)
     const hold = st.assets.flatMap(a => a.holdings ?? []).map(h => {

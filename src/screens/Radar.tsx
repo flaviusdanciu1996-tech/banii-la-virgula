@@ -3,7 +3,7 @@ import { Star, RefreshCw, Sparkles, Info } from 'lucide-react'
 import { useStore } from '../store.tsx'
 import { supabase, DEMO } from '../db.ts'
 import { Sheet, Seg } from '../ui.tsx'
-import { score, passesRules, backtest, indexAt, isoOf, LABELS, STRATEGIES, type StockData, type Score, type Rules, type StrategyId } from '../lib/radar.ts'
+import { score, passesRules, backtest, indexAt, isoOf, LABELS, STRATEGIES, marketReturns, setMarket, type StockData, type Score, type Rules, type StrategyId } from '../lib/radar.ts'
 import { xirr } from '../lib/fi.ts'
 import { demoStocks } from '../demoMarket.ts'
 import type { Nav } from '../App.tsx'
@@ -18,11 +18,12 @@ export function useMarket() {
   const [err, setErr] = useState('')
   async function load(force = false) {
     if (!force && cache && Date.now() - cache.at < 10 * 60_000) { setStocks(cache.stocks); return }
-    if (DEMO || !supabase) { cache = { at: Date.now(), stocks: demoStocks() }; setStocks(cache.stocks); return }
+    if (DEMO || !supabase) { cache = { at: Date.now(), stocks: demoStocks() }; setMarket(marketReturns(cache.stocks.filter(s => !/ETF/.test(s.symbol)))); setStocks(cache.stocks); return }
     const { data, error } = await supabase.from('market_stocks').select('*')
     if (error) { setErr('Nu am putut încărca datele bursei.'); return }
     const list = (data ?? []).map((r: any) => ({ ...r, per: num(r.per), pbv: num(r.pbv), eps: num(r.eps), divy: num(r.divy), mcap: num(r.mcap) })) as StockData[]
     cache = { at: Date.now(), stocks: list.filter(s => s.t?.length > 30) }
+    setMarket(marketReturns(cache.stocks.filter(s => !/ETF/.test(s.symbol))))
     setStocks(cache.stocks)
   }
   useEffect(() => { load() }, [])
@@ -160,7 +161,17 @@ function StockSheet({ s, sc, rules, watched, mine, onWatch, onAsk, onClose }: { 
         <div><span>Minim–maxim 1 an</span><b className="num">{n1(sc.ind.lo52, 2)}–{n1(sc.ind.hi52, 2)}</b></div>
         <div><span>Volatilitate</span><b className="num">{n1(sc.ind.vol, 0)}%/an</b></div>
         <div><span>Cea mai mare cădere (1 an)</span><b className="num bad">{n1(sc.ind.dd, 0)}%</b></div>
+        <div><span>ROE (profit / capital)</span><b className="num">{sc.ind.roe == null ? '–' : n1(sc.ind.roe) + '%'}</b></div>
+        <div><span>Beta (față de bursă)</span><b className="num">{n1(sc.ind.beta, 2)}</b></div>
+        <div><span>MACD</span><b className={'num ' + (sc.ind.macd ? (sc.ind.macd.hist > 0 ? 'in' : 'bad') : '')}>{sc.ind.macd ? `${sc.ind.macd.hist > 0 ? 'pozitiv' : 'negativ'}${sc.ind.macd.rising ? ' ↗' : ' ↘'}` : '–'}</b></div>
+        <div><span>Bollinger (20 zile)</span><b className="num">{sc.ind.boll ? `${Math.round(sc.ind.boll.pctB * 100)}% din bandă` : '–'}</b></div>
+        <div><span>Volum față de normal</span><b className="num">{sc.ind.volRatio == null ? '–' : n1(sc.ind.volRatio) + '×'}</b></div>
       </div>
+      <details className="explain"><summary>Ce înseamnă indicatorii?</summary>
+        <p><b>P/E</b> — de câți ani de profit plătești prețul. Mic = ieftin. <b>P/BV</b> — preț față de valoarea din bilanț. <b>ROE</b> — cât profit face firma din 100 de lei capital propriu. <b>Dividend</b> — cât îți dă pe an, în % din preț.</p>
+        <p><b>Media 50/200</b> — prețul mediu pe 50 și 200 de zile; peste ele = trend de creștere. <b>RSI</b> — sub 30 a scăzut mult, peste 70 a crescut prea repede. <b>MACD</b> — dacă impulsul e de creștere sau de scădere. <b>Bollinger</b> — 0% = la marginea de jos a mișcării obișnuite, 100% = la marginea de sus.</p>
+        <p><b>Volatilitate</b> — cât de tare se mișcă pe an. <b>Beta</b> — 1 = se mișcă exact ca bursa, sub 1 mai calm, peste 1 mai agitat. <b>Volum</b> — cât de mult se tranzacționează acum față de de obicei.</p>
+      </details>
       {hasRules && <p className={'note ' + (pr.ok ? 'in' : '')}>{pr.ok ? '✓ Trece regulile tale.' : `Nu trece regulile tale: ${pr.fails.join(', ')}.`}</p>}
       <div className="actions">
         <button type="button" className="ghost-btn" onClick={onWatch}><Star size={16} />{watched ? 'Nu mai urmări' : mine ? 'O ai deja · urmărește' : 'Urmărește'}</button>
@@ -186,7 +197,10 @@ function RulesTab({ rules, alerts, scored, save, notify }: { rules: Rules; alert
       <p className="hint">Pune doar ce contează pentru tine. Câmpurile goale nu se aplică.</p>
       <div className="two">{numField('minDiv', 'Dividend minim (%)', 'ex. 6')}{numField('maxPer', 'P/E maxim', 'ex. 10')}</div>
       <div className="two">{numField('maxPbv', 'P/BV maxim', 'ex. 1,5')}{numField('maxRsi', 'RSI maxim', 'ex. 60')}</div>
-      {numField('minScore', 'Scor minim', 'ex. 60')}
+      <div className="two">{numField('minScore', 'Scor minim', 'ex. 60')}{numField('minRoe', 'ROE minim (%)', 'ex. 15')}</div>
+      {numField('maxBeta', 'Beta maxim', 'ex. 1')}
+      <label className="switch">Doar cu MACD pozitiv (impuls de creștere)<input type="checkbox" checked={!!r.macdUp} onChange={e => setR({ ...r, macdUp: e.target.checked })} /></label>
+      <label className="switch">Doar lângă banda de jos Bollinger (ieftină pe termen scurt)<input type="checkbox" checked={!!r.nearLowBand} onChange={e => setR({ ...r, nearLowBand: e.target.checked })} /></label>
       <label className="switch">Doar peste media de 200 de zile (trend de creștere)<input type="checkbox" checked={!!r.aboveMa200} onChange={e => setR({ ...r, aboveMa200: e.target.checked })} /></label>
       <label className="switch">Alerte pe telefon (ce ai și ce urmărești)<input type="checkbox" checked={al} onChange={e => setAl(e.target.checked)} /></label>
       <p className="note">Azi trec regulile: <b>{pass.length ? pass.map(x => x.s.symbol).join(', ') : 'nicio acțiune'}</b></p>

@@ -604,3 +604,7 @@ section > h2.grp-h::before { display: none; }
 .chat-box { display: flex; gap: 8px; position: sticky; bottom: 84px; background: var(--bg, transparent); padding-top: 4px; }
 .chat-box input { flex: 1; min-width: 0; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px; font: inherit; }
 .chat-box .primary { flex: none; width: 50px; padding: 0; }
+.explain { font-size: 13.5px; }
+.explain summary { color: var(--accent); font-weight: 600; cursor: pointer; padding: 4px 0; }
+.explain p { margin: 6px 0; color: var(--muted); }
+.explain b { color: var(--ink); }
