@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Star, RefreshCw, Sparkles, Info } from 'lucide-react'
+import { Star, RefreshCw, Sparkles, Info, NotebookPen } from 'lucide-react'
 import { useStore } from '../store.tsx'
 import { supabase, DEMO } from '../db.ts'
 import { Sheet, Seg } from '../ui.tsx'
@@ -87,7 +87,7 @@ export function RadarScreen({ nav, notify }: { nav: Nav; notify: (m: string) => 
 
       {open && (() => {
         const x = scored.find(y => y.s.symbol === open)
-        return x ? <StockSheet s={x.s} sc={x.sc} rules={rules} watched={watch.has(open)} mine={mine.has(open)} onWatch={() => toggleWatch(open)} onAsk={() => { setOpen(null); nav('asistent', { q: `Analizează ${open}` }) }} onClose={() => setOpen(null)} /> : null
+        return x ? <StockSheet s={x.s} sc={x.sc} rules={rules} watched={watch.has(open)} mine={mine.has(open)} onWatch={() => toggleWatch(open)} onAsk={() => { setOpen(null); nav('asistent', { q: `Analizează ${open}` }) }} onJournal={() => { setOpen(null); nav('jurnal', { symbol: open }) }} onClose={() => setOpen(null)} /> : null
       })()}
     </div>
   )
@@ -139,7 +139,7 @@ function PriceChart({ s }: { s: StockData }) {
   )
 }
 
-function StockSheet({ s, sc, rules, watched, mine, onWatch, onAsk, onClose }: { s: StockData; sc: Score; rules: Rules; watched: boolean; mine: boolean; onWatch: () => void; onAsk: () => void; onClose: () => void }) {
+function StockSheet({ s, sc, rules, watched, mine, onWatch, onAsk, onJournal, onClose }: { s: StockData; sc: Score; rules: Rules; watched: boolean; mine: boolean; onWatch: () => void; onAsk: () => void; onJournal: () => void; onClose: () => void }) {
   const pr = passesRules(s, sc, rules)
   const hasRules = Object.values(rules).some(v => v != null && v !== false)
   const part = (v: number, max: number, t: string) => <div className="sc-part"><span>{t}</span><span className="sc-bar"><i style={{ width: (v / max) * 100 + '%' }} /></span><b className="num">{v}/{max}</b></div>
@@ -177,6 +177,7 @@ function StockSheet({ s, sc, rules, watched, mine, onWatch, onAsk, onClose }: { 
         <button type="button" className="ghost-btn" onClick={onWatch}><Star size={16} />{watched ? 'Nu mai urmări' : mine ? 'O ai deja · urmărește' : 'Urmărește'}</button>
         <button type="button" className="primary" onClick={onAsk}><Sparkles size={16} />Întreabă asistentul</button>
       </div>
+      <button type="button" className="ghost-btn wide" onClick={onJournal}><NotebookPen size={16} />Scrie o ipoteză în jurnal</button>
       <p className="hint">Instrument de analiză, nu recomandare de investiții. Decizia îți aparține.</p>
     </Sheet>
   )

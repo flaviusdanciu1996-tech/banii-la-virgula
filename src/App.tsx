@@ -1,3 +1,4 @@
+import { JournalScreen } from './screens/Journal.tsx'
 import { RadarScreen } from './screens/Radar.tsx'
 import { AssistantScreen } from './screens/Assistant.tsx'
 import { BrokerImportScreen } from './screens/BrokerImport.tsx'
@@ -28,7 +29,7 @@ type Theme = 'system' | 'light' | 'dark'
 
 const SUB_TITLES: Record<string, string> = {
   history: 'Istoric', categories: 'Pe categorii', finante: 'Finanțe', familie: 'Familia mea',
-  aspect: 'Aspect', setari: 'Setări cont', despre: 'Despre aplicație', recurente: 'Plăți recurente', import: 'Import extras BT', notificari: 'Notificări și citate', visuri: 'Visurile mele', 'import-broker': 'Import Tradeville', radar: 'Radar BVB', asistent: 'Asistent investiții',
+  aspect: 'Aspect', setari: 'Setări cont', despre: 'Despre aplicație', recurente: 'Plăți recurente', import: 'Import extras BT', notificari: 'Notificări și citate', visuri: 'Visurile mele', 'import-broker': 'Import Tradeville', radar: 'Radar BVB', jurnal: 'Jurnal de investiții', asistent: 'Asistent investiții',
 }
 
 function readTheme(): Theme {
@@ -182,6 +183,7 @@ function Shell({ theme, setTheme }: { theme: Theme; setTheme: (t: Theme) => void
       case 'recurente': inner = <RecurringScreen openRecurring={openRecurring} />; break
       case 'notificari': inner = <ReminderScreen notify={notify} />; break
       case 'import': inner = <ImportScreen notify={notify} />; break
+      case 'jurnal': inner = <JournalScreen notify={notify} initialSymbol={sub.params?.symbol} />; break
       case 'radar': inner = <RadarScreen nav={nav} notify={notify} />; break
       case 'asistent': inner = <AssistantScreen initial={sub.params?.q} />; break
       case 'import-broker': inner = <BrokerImportScreen nav={nav} notify={notify} />; break

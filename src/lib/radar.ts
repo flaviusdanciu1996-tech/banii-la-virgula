@@ -378,3 +378,12 @@ export function parseBvbIndicators(html: string): { per: number | null; pbv: num
 }
 
 export { r1 }
+
+/** Change of the equal-weight market between two days, in %. */
+export function marketChange(m: Market | null, fromDay: number, toDay: number): number | null {
+  if (!m) return null
+  let g = 1, n = 0
+  for (const [d, r] of m) if (d > fromDay && d <= toDay) { g *= 1 + r; n++ }
+  return n ? (g - 1) * 100 : null
+}
+export function getMarket() { return MARKET }

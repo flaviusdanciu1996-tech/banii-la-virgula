@@ -12,7 +12,7 @@ const KEY = 'banii-asistent'
 const SUGGEST = ['Analizează portofoliul meu', 'Ce acțiuni trec regulile mele azi?', 'Analizează H2O', 'Unde aș putea pune 1.000 € luna asta?', 'Sunt prea expus pe o singură firmă?']
 
 /** Very small formatter: **bold**, bullet lines, paragraphs. */
-function Rich({ text }: { text: string }) {
+export function Rich({ text }: { text: string }) {
   const lines = text.split('\n')
   const out: JSX.Element[] = []
   let list: string[] = []
@@ -31,6 +31,37 @@ function Rich({ text }: { text: string }) {
   return <>{out}</>
 }
 
+export function buildContext(stocks: ReturnType<typeof useMarket>['stocks'], st: ReturnType<typeof useStore>) {
+    if (!stocks) return null
+  const rules = st.settings.radar?.rules ?? {}
+  const radar = stocks.filter(s => s.t.length >= 220).map(s => {
+    const sc = score(s), i = sc.ind
+    return { simbol: s.symbol, nume: s.name, scor: sc.total, zona: LABELS[sc.label].text, fundamental: sc.fund, tehnic: sc.tech, risc: sc.risk,
+      pret: i.price, pe: s.per, pbv: s.pbv, eps: s.eps, dividend_pct: i.divYield && Math.round(i.divYield * 10) / 10, rsi: i.rsi && Math.round(i.rsi),
+      media50: i.ma50 && +i.ma50.toFixed(3), media200: i.ma200 && +i.ma200.toFixed(3), min_1an: i.lo52, max_1an: i.hi52,
+      randament_1an_pct: i.ret1y && Math.round(i.ret1y), roe_pct: i.roe && Math.round(i.roe * 10) / 10, beta: i.beta && +i.beta.toFixed(2),
+      macd: i.macd && { histograma_pct: +i.macd.hist.toFixed(2), accelereaza: i.macd.rising }, bollinger_pozitie_pct: i.boll && Math.round(i.boll.pctB * 100), volum_fata_de_normal: i.volRatio && +i.volRatio.toFixed(2), randament_3luni_pct: i.ret3m && Math.round(i.ret3m), volatilitate_pct: i.vol && Math.round(i.vol), cadere_max_1an_pct: i.dd && Math.round(i.dd),
+      trece_regulile: passesRules(s, sc, rules).ok, motive: sc.reasons.map(r => (r.good === true ? '+ ' : r.good === false ? '- ' : '· ') + r.text) }
+  }).sort((a, b) => b.scor - a.scor)
+  const hold = st.assets.flatMap(a => a.holdings ?? []).map(h => {
+    const v = h.price ? h.qty * h.price : h.cost / 100
+    return { simbol: h.symbol, bucati: h.qty, cost_mediu: +(h.cost / 100 / h.qty).toFixed(4), pret: h.price, valoare_lei: Math.round(v), profit_lei: Math.round(v - h.cost / 100) }
+  })
+  const total = hold.reduce((a, h) => a + h.valoare_lei, 0)
+  const sum = st.assets.find(a => a.invest_summary)?.invest_summary
+  const s = st.settings, eur = st.rates.EUR
+  const have = st.assets.filter(a => !a.archived && ['invest', 'liquid'].includes(kindOf(a.kind).section)).reduce((x, a) => x + a.value * (a.currency === 'EUR' ? eur : a.currency === 'USD' ? st.rates.USD : 1), 0) / 100
+  return {
+    data_preturi: stocks.length ? isoOf(Math.max(...stocks.map(x => x.t[x.t.length - 1]))) : null,
+    portofoliu: { pozitii: hold.map(h => ({ ...h, pondere_pct: total ? Math.round((h.valoare_lei / total) * 100) : 0 })), total_lei: total,
+      istoric: sum && { depus: sum.deposits / 100, retras: sum.withdrawals / 100, dividende: sum.dividends / 100, profit_vanzari: sum.realized / 100 } },
+    independenta: s.fi_target ? { tinta: s.fi_target / 100, moneda: s.fi_currency, ai_acum_aprox_eur: Math.round(have / eur), pui_pe_luna: (s.fi_monthly ?? 0) / 100, randament_presupus: s.fi_return,
+      luni_pana_la_tinta: monthsToTarget(Math.round(have / eur * 100), s.fi_monthly ?? 100000, s.fi_return ?? 7, s.fi_target) } : null,
+    regulile_mele: s.radar?.rules ?? {}, urmarite: s.radar?.watch ?? [],
+    radar: radar,
+  }
+}
+
 export function AssistantScreen({ initial }: { initial?: string }) {
   const st = useStore()
   const { stocks } = useMarket()
@@ -41,36 +72,7 @@ export function AssistantScreen({ initial }: { initial?: string }) {
   useEffect(() => { try { localStorage.setItem(KEY, JSON.stringify(msgs.slice(-20))) } catch { /* fine */ } ; end.current?.scrollIntoView({ behavior: 'smooth' }) }, [msgs])
 
   // Everything the assistant may use — it is told to use only these numbers.
-  const context = useMemo(() => {
-    if (!stocks) return null
-    const rules = st.settings.radar?.rules ?? {}
-    const radar = stocks.filter(s => s.t.length >= 220).map(s => {
-      const sc = score(s), i = sc.ind
-      return { simbol: s.symbol, nume: s.name, scor: sc.total, zona: LABELS[sc.label].text, fundamental: sc.fund, tehnic: sc.tech, risc: sc.risk,
-        pret: i.price, pe: s.per, pbv: s.pbv, eps: s.eps, dividend_pct: i.divYield && Math.round(i.divYield * 10) / 10, rsi: i.rsi && Math.round(i.rsi),
-        media50: i.ma50 && +i.ma50.toFixed(3), media200: i.ma200 && +i.ma200.toFixed(3), min_1an: i.lo52, max_1an: i.hi52,
-        randament_1an_pct: i.ret1y && Math.round(i.ret1y), roe_pct: i.roe && Math.round(i.roe * 10) / 10, beta: i.beta && +i.beta.toFixed(2),
-        macd: i.macd && { histograma_pct: +i.macd.hist.toFixed(2), accelereaza: i.macd.rising }, bollinger_pozitie_pct: i.boll && Math.round(i.boll.pctB * 100), volum_fata_de_normal: i.volRatio && +i.volRatio.toFixed(2), randament_3luni_pct: i.ret3m && Math.round(i.ret3m), volatilitate_pct: i.vol && Math.round(i.vol), cadere_max_1an_pct: i.dd && Math.round(i.dd),
-        trece_regulile: passesRules(s, sc, rules).ok, motive: sc.reasons.map(r => (r.good === true ? '+ ' : r.good === false ? '- ' : '· ') + r.text) }
-    }).sort((a, b) => b.scor - a.scor)
-    const hold = st.assets.flatMap(a => a.holdings ?? []).map(h => {
-      const v = h.price ? h.qty * h.price : h.cost / 100
-      return { simbol: h.symbol, bucati: h.qty, cost_mediu: +(h.cost / 100 / h.qty).toFixed(4), pret: h.price, valoare_lei: Math.round(v), profit_lei: Math.round(v - h.cost / 100) }
-    })
-    const total = hold.reduce((a, h) => a + h.valoare_lei, 0)
-    const sum = st.assets.find(a => a.invest_summary)?.invest_summary
-    const s = st.settings, eur = st.rates.EUR
-    const have = st.assets.filter(a => !a.archived && ['invest', 'liquid'].includes(kindOf(a.kind).section)).reduce((x, a) => x + a.value * (a.currency === 'EUR' ? eur : a.currency === 'USD' ? st.rates.USD : 1), 0) / 100
-    return {
-      data_preturi: stocks.length ? isoOf(Math.max(...stocks.map(x => x.t[x.t.length - 1]))) : null,
-      portofoliu: { pozitii: hold.map(h => ({ ...h, pondere_pct: total ? Math.round((h.valoare_lei / total) * 100) : 0 })), total_lei: total,
-        istoric: sum && { depus: sum.deposits / 100, retras: sum.withdrawals / 100, dividende: sum.dividends / 100, profit_vanzari: sum.realized / 100 } },
-      independenta: s.fi_target ? { tinta: s.fi_target / 100, moneda: s.fi_currency, ai_acum_aprox_eur: Math.round(have / eur), pui_pe_luna: (s.fi_monthly ?? 0) / 100, randament_presupus: s.fi_return,
-        luni_pana_la_tinta: monthsToTarget(Math.round(have / eur * 100), s.fi_monthly ?? 100000, s.fi_return ?? 7, s.fi_target) } : null,
-      regulile_mele: s.radar?.rules ?? {}, urmarite: s.radar?.watch ?? [],
-      radar: radar,
-    }
-  }, [stocks, st.assets, st.settings, st.rates])
+  const context = useMemo(() => buildContext(stocks, st), [stocks, st.assets, st.settings, st.rates])
 
   async function ask(text: string) {
     const t = text.trim()
@@ -110,4 +112,12 @@ export function AssistantScreen({ initial }: { initial?: string }) {
       {msgs.length > 0 && <button type="button" className="link" onClick={() => setMsgs([])}>Conversație nouă</button>}
     </div>
   )
+}
+
+/** One question with the full context, outside the chat (journal feedback). */
+export async function askAssistant(text: string, context: unknown): Promise<string> {
+  if (DEMO || !supabase) return 'În modul demo asistentul nu e conectat.'
+  const { data, error } = await supabase.functions.invoke('invest-assistant', { body: { messages: [{ role: 'user', text }], context } })
+  if (error || !data?.text) throw new Error(data?.error === 'rate_limited' ? 'Am atins limita gratuită pe minut. Încearcă peste un minut.' : 'Nu am putut primi răspuns acum.')
+  return data.text
 }

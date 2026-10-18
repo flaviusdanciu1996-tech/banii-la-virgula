@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { Plus, RefreshCw, FileUp, Radar as RadarIcon, Sparkles } from 'lucide-react'
+import { Plus, RefreshCw, FileUp, Radar as RadarIcon, Sparkles, NotebookPen } from 'lucide-react'
 import type { Nav } from '../App.tsx'
 import { useStore } from '../store.tsx'
 import { Donut, LineChart, CatIcon } from '../ui.tsx'
@@ -86,6 +86,7 @@ export function AvereScreen({ scope, openAsset, openGoal, nav }: { scope: 'all' 
                 <button type="button" className="row add-line" onClick={() => openAsset(undefined, s.id)}><Plus size={16} />Adaugă la {s.name.toLowerCase()}</button>
                 {s.id === 'invest' && <button type="button" className="row add-line" onClick={() => nav('import-broker')}><FileUp size={16} />Import din Tradeville</button>}
                 {s.id === 'invest' && <button type="button" className="row add-line" onClick={() => nav('radar')}><RadarIcon size={16} />Radar BVB · scoruri și analize</button>}
+                {s.id === 'invest' && <button type="button" className="row add-line" onClick={() => nav('jurnal')}><NotebookPen size={16} />Jurnal de investiții · ipotezele mele</button>}
                 {s.id === 'invest' && <button type="button" className="row add-line" onClick={() => nav('asistent')}><Sparkles size={16} />Asistent investiții</button>}
               </div>
             </section>

@@ -325,3 +325,14 @@ test('server radar score matches the app score', async () => {
   }
   void rf
 })
+
+import { riskCalc, dueReviews, ideaReturn } from './journal.ts'
+test('journal: risk in money and review dates', () => {
+  const r = riskCalc({ portfolio: 30000, amount: 3000, price: 30, stop: 27, target: 39 })
+  assert.equal(r.shares, 100); assert.equal(r.loss, 300); assert.equal(r.gain, 900); assert.equal(r.rr, 3)
+  assert.ok(Math.abs(r.lossPct! - 300 / 33000 * 100) < 1e-9)
+  assert.equal(r.maxShares2, 220)
+  const e: any = { created_on: '2026-01-10', horizon_months: 12, reviews: { '3': {} }, action: 'cumpar', price_at: 10 }
+  assert.deepEqual(dueReviews(e, '2026-07-15'), [6])
+  assert.ok(Math.abs(ideaReturn({ action: 'vand', price_at: 10 }, 9) - 10) < 1e-9)
+})

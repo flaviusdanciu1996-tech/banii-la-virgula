@@ -10,7 +10,7 @@ export const supabase: SupabaseClient | null = SUPABASE_URL && SUPABASE_KEY && !
   ? createClient(SUPABASE_URL, SUPABASE_KEY, { auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true } })
   : null
 
-export type Table = 'categories' | 'transactions' | 'assets' | 'snapshots' | 'settings' | 'members' | 'invites' | 'households' | 'recurring' | 'goals' | 'push_subs' | 'import_rules' | 'asset_values' | 'invest_tx'
+export type Table = 'categories' | 'transactions' | 'assets' | 'snapshots' | 'settings' | 'members' | 'invites' | 'households' | 'recurring' | 'goals' | 'push_subs' | 'import_rules' | 'asset_values' | 'invest_tx' | 'invest_journal'
 
 /** Thin repository so the UI works the same against Supabase or the in-memory demo. */
 export interface Repo {

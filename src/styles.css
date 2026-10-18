@@ -608,3 +608,14 @@ section > h2.grp-h::before { display: none; }
 .explain summary { color: var(--accent); font-weight: 600; cursor: pointer; padding: 4px 0; }
 .explain p { margin: 6px 0; color: var(--muted); }
 .explain b { color: var(--ink); }
+
+/* Journal */
+.journal-row { align-items: flex-start; }
+.j-act { flex: none; font-size: 11px; font-weight: 700; padding: 4px 7px; border-radius: 8px; margin-top: 2px; }
+.j-act.cumpar { background: color-mix(in srgb, #22C55E 20%, transparent); color: #22C55E; }
+.j-act.vand { background: color-mix(in srgb, #EF4444 20%, transparent); color: #EF4444; }
+.j-act.astept { background: color-mix(in srgb, #EAB308 20%, transparent); color: #EAB308; }
+.j-thesis { color: var(--ink); opacity: .8; white-space: normal; }
+.due-card h2 { display: flex; gap: 6px; align-items: center; }
+textarea { width: 100%; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; font: inherit; resize: vertical; }
+.ai-feedback { max-width: 100%; }
