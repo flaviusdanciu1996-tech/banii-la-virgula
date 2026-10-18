@@ -18,14 +18,15 @@ const DEMO: [string, string, number, number, number, number | null, number | nul
 export function demoStocks(): StockData[] {
   const today = Math.floor(Date.now() / 864e5)
   return DEMO.map(([symbol, name, p0, mu, sig, per, pbv, divy], n) => {
-    const r = rng(n * 977 + 13), t: number[] = [], a: number[] = [], c: number[] = [], v: number[] = []
+    const r = rng(n * 977 + 13), t: number[] = [], a: number[] = [], c: number[] = [], v: number[] = [], o: number[] = [], h: number[] = [], l: number[] = []
     let p = p0
     for (let d = today - 6 * 365; d <= today; d++) {
       const wd = new Date(d * 864e5).getUTCDay(); if (wd === 0 || wd === 6) continue
       const z = (r() + r() + r() - 1.5) * 2
+      const prev = p
       p *= Math.exp((mu - sig * sig / 2) / 252 + (sig / Math.sqrt(252)) * z)
-      t.push(d); a.push(+p.toFixed(4)); c.push(+p.toFixed(4)); v.push(Math.round(20000 + r() * 200000))
+      t.push(d); a.push(+p.toFixed(4)); c.push(+p.toFixed(4)); o.push(+prev.toFixed(4)); h.push(+(Math.max(prev, p) * (1 + r() * sig / 25)).toFixed(4)); l.push(+(Math.min(prev, p) * (1 - r() * sig / 25)).toFixed(4)); v.push(Math.round(20000 + r() * 200000))
     }
-    return { symbol, name, per, pbv, divy, t, a, c, v, divs: [] }
+    return { symbol, name, per, pbv, divy, t, a, c, o, h, l, v, divs: [] }
   })
 }

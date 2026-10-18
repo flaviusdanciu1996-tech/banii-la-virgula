@@ -11,6 +11,9 @@ export interface StockData {
   mcap?: number | null // lei
   t: number[] // trading days, as days since 1970-01-01
   c: number[] // close
+  o?: number[] // open (same scale as close)
+  h?: number[] // high
+  l?: number[] // low
   a: number[] // adjusted close (splits + dividends)
   v?: number[] // volume
   divs?: { d: number; a: number }[] // dividend per share, day index
@@ -349,13 +352,14 @@ export function fromYahoo(symbol: string, j: any, years = 6): StockData | null {
   const r = j?.chart?.result?.[0]
   if (!r?.timestamp?.length) return null
   const q = r.indicators?.quote?.[0] ?? {}, adj = r.indicators?.adjclose?.[0]?.adjclose ?? q.close
-  const out: StockData = { symbol, t: [], c: [], a: [], v: [], divs: [] }
+  const out: StockData = { symbol, t: [], c: [], o: [], h: [], l: [], a: [], v: [], divs: [] }
   const cut = Math.floor(Date.now() / 864e5) - years * 366
   r.timestamp.forEach((ts: number, k: number) => {
     const day = Math.floor((ts + 3 * 3600) / 86400), c = q.close?.[k], a = adj?.[k]
     if (day < cut || c == null || a == null || !(c > 0)) return
     if (out.t.length && out.t[out.t.length - 1] === day) return
-    out.t.push(day); out.c.push(Math.round(c * 1e4) / 1e4); out.a.push(Math.round(a * 1e4) / 1e4); out.v!.push(q.volume?.[k] ?? 0)
+    const R = (x: number | null | undefined) => Math.round((x ?? c) * 1e4) / 1e4
+    out.t.push(day); out.c.push(Math.round(c * 1e4) / 1e4); out.o!.push(R(q.open?.[k])); out.h!.push(Math.max(R(q.high?.[k]), R(c))); out.l!.push(Math.min(R(q.low?.[k]), R(c))); out.a.push(Math.round(a * 1e4) / 1e4); out.v!.push(q.volume?.[k] ?? 0)
   })
   for (const dv of Object.values(r.events?.dividends ?? {}) as any[]) {
     const day = Math.floor((dv.date + 3 * 3600) / 86400)
@@ -387,3 +391,19 @@ export function marketChange(m: Market | null, fromDay: number, toDay: number): 
   return n ? (g - 1) * 100 : null
 }
 export function getMarket() { return MARKET }
+
+/** Daily bars → weekly candles (Monday-based): open of the first day, close of the last, highest high, lowest low. */
+export interface Candle { day: number; o: number; h: number; l: number; c: number; v: number }
+export function weeklyCandles(s: StockData, fromDay: number): Candle[] {
+  const out: Candle[] = []
+  for (let i = 0; i < s.t.length; i++) {
+    const d = s.t[i]
+    if (d < fromDay) continue
+    const wk = d - ((d + 3) % 7) // 1970-01-01 was a Thursday → this is that week's Monday
+    const c = s.c[i], o = s.o?.[i] ?? c, h = Math.max(s.h?.[i] ?? c, c, o), l = Math.min(s.l?.[i] ?? c, c, o), v = s.v?.[i] ?? 0
+    const last = out[out.length - 1]
+    if (last && last.day === wk) { last.c = c; last.h = Math.max(last.h, h); last.l = Math.min(last.l, l); last.v += v }
+    else out.push({ day: wk, o, h, l, c, v })
+  }
+  return out
+}

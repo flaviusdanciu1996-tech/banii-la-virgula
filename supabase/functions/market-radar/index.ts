@@ -35,7 +35,7 @@ async function getText(u: string) {
 }
 
 async function refreshOne(sym: string, old: any | null) {
-  const fresh = old?.t?.length && old.t[old.t.length - 1] > Math.floor(Date.now() / 864e5) - 60;
+  const fresh = old?.t?.length && old?.o?.length === old.t.length && old.t[old.t.length - 1] > Math.floor(Date.now() / 864e5) - 60;
   const y = await getJson(`https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(sym)}.RO?range=${fresh ? "3mo" : "10y"}&interval=1d&events=div`);
   let data = y ? fromYahoo(sym, y, 6) : null;
   if (data && fresh) {
@@ -51,6 +51,9 @@ async function refreshOne(sym: string, old: any | null) {
       ...data,
       t: [...idx.map((i: number) => old.t[i]), ...data.t],
       c: [...idx.map((i: number) => old.c[i]), ...data.c],
+      o: [...idx.map((i: number) => old.o[i]), ...(data.o ?? [])],
+      h: [...idx.map((i: number) => old.h[i]), ...(data.h ?? [])],
+      l: [...idx.map((i: number) => old.l[i]), ...(data.l ?? [])],
       a: [...idx.map((i: number) => Math.round(old.a[i] * k * 1e4) / 1e4), ...data.a],
       v: [...idx.map((i: number) => old.v?.[i] ?? 0), ...(data.v ?? [])],
       divs: [...(old.divs ?? []).filter((d: any) => d.d < firstNew && d.d >= minDay), ...(data.divs ?? [])],
@@ -60,7 +63,7 @@ async function refreshOne(sym: string, old: any | null) {
   const f = html ? parseBvbIndicators(html) : null;
   if (!data && !f) return false;
   const row: any = { symbol: sym, updated_on: todayRo(), updated_at: new Date().toISOString() };
-  if (data) Object.assign(row, { t: data.t, c: data.c, a: data.a, v: data.v, divs: data.divs });
+  if (data) Object.assign(row, { t: data.t, c: data.c, o: data.o, h: data.h, l: data.l, a: data.a, v: data.v, divs: data.divs });
   if (f) Object.assign(row, { per: f.per, pbv: f.pbv, eps: f.eps, divy: f.divy, mcap: f.mcap, ...(f.name ? { name: f.name } : {}) });
   const { error } = await db.from("market_stocks").upsert(row, { onConflict: "symbol" });
   if (error) console.log("upsert", sym, error.message);
@@ -121,7 +124,7 @@ Deno.serve(async (req) => {
 
   const { data: rows } = await db.from("market_stocks").select("*");
   const bySym = new Map((rows ?? []).map((r: any) => [r.symbol, r]));
-  const todo = [...syms].filter(s => bySym.get(s)?.updated_on !== today).slice(0, 30);
+  const todo = [...syms].filter(s => bySym.get(s)?.updated_on !== today || !bySym.get(s)?.o).slice(0, 30);
   let updated = 0;
   for (let i = 0; i < todo.length; i += 4) {
     const res = await Promise.all(todo.slice(i, i + 4).map(s => refreshOne(s, bySym.get(s) ?? null).catch(e => { console.log(s, String(e)); return false; })));

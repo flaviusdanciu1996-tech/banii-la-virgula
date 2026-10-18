@@ -642,3 +642,10 @@ textarea { width: 100%; background: var(--surface); color: var(--ink); border: 1
 .buy-row .sym { grid-area: s; } .buy-row > span:nth-child(2) { grid-area: q; text-align: right; } .buy-row > span:nth-child(3) { grid-area: p; text-align: right; } .buy-row > b:last-child { grid-area: t; text-align: right; }
 .plan-line { font-weight: 600; }
 .plan-home .muted { display: flex; gap: 6px; align-items: center; }
+
+/* Lumânări japoneze */
+.chart-box { display: flex; flex-direction: column; gap: 8px; }
+.candle-info { border-left: 3px solid var(--good, #22C55E); padding: 6px 10px; border-radius: 8px; background: var(--chip, rgba(127,127,127,.08)); display: flex; flex-direction: column; gap: 4px; }
+.candle-info.down { border-left-color: var(--bad, #EF4444); }
+.candle-info .ohlc { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 12px; font-size: .88rem; }
+.candle-info .ohlc span { display: flex; justify-content: space-between; }

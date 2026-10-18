@@ -3,7 +3,7 @@ import { Star, RefreshCw, Sparkles, Info, NotebookPen } from 'lucide-react'
 import { useStore } from '../store.tsx'
 import { supabase, DEMO } from '../db.ts'
 import { Sheet, Seg } from '../ui.tsx'
-import { score, passesRules, backtest, indexAt, isoOf, LABELS, STRATEGIES, marketReturns, setMarket, type StockData, type Score, type Rules, type StrategyId } from '../lib/radar.ts'
+import { weeklyCandles, score, passesRules, backtest, indexAt, isoOf, LABELS, STRATEGIES, marketReturns, setMarket, type StockData, type Score, type Rules, type StrategyId } from '../lib/radar.ts'
 import { xirr } from '../lib/fi.ts'
 import { demoStocks } from '../demoMarket.ts'
 import type { Nav } from '../App.tsx'
@@ -118,6 +118,63 @@ function RadarRow({ s, sc, mine, watched, onOpen }: { s: StockData; sc: Score; m
   )
 }
 
+/** Line (price + 200-day average) or weekly Japanese candles, like on TradingView. */
+function ChartBox({ s }: { s: StockData }) {
+  const hasOhlc = !!s.o?.length
+  const [mode, setMode] = useState<'line' | 'candles'>('candles')
+  return (
+    <div className="chart-box">
+      <Seg label="Tip grafic" value={mode} onChange={setMode} options={[{ id: 'candles', label: 'Lumânări (săptămâni)' }, { id: 'line', label: 'Linie + media 200' }]} />
+      {mode === 'line' ? <PriceChart s={s} /> : hasOhlc ? <CandleChart s={s} /> : <p className="muted small">Lumânările apar după următoarea actualizare a bursei.</p>}
+    </div>
+  )
+}
+
+function CandleChart({ s }: { s: StockData }) {
+  const W = 340, H = 190, padL = 4, padR = 40, top = 8, volH = 30
+  const cs = weeklyCandles(s, s.t[s.t.length - 1] - 7 * 52)
+  const [sel, setSel] = useState<number>(cs.length - 1)
+  if (cs.length < 2) return null
+  const hi = Math.max(...cs.map(k => k.h)), lo = Math.min(...cs.map(k => k.l)), vmax = Math.max(...cs.map(k => k.v)) || 1
+  const priceH = H - top - volH - 16
+  const step = (W - padL - padR) / cs.length, bw = Math.max(2, step * 0.62)
+  const X = (i: number) => padL + step * i + step / 2
+  const Y = (v: number) => top + (1 - (v - lo) / (hi - lo || 1)) * priceH
+  const d = (v: number) => n1(v, v < 10 ? 3 : 2)
+  const k = cs[Math.min(sel, cs.length - 1)]
+  const up = k.c >= k.o
+  const ticks = [hi, (hi + lo) / 2, lo]
+  return (
+    <>
+      <svg viewBox={`0 0 ${W} ${H}`} className="chart candles" role="img" aria-label="Lumânări japoneze săptămânale pe un an">
+        {ticks.map(t => <g key={t}><line x1={padL} x2={W - padR} y1={Y(t)} y2={Y(t)} stroke="var(--line, rgba(127,127,127,.18))" strokeWidth="1" /><text x={W - padR + 4} y={Y(t) + 3} fontSize="9" fill="var(--muted)">{d(t)}</text></g>)}
+        {cs.map((c, i) => {
+          const g = c.c >= c.o, col = g ? 'var(--good, #22C55E)' : 'var(--bad, #EF4444)'
+          const y1 = Y(Math.max(c.o, c.c)), y2 = Y(Math.min(c.o, c.c))
+          return (
+            <g key={c.day} onClick={() => setSel(i)} style={{ cursor: 'pointer' }} opacity={i === sel ? 1 : 0.85}>
+              <rect x={X(i) - step / 2} y={top} width={step} height={H - top} fill={i === sel ? 'rgba(127,127,127,.12)' : 'transparent'} />
+              <line x1={X(i)} x2={X(i)} y1={Y(c.h)} y2={Y(c.l)} stroke={col} strokeWidth="1" />
+              <rect x={X(i) - bw / 2} y={y1} width={bw} height={Math.max(1, y2 - y1)} fill={col} rx="0.5" />
+              <rect x={X(i) - bw / 2} y={H - 14 - (c.v / vmax) * volH} width={bw} height={(c.v / vmax) * volH} fill="var(--muted)" opacity="0.35" />
+            </g>
+          )
+        })}
+        <text x={padL} y={H - 2} fontSize="9" fill="var(--muted)">{isoOf(cs[0].day).slice(0, 7).split('-').reverse().join('.')}</text>
+        <text x={W - padR} y={H - 2} fontSize="9" fill="var(--muted)" textAnchor="end">fiecare lumânare = o săptămână</text>
+      </svg>
+      <div className={'candle-info ' + (up ? 'up' : 'down')}>
+        <b>Săpt. din {isoOf(k.day).split('-').reverse().join('.')} · {up ? 'a urcat' : 'a coborât'} {pctTxt((k.c / k.o - 1) * 100)}</b>
+        <div className="ohlc">
+          <span>Deschidere <b className="num">{d(k.o)}</b></span><span>Închidere <b className="num">{d(k.c)}</b></span>
+          <span>Maxim <b className="num">{d(k.h)}</b></span><span>Minim <b className="num">{d(k.l)}</b></span>
+        </div>
+        <span className="muted small">Corp {d(Math.abs(k.c - k.o))} · umbra de sus {d(k.h - Math.max(k.o, k.c))} · umbra de jos {d(Math.min(k.o, k.c) - k.l)}. Atinge o lumânare ca s-o vezi.</span>
+      </div>
+    </>
+  )
+}
+
 /** Price over the last year with the 200-day average. */
 function PriceChart({ s }: { s: StockData }) {
   const W = 340, H = 150, pad = 8
@@ -149,7 +206,7 @@ function StockSheet({ s, sc, rules, watched, mine, onWatch, onAsk, onJournal, on
         <ScoreBadge sc={sc} size={64} />
         <div><b style={{ color: LABEL_COLOR[sc.label] }}>{LABELS[sc.label].emoji} {LABELS[sc.label].text}</b><span className="muted small">Preț {n1(sc.ind.price, sc.ind.price < 10 ? 3 : 2)} lei · {pctTxt(sc.ind.ret1y)} într-un an (cu dividende)</span></div>
       </div>
-      <PriceChart s={s} />
+      <ChartBox s={s} />
       <div className="sc-parts">{part(sc.fund, 40, 'Fundamental')}{part(sc.tech, 40, 'Tehnic')}{part(sc.risk, 20, 'Risc')}</div>
       <ul className="reasons">{sc.reasons.map((r, i) => <li key={i} className={r.good === true ? 'good' : r.good === false ? 'bad' : ''}>{r.good === true ? '✓' : r.good === false ? '✗' : '•'} {r.text}</li>)}</ul>
       <div className="inv-grid">

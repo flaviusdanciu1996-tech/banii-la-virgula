@@ -1,6 +1,6 @@
 // Server copy of the Radar score (same numbers as src/lib/radar.ts; reason texts and info-only indicators left out).
 // Keep the point tables here in step with the app when the score changes.
-export interface StockData { symbol: string; name?: string; per?: number | null; pbv?: number | null; eps?: number | null; divy?: number | null; mcap?: number | null; t: number[]; c: number[]; a: number[]; v?: number[]; divs?: { d: number; a: number }[] }
+export interface StockData { symbol: string; name?: string; per?: number | null; pbv?: number | null; eps?: number | null; divy?: number | null; mcap?: number | null; t: number[]; c: number[]; o?: number[]; h?: number[]; l?: number[]; a: number[]; v?: number[]; divs?: { d: number; a: number }[] }
 export type Label = 'buy' | 'neutral' | 'hot' | 'avoid'
 export const LABELS: Record<Label, { text: string; emoji: string }> = {
   buy: { text: 'Zonă de cumpărare', emoji: '🟢' },
@@ -64,13 +64,14 @@ export function fromYahoo(symbol: string, j: any, years = 6): StockData | null {
   const r = j?.chart?.result?.[0]
   if (!r?.timestamp?.length) return null
   const q = r.indicators?.quote?.[0] ?? {}, adj = r.indicators?.adjclose?.[0]?.adjclose ?? q.close
-  const out: StockData = { symbol, t: [], c: [], a: [], v: [], divs: [] }
+  const out: StockData = { symbol, t: [], c: [], o: [], h: [], l: [], a: [], v: [], divs: [] }
   const cut = Math.floor(Date.now() / 864e5) - years * 366
   r.timestamp.forEach((ts: number, k: number) => {
     const day = Math.floor((ts + 3 * 3600) / 86400), c = q.close?.[k], a = adj?.[k]
     if (day < cut || c == null || a == null || !(c > 0)) return
     if (out.t.length && out.t[out.t.length - 1] === day) return
-    out.t.push(day); out.c.push(Math.round(c * 1e4) / 1e4); out.a.push(Math.round(a * 1e4) / 1e4); out.v!.push(q.volume?.[k] ?? 0)
+    const R = (x: number | null | undefined) => Math.round((x ?? c) * 1e4) / 1e4
+    out.t.push(day); out.c.push(Math.round(c * 1e4) / 1e4); out.o!.push(R(q.open?.[k])); out.h!.push(Math.max(R(q.high?.[k]), R(c))); out.l!.push(Math.min(R(q.low?.[k]), R(c))); out.a.push(Math.round(a * 1e4) / 1e4); out.v!.push(q.volume?.[k] ?? 0)
   })
   for (const dv of Object.values(r.events?.dividends ?? {}) as any[]) { const day = Math.floor((dv.date + 3 * 3600) / 86400); if (day >= cut) out.divs!.push({ d: day, a: dv.amount }) }
   out.divs!.sort((x, y) => x.d - y.d)
@@ -86,3 +87,4 @@ export function parseBvbIndicators(html: string): { per: number | null; pbv: num
   const title = html.match(/<title>\s*BVB\s*-\s*\S+\s+\S+\s+([^<]+?)\s*<\/title>/i)?.[1] ?? null
   return { per: cell('PER'), pbv: cell('P/BV'), eps: cell('EPS'), divy: cell('DIVY'), mcap: cell('Capitalizare'), name: title }
 }
+

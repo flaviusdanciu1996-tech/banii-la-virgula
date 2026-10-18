@@ -357,3 +357,14 @@ test('monthly plan: core ETF + capped satellites, whole shares', async () => {
   const parts = splitBySymbol('Intro\n### AAA — Firma\nbun\n### BBB\nrisc', ['AAA', 'BBB'])
   assert.equal(parts.AAA, 'bun'); assert.equal(parts.BBB, 'risc'); assert.equal(parts._intro, 'Intro')
 })
+
+test('weekly candles: open of Monday, close of Friday, extreme high/low', async () => {
+  const { weeklyCandles } = await import('./radar.ts')
+  const mon = 20034
+  const m = mon - ((mon + 3) % 7)
+  const s = { symbol: 'X', t: [m, m + 1, m + 4, m + 7], o: [10, 11, 12, 13], h: [12, 15, 13, 14], l: [9, 10, 8, 12], c: [11, 12, 12.5, 13.5], a: [11, 12, 12.5, 13.5], v: [1, 2, 3, 4] } as any
+  const w = weeklyCandles(s, 0)
+  assert.equal(w.length, 2)
+  assert.deepEqual(w[0], { day: m, o: 10, h: 15, l: 8, c: 12.5, v: 6 })
+  assert.equal(w[1].o, 13)
+})
