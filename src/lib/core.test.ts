@@ -336,3 +336,24 @@ test('journal: risk in money and review dates', () => {
   assert.deepEqual(dueReviews(e, '2026-07-15'), [6])
   assert.ok(Math.abs(ideaReturn({ action: 'vand', price_at: 10 }, 9) - 10) < 1e-9)
 })
+
+test('monthly plan: core ETF + capped satellites, whole shares', async () => {
+  const { buildPlan, splitBySymbol } = await import('./plan.ts')
+  const { score } = await import('./radar.ts')
+  const mk = (symbol: string, price: number, up: number) => {
+    const t: number[] = [], c: number[] = [], v: number[] = []
+    for (let i = 0; i < 300; i++) { t.push(20000 + i); c.push(+(price * (1 + up * i / 300) * (1 + 0.01 * Math.sin(i / 3))).toFixed(3)); v.push(100000) }
+    return { symbol, name: symbol, per: 8, pbv: 1, eps: null, divy: 7, t, a: c, c, v, divs: [] } as any
+  }
+  const stocks = [mk('TVBETETF', 20, 0.1), mk('AAA', 10, 0.15), mk('BBB', 5, 0.12), mk('HEAVY', 50, 0.15)].map(s => ({ s, sc: score(s) }))
+  const p = buildPlan({ stocks, holdings: [{ symbol: 'HEAVY', value: 30000 }], cash: 5000, rules: {}, corePct: 50 })
+  const core = p.items.find(i => i.role === 'nucleu')!
+  assert.equal(core.symbol, 'TVBETETF')
+  assert.ok(core.lei <= 2500 && core.shares === Math.floor(2500 / core.price))
+  assert.ok(!p.items.some(i => i.symbol === 'HEAVY'), 'already above 25% is skipped')
+  assert.ok(p.skipped.some(s => s.symbol === 'HEAVY'))
+  for (const i of p.items) assert.equal(Number.isInteger(i.shares), true)
+  assert.ok(Math.abs(p.invested + p.leftover - 5000) < 0.01)
+  const parts = splitBySymbol('Intro\n### AAA — Firma\nbun\n### BBB\nrisc', ['AAA', 'BBB'])
+  assert.equal(parts.AAA, 'bun'); assert.equal(parts.BBB, 'risc'); assert.equal(parts._intro, 'Intro')
+})

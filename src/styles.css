@@ -619,3 +619,26 @@ section > h2.grp-h::before { display: none; }
 .due-card h2 { display: flex; gap: 6px; align-items: center; }
 textarea { width: 100%; background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 12px; padding: 10px 12px; font: inherit; resize: vertical; }
 .ai-feedback { max-width: 100%; }
+
+/* Planul lunii */
+.card.plan-score { display: flex; flex-direction: row; gap: 12px; align-items: center; text-align: left; }
+.plan-score > div { display: flex; flex-direction: column; gap: 2px; }
+.plan-head h2, .plan h2 { margin: 0 0 8px; display: flex; gap: 6px; align-items: center; }
+.plan-sum { margin: 0; font-size: 1.05rem; }
+.plan-item .plan-top { display: flex; justify-content: space-between; gap: 10px; }
+.plan-item .right { text-align: right; }
+.plan-item .sym, .buy-row .sym { font-size: 1.1rem; letter-spacing: .02em; }
+.plan-item .role { font-size: .72rem; padding: 2px 8px; border-radius: 99px; background: var(--chip, rgba(127,127,127,.15)); margin-left: 4px; vertical-align: 2px; }
+.plan-item .role.nucleu { background: rgba(34,197,94,.16); color: var(--good, #16a34a); }
+.plan-item .role.satelit { background: rgba(59,130,246,.16); color: #3b82f6; }
+.plan-meta { margin: 6px 0 4px; }
+.plan-item .ai-box { margin-top: 6px; font-size: .9rem; }
+.plan-item .ai-box p { margin: 3px 0; }
+.plan-item .ai-box h4 { display: none; }
+.plan-actions { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; }
+.plan-actions button { display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 10px 4px; font-size: .85rem; }
+.buy-list { display: flex; flex-direction: column; gap: 6px; margin: 10px 0; }
+.buy-row { display: grid; grid-template-columns: 1fr auto auto; grid-template-areas: "s q t" "s p t"; column-gap: 12px; align-items: center; padding: 8px 10px; border-radius: 12px; background: var(--chip, rgba(127,127,127,.1)); }
+.buy-row .sym { grid-area: s; } .buy-row > span:nth-child(2) { grid-area: q; text-align: right; } .buy-row > span:nth-child(3) { grid-area: p; text-align: right; } .buy-row > b:last-child { grid-area: t; text-align: right; }
+.plan-line { font-weight: 600; }
+.plan-home .muted { display: flex; gap: 6px; align-items: center; }

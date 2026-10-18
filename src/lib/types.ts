@@ -52,7 +52,7 @@ export interface Settings {
   fi_return?: number // assumed yearly return, %
   fi_include_liquid?: boolean
   // BVB Radar: followed stocks, own rules, alerts (last = zone already announced per stock)
-  radar?: { watch?: string[]; rules?: { minDiv?: number | null; maxPer?: number | null; maxPbv?: number | null; aboveMa200?: boolean; maxRsi?: number | null; minScore?: number | null; minRoe?: number | null; maxBeta?: number | null; macdUp?: boolean; nearLowBand?: boolean }; alerts?: boolean; last?: Record<string, string> }
+  radar?: { watch?: string[]; rules?: { minDiv?: number | null; maxPer?: number | null; maxPbv?: number | null; aboveMa200?: boolean; maxRsi?: number | null; minScore?: number | null; minRoe?: number | null; maxBeta?: number | null; macdUp?: boolean; nearLowBand?: boolean }; alerts?: boolean; last?: Record<string, string>; plan?: { core?: number; skip?: string } }
 }
 
 export type AssetSection = 'liquid' | 'invest' | 'goods' | 'debt'

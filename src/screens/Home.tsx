@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { History, LayoutGrid, ArrowLeftRight, Lightbulb, ChevronRight, ChevronLeft, Plus, Minus } from 'lucide-react'
+import { History, LayoutGrid, ArrowLeftRight, Lightbulb, ChevronRight, ChevronLeft, Plus, Minus, CalendarCheck } from 'lucide-react'
 import { useStore } from '../store.tsx'
 import { Ring, Bar, Seg, CountUp, EmptyArt } from '../ui.tsx'
 import { TxRow, catColor } from '../helpers.tsx'
@@ -108,6 +108,14 @@ export function HomeScreen({ nav, period, setPeriod, scope, setScope, openTx, op
         {monthAgo && <span className={'num small ' + (nw.net - monthAgo.net >= 0 ? 'in' : 'bad')}>{fmtSigned(nw.net - monthAgo.net)} față de acum o lună</span>}
         <ChevronRight size={16} className="chev" />
       </button>
+
+      {st.assets.some(a => a.holdings?.length) && (
+        <button type="button" className="card nw-line plan-home" onClick={() => nav('plan')}>
+          <span className="muted"><CalendarCheck size={15} /> Planul lunii</span>
+          <span className="small">Vezi ce îți propune sistemul să cumperi</span>
+          <ChevronRight size={16} className="chev" />
+        </button>
+      )}
 
       <DreamStrip openGoal={openGoal} nav={nav} />
 

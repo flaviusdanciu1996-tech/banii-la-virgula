@@ -20,6 +20,9 @@ export interface JournalEntry {
   reviews: Record<string, { price: number; ret: number; market: number | null; note: string; at: string }>
   lesson?: string | null
   status: 'deschis' | 'inchis'
+  source?: 'manual' | 'plan'
+  plan_month?: string | null
+  shares?: number | null
   created_on: string
   created_at?: string
 }
@@ -75,4 +78,17 @@ export function journalStats(list: JournalEntry[]) {
   const beat = done.filter(x => x.r.market != null && x.r.ret > x.r.market).length
   const avg = done.length ? done.reduce((a, x) => a + x.r.ret, 0) / done.length : null
   return { reviewed: done.length, wins, beat, avg }
+}
+
+/** Fill the 3/6/12-month checks by itself, from the price on the checkpoint day (for the system's proposals). */
+export function autoReviews(e: JournalEntry, today: string, priceOn: (iso: string) => number | null, marketBetween: (from: string, to: string) => number | null) {
+  const add: JournalEntry['reviews'] = {}
+  for (const cp of dueReviews(e, today)) {
+    const d = new Date(e.created_on + 'T00:00:00Z'); d.setUTCMonth(d.getUTCMonth() + cp)
+    const at = d.toISOString().slice(0, 10)
+    const price = priceOn(at)
+    if (price == null) continue
+    add[String(cp)] = { price, ret: Math.round(ideaReturn(e, price) * 10) / 10, market: marketBetween(e.created_on, at), note: 'verificat automat', at }
+  }
+  return Object.keys(add).length ? add : null
 }
