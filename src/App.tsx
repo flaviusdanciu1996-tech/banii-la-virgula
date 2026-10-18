@@ -13,6 +13,7 @@ import { AccountScreen, FinanteScreen, FamilyScreen, AspectScreen, AccountSettin
 import { AuthScreen, NewPasswordScreen } from './screens/Auth.tsx'
 import { RecurringScreen, RecurringSheet, GoalSheet } from './screens/Plans.tsx'
 import { ReminderScreen } from './screens/Reminder.tsx'
+import { ImportScreen } from './screens/Import.tsx'
 import { summarize, recordDays, streak } from './lib/calc.ts'
 import { periodFor, shiftPeriod, todayIso, type Period } from './lib/period.ts'
 import type { Tx, Category, Asset, AssetSection, Kind, Recurring, Goal } from './lib/types.ts'
@@ -23,7 +24,7 @@ type Theme = 'system' | 'light' | 'dark'
 
 const SUB_TITLES: Record<string, string> = {
   history: 'Istoric', categories: 'Pe categorii', finante: 'Finanțe', familie: 'Familia mea',
-  aspect: 'Aspect', setari: 'Setări cont', despre: 'Despre aplicație', recurente: 'Plăți recurente', notificari: 'Notificări și citate',
+  aspect: 'Aspect', setari: 'Setări cont', despre: 'Despre aplicație', recurente: 'Plăți recurente', import: 'Import extras BT', notificari: 'Notificări și citate',
 }
 
 function readTheme(): Theme {
@@ -176,6 +177,7 @@ function Shell({ theme, setTheme }: { theme: Theme; setTheme: (t: Theme) => void
       case 'setari': inner = <AccountSettingsScreen notify={notify} />; break
       case 'recurente': inner = <RecurringScreen openRecurring={openRecurring} />; break
       case 'notificari': inner = <ReminderScreen notify={notify} />; break
+      case 'import': inner = <ImportScreen notify={notify} />; break
       default: inner = <AboutScreen />
     }
     body = (

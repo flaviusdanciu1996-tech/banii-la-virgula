@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { ChevronRight, Plus, Minus, Settings2, ChevronLeft, Search, Repeat } from 'lucide-react'
+import { ChevronRight, Plus, Minus, Settings2, ChevronLeft, Search, Repeat, FileUp } from 'lucide-react'
 import { useStore } from '../store.tsx'
 import { Ring, EmptyArt } from '../ui.tsx'
 import { TxRow, catColor } from '../helpers.tsx'
@@ -30,6 +30,7 @@ export function ExpensesTab({ nav, openTx }: { nav: Nav; openTx: (t?: Tx, kind?:
         <button type="button" className="link" onClick={() => nav('history')}>Vezi tot istoricul <ChevronRight size={15} /></button>
       </section>
       <div className="menu">
+        <button type="button" className="menu-row" onClick={() => nav('import')}><FileUp size={18} />Import extras BT<ChevronRight size={16} className="chev" /></button>
         <button type="button" className="menu-row" onClick={() => nav('recurente')}><Repeat size={18} />Plăți recurente<ChevronRight size={16} className="chev" /></button>
         <button type="button" className="menu-row" onClick={() => nav('finante')}><Settings2 size={18} />Setări finanțe<ChevronRight size={16} className="chev" /></button>
       </div>

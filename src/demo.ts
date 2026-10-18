@@ -67,7 +67,7 @@ export function demoSeed(): Record<Table, any[]> {
     households: [{ id: H, name: 'Familia mea', owner_id: U }],
     members: [{ household_id: H, user_id: U, display_name: 'Flavius Danciu', role: 'owner' }, { household_id: H, user_id: U2, display_name: 'Ana Pop', role: 'member' }],
     settings: [{ household_id: H, payday: 1, total_budget: null, savings_target_pct: 20, eur_rate: 4.9768, usd_rate: 4.2851, rates_date: today }],
-    categories, transactions, assets, snapshots, invites: [], push_subs: [],
+    categories, transactions, assets, snapshots, invites: [], push_subs: [], import_rules: [],
     recurring: [
       { id: 'r1', household_id: H, member_id: U, kind: 'out', name: 'Chirie', amount: 150000, currency: 'RON', category_id: id('Chirie / rată'), day: 16, auto: true, start_date: addDays(today, -90), last_run: today, active: true },
       { id: 'r2', household_id: H, member_id: U, kind: 'out', name: 'Netflix + Spotify', amount: 6999, currency: 'RON', category_id: id('Abonamente'), day: 4, auto: true, start_date: addDays(today, -90), last_run: today, active: true },

@@ -29,6 +29,7 @@ export interface Tx {
   orig_amount?: number | null
   orig_currency?: Currency | null
   recurring_id?: string | null
+  import_ref?: string | null
 }
 
 export interface Settings {

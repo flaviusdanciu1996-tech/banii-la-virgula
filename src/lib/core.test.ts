@@ -110,3 +110,40 @@ test('goal maths', () => {
   assert.equal(monthlyNeeded(100000, 0, '2026-10-18', null), null)
   assert.equal(monthlyNeeded(100000, 0, '2026-10-18', '2026-10-01'), 100000)
 })
+
+import { parseBT, categorize, parseBtAmount } from './btImport.ts'
+
+test('BT statement parsing and categories', () => {
+  assert.equal(parseBtAmount('4,690.93'), 469093)
+  const P = (y: number, x: number, str: string) => ({ page: 1, x, y, str })
+  const items = [
+    P(625, 261, 'Valuta'), P(613, 266, 'EUR'),
+    P(597, 22, 'Data'), P(597, 89, 'Descriere'), P(597, 451, 'Debit'), P(597, 545, 'Credit'),
+    P(583, 89, 'SOLD ANTERIOR'), P(583, 554, '71.02'),
+    P(567, 28, '13/10/2026'), P(568, 90, 'Plata la POS non-BT cu card MASTERCARD'), P(568, 466, '4.01'),
+    P(558, 90, 'POS 10/10/2026 9084773 TID:37C31301 1301 Shell Service Fynske Motorvej'),
+    P(547, 90, '531B Vissenbjerg DK 54956535 valoare tranzactie: 30.00 DKK RRN:'),
+    P(537, 90, 'CURS 5.3373 RON ECHIVALENT LEI 21.40'),
+    P(527, 90, 'REF: 000TEST1'),
+    P(517, 90, 'Plata la POS non-BT cu card MASTERCARD'), P(517, 460, '10.50'),
+    P(507, 90, 'POS 13/10/2026 0802199 TID:20029309 City Gross Attekulla RUSTHALLSG 43 Helsingborg SE 54956535'),
+    P(497, 90, 'valoare tranzactie: 117.40 SEK RRN:1 comision tranzactie 0.00 EUR; X;'),
+    P(487, 90, 'CURS 5.3393 RON ECHIVALENT LEI 56.06'),
+    P(477, 90, 'REF: 000TEST2'),
+    P(467, 28, '14/10/2026'), P(467, 90, 'Incasare valutara - canal electronic'), P(467, 545, '880.00'),
+    P(457, 90, 'C.I.F.:1;decont 1 septembrie;1894;FIRMA TRANSPORT S R L;RO23BTRL;'),
+    P(447, 90, 'REF: 000TEST3'),
+    P(437, 28, '14/10/2026'), P(437, 89, 'RULAJ ZI'), P(437, 456, '14.51'), P(437, 543, '880.00'),
+  ]
+  const txs = parseBT(items)
+  assert.equal(txs.length, 3)
+  assert.deepEqual(txs.map(t => [t.date, t.kind, t.amount, t.ron, t.ref]), [
+    ['2026-10-10', 'out', 401, 2140, '000TEST1'],
+    ['2026-10-13', 'out', 1050, 5606, '000TEST2'],
+    ['2026-10-14', 'in', 88000, null, '000TEST3'],
+  ])
+  assert.equal(txs[0].original, '30.00 DKK')
+  const cats = [{ id: 'f', name: 'Combustibil', kind: 'out', archived: false }, { id: 'm', name: 'Mâncare acasă', kind: 'out', archived: false }, { id: 'd', name: 'Diurnă', kind: 'in', archived: false }]
+  assert.deepEqual(txs.map(t => categorize(t, [], cats)), ['f', 'm', 'd'])
+  assert.equal(categorize(txs[1], [{ pattern: 'city gross', category_id: 'f' }], cats), 'f') // learned rule wins
+})
