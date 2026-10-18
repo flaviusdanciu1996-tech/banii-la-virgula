@@ -452,3 +452,37 @@ section > h2.grp-h::before { display: none; }
 .dep .ghost-btn { display: inline-flex; gap: 8px; align-items: center; justify-content: center; }
 .dep input:not([type=checkbox]) { background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; font: inherit; }
 .dep .small-in input { padding: 8px 10px; }
+
+/* Dream board */
+.sec-head { display: flex; align-items: baseline; justify-content: space-between; }
+.sec-head .link { padding: 0; }
+.dream-strip { display: flex; gap: 10px; overflow-x: auto; scroll-snap-type: x mandatory; margin: 0 -16px; padding: 2px 16px 6px; scrollbar-width: none; }
+.dream-strip::-webkit-scrollbar { display: none; }
+.dream-tile { position: relative; flex: none; width: 160px; height: 200px; border-radius: 18px; overflow: hidden; border: 0; padding: 0; scroll-snap-align: start; color: #fff; text-align: left; background: var(--surface-2); box-shadow: var(--shadow); }
+.dream-img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; }
+.dream-ph { display: grid; place-items: center; color: #fff; background: linear-gradient(135deg, var(--accent-2), var(--accent)); }
+.dream-shade { position: absolute; inset: 0; background: linear-gradient(180deg, rgba(0,0,0,0) 35%, rgba(0,0,0,.72) 100%); }
+.dream-cap { position: absolute; left: 12px; right: 12px; bottom: 12px; display: flex; flex-direction: column; gap: 6px; text-shadow: 0 1px 3px rgba(0,0,0,.5); }
+.dream-cap b { font-size: 15px; line-height: 1.2; }
+.dream-cap.big b { font-size: 21px; }
+.dream-note { font-size: 13.5px; opacity: .92; }
+.dream-bar { display: block; height: 6px; border-radius: 99px; background: rgba(255,255,255,.3); overflow: hidden; }
+.dream-bar i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #6EE7B7, #34D399); }
+.dream-bar.solid { background: var(--track); height: 8px; }
+.dream-new { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; text-align: center; color: var(--accent); border: 2px dashed color-mix(in srgb, var(--accent) 45%, transparent); background: color-mix(in srgb, var(--accent) 8%, var(--surface)); box-shadow: none; text-shadow: none; padding: 12px; }
+.dream-new .small { color: var(--muted); }
+.dream-board { display: flex; flex-direction: column; gap: 16px; }
+.dream-card { background: var(--surface); border: 1px solid var(--line); border-radius: 20px; overflow: hidden; box-shadow: var(--shadow); }
+.dream-photo { position: relative; display: block; width: 100%; aspect-ratio: 16 / 10; border: 0; padding: 0; color: #fff; text-align: left; background: var(--surface-2); }
+.dream-body { padding: 14px 16px 16px; display: flex; flex-direction: column; gap: 8px; }
+.dream-row { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; }
+.dream-add { align-self: stretch !important; margin-top: 4px !important; }
+.dream-add-btn { width: 100%; margin-top: 4px; display: inline-flex; gap: 8px; align-items: center; justify-content: center; }
+.dream-field { display: flex; flex-direction: column; gap: 10px; }
+.dream-preview { position: relative; aspect-ratio: 16 / 10; border-radius: 16px; overflow: hidden; background: var(--surface-2); }
+.dream-preview img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.dream-preview .icon-btn { position: absolute; top: 8px; right: 8px; background: rgba(0,0,0,.55); color: #fff; border: 0; }
+.dream-preview.empty { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; color: var(--muted); border: 2px dashed var(--line); }
+.dream-field .add-row .ghost-btn { flex: 1; display: inline-flex; gap: 6px; align-items: center; justify-content: center; }
+.goal-thumb { position: static; width: 46px; height: 46px; border-radius: 12px; flex: none; }
+.goal-thumb.dream-ph { display: grid; }

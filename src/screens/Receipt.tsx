@@ -10,7 +10,7 @@ import { matchReceipt, groupItems, splitProportional, toMinor, type ReadReceipt,
 import { GROUPS, type Tx } from '../lib/types.ts'
 
 /** Shrink the photo (max 1600 px, JPEG) so it uploads fast on mobile data. */
-async function compress(file: File): Promise<{ data: string; mime: string; blob: Blob }> {
+export async function compress(file: File): Promise<{ data: string; mime: string; blob: Blob }> {
   try {
     const bmp = await createImageBitmap(file)
     const k = Math.min(1, 1600 / Math.max(bmp.width, bmp.height))

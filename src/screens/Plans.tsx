@@ -8,6 +8,7 @@ import { fmt, fmtNum, parseMoney, CUR_LABEL, pct, type Currency } from '../lib/m
 import { todayIso, diffDays, shortDayLabel, MONTHS } from '../lib/period.ts'
 import { nextOccurrence, monthlyNeeded } from '../lib/schedule.ts'
 import { GROUPS, type Recurring, type Goal, type Kind } from '../lib/types.ts'
+import { DreamImage, DreamPhotoField, saveDreamPhoto, removeDreamPhoto } from './Dreams.tsx'
 import type { Nav } from '../App.tsx'
 
 /* ---------------- Upcoming payments ---------------- */
@@ -142,22 +143,22 @@ export function RecurringSheet({ rec, onClose, notify }: { rec?: Recurring; onCl
 
 export function GoalCard({ g, onOpen, onAdd }: { g: Goal; onOpen: () => void; onAdd: () => void }) {
   const today = todayIso()
-  const p = pct(g.saved, g.target)
-  const need = monthlyNeeded(g.target, g.saved, today, g.deadline)
-  const done = g.saved >= g.target
+  const p = g.target ? pct(g.saved, g.target) : 0
+  const need = g.target ? monthlyNeeded(g.target, g.saved, today, g.deadline) : null
+  const done = g.target > 0 && g.saved >= g.target
   return (
     <div className="goal">
       <button type="button" className="goal-head" onClick={onOpen} style={{ background: 'none', border: 0, padding: 0, textAlign: 'left', color: 'inherit' }}>
-        <span className="cat-icon" style={{ width: 42, height: 42, ['--c' as any]: done ? 'var(--good)' : 'var(--accent-2)' }}><Icon name={g.icon} size={20} /></span>
-        <span className="row-main"><b>{g.name}</b><span className="muted small num">{fmt(g.saved)} din {fmt(g.target)}</span></span>
-        <b className={'num ' + (done ? 'good' : '')} style={{ fontSize: 18 }}>{p}%</b>
+        {g.photo_path ? <DreamImage g={g} className="goal-thumb" /> : <span className="cat-icon" style={{ width: 42, height: 42, ['--c' as any]: done ? 'var(--good)' : 'var(--accent-2)' }}><Icon name={g.icon} size={20} /></span>}
+        <span className="row-main"><b>{g.name}</b><span className="muted small num">{g.target ? `${fmt(g.saved)} din ${fmt(g.target)}` : 'fără sumă'}</span></span>
+        {g.target > 0 && <b className={'num ' + (done ? 'good' : '')} style={{ fontSize: 18 }}>{p}%</b>}
       </button>
-      <Bar value={p} color={done ? 'var(--good)' : 'var(--accent-2)'} />
+      {g.target > 0 && <Bar value={p} color={done ? 'var(--good)' : 'var(--accent-2)'} />}
       <div className="goal-foot">
-        <span>{done ? 'Obiectiv atins! 🎉' : g.deadline ? `Termen: ${formatDeadline(g.deadline)}` : 'Fără termen'}</span>
+        <span>{done ? 'Visul e acoperit! 🎉' : g.deadline ? `Termen: ${formatDeadline(g.deadline)}` : 'Fără termen'}</span>
         {!done && need !== null && <span className="num">pune ~{fmt(need)} / lună</span>}
       </div>
-      {!done && <button type="button" className="ghost-btn" onClick={onAdd}><Plus size={15} />Adaugă bani</button>}
+      {!done && g.target > 0 && <button type="button" className="ghost-btn" onClick={onAdd}><Plus size={15} />Adaugă bani</button>}
     </div>
   )
 }
@@ -170,6 +171,9 @@ export function GoalSheet({ goal, addMode, onClose, notify, celebrate }: { goal?
   const [target, setTarget] = useState(goal ? fmtNum(goal.target) : '')
   const [saved, setSaved] = useState(goal ? fmtNum(goal.saved) : '')
   const [deadline, setDeadline] = useState(goal?.deadline ?? '')
+  const [note, setNote] = useState(goal?.note ?? '')
+  const [photo, setPhoto] = useState<{ blob: Blob; preview: string } | null | 'remove'>(null)
+  const [busy, setBusy] = useState(false)
   const [add, setAdd] = useState('')
   const [record, setRecord] = useState(true)
   const [err, setErr] = useState('')
@@ -185,21 +189,30 @@ export function GoalSheet({ goal, addMode, onClose, notify, celebrate }: { goal?
         const savCat = st.categories.find(c => c.grp === 'economii' && !c.archived && c.name === 'Economii') || st.categories.find(c => c.grp === 'economii' && !c.archived)
         if (savCat) await st.saveTx({ kind: 'out', amount: v, category_id: savCat.id, date: todayIso(), note: goal.name, asset_id: null })
       }
-      if (goal.saved < goal.target && newSaved >= goal.target) celebrate(`Ai atins obiectivul „${goal.name}”! 🎉`)
+      if (goal.saved < goal.target && newSaved >= goal.target) celebrate(`Ai strâns toți banii pentru „${goal.name}”! 🎉`)
       else notify('Bani adăugați')
       onClose()
     } catch (e: any) { setErr(e?.message || 'Nu s-a putut salva.') }
   }
 
   async function save() {
-    const t = parseMoney(target), sv = saved.trim() ? parseMoney(saved) : 0
-    if (!name.trim()) return setErr('Scrie un nume, de ex. „Cabana”.')
-    if (t === null || t <= 0) return setErr('Scrie suma țintă (ex. 50.000).')
+    const t = target.trim() ? parseMoney(target) : 0, sv = saved.trim() ? parseMoney(saved) : 0
+    if (!name.trim()) return setErr('Scrie visul, de ex. „Cabana A-frame”.')
+    if (t === null || t < 0) return setErr('Suma nu e validă (ex. 50.000).')
     if (sv === null || sv < 0) return setErr('Suma strânsă nu e validă.')
+    setBusy(true); setErr('')
     try {
-      await st.saveGoal({ id: goal?.id, name: name.trim(), icon, target: t, saved: sv, deadline: deadline || null, archived: false })
-      notify('Obiectiv salvat'); onClose()
+      const g = await st.saveGoal({ id: goal?.id, name: name.trim(), icon, target: t, saved: sv, deadline: deadline || null, note: note.trim() || null, archived: false })
+      if (photo === 'remove') {
+        await removeDreamPhoto(goal?.photo_path)
+        await st.saveGoal({ id: g.id, photo_path: null })
+      } else if (photo) {
+        const path = await saveDreamPhoto(st.householdId, g.id, photo.blob, goal?.photo_path)
+        await st.saveGoal({ id: g.id, photo_path: path })
+      }
+      notify(goal ? 'Vis salvat' : 'Vis adăugat ✨'); onClose()
     } catch (e: any) { setErr(e?.message || 'Nu s-a putut salva.') }
+    finally { setBusy(false) }
   }
 
   if (addMode && goal) {
@@ -215,21 +228,27 @@ export function GoalSheet({ goal, addMode, onClose, notify, celebrate }: { goal?
   }
 
   return (
-    <Sheet title={goal ? 'Obiectiv' : 'Obiectiv nou'} onClose={onClose}>
-      <label className="field">Pentru ce strângi<input id="goal-name" maxLength={40} placeholder="ex. Cabana, Mașină nouă, Vacanță" value={name} onChange={e => setName(e.target.value)} /></label>
-      <label className="field">Suma țintă</label>
+    <Sheet title={goal ? 'Visul tău' : 'Vis nou'} onClose={onClose}>
+      <DreamPhotoField current={goal?.photo_path} value={photo} onChange={setPhoto} />
+      <label className="field">Ce visezi<input id="goal-name" maxLength={40} placeholder="ex. Cabana A-frame, BMW X5, Islanda" value={name} onChange={e => setName(e.target.value)} /></label>
+      <label className="field">De ce îl vrei (opțional)<input id="goal-note" maxLength={90} placeholder="ex. Liniște la munte, cu vedere spre Cheile Ordâncușii" value={note} onChange={e => setNote(e.target.value)} /></label>
+      <label className="field">De câți bani ai nevoie (opțional)</label>
       <MoneyField id="goal-target" big value={target} onChange={setTarget} suffix="lei" />
-      <label className="field">Cât ai strâns deja</label>
-      <MoneyField id="goal-saved" value={saved} onChange={setSaved} suffix="lei" />
-      <label className="field">Până când (opțional)<input id="goal-deadline" type="date" value={deadline} onChange={e => setDeadline(e.target.value)} /></label>
-      <div className="field">Iconiță</div>
-      <div className="icon-grid">
-        {ICON_CHOICES.map(n => <button key={n} type="button" className="icon-choice" aria-pressed={n === icon} aria-label={n} onClick={() => setIcon(n)}><Icon name={n} size={18} /></button>)}
-      </div>
+      {parseMoney(target) ? <>
+        <label className="field">Cât ai strâns deja</label>
+        <MoneyField id="goal-saved" value={saved} onChange={setSaved} suffix="lei" />
+        <label className="field">Până când (opțional)<input id="goal-deadline" type="date" value={deadline} onChange={e => setDeadline(e.target.value)} /></label>
+      </> : <p className="hint">Fără sumă rămâne doar poza, ca inspirație. O poți pune oricând.</p>}
+      {!photo && !goal?.photo_path && <>
+        <div className="field">Iconiță (dacă n-ai poză)</div>
+        <div className="icon-grid">
+          {ICON_CHOICES.map(n => <button key={n} type="button" className="icon-choice" aria-pressed={n === icon} aria-label={n} onClick={() => setIcon(n)}><Icon name={n} size={18} /></button>)}
+        </div>
+      </>}
       {err && <p className="err">{err}</p>}
       <div className="actions">
         {goal && <ConfirmButton onConfirm={async () => { await st.deleteGoal(goal.id); notify('Șters'); onClose() }} />}
-        <button type="button" className="primary" onClick={save}>Salvează</button>
+        <button type="button" className="primary" disabled={busy} onClick={save}>{busy ? 'Salvez…' : 'Salvează'}</button>
       </div>
     </Sheet>
   )
@@ -241,15 +260,15 @@ export function GoalsSection({ openGoal, compact, nav }: { openGoal: (g?: Goal, 
   if (compact && !goals.length) return null
   return (
     <section>
-      <h2>Obiective</h2>
+      <h2>Visuri și obiective</h2>
       {goals.length ? (
         <div className="goals">
           {(compact ? goals.slice(0, 2) : goals).map(g => <GoalCard key={g.id} g={g} onOpen={() => openGoal(g)} onAdd={() => openGoal(g, true)} />)}
         </div>
-      ) : <EmptyArt icon="target" title="Pentru ce strângi?" text="Pune-ți un obiectiv (cabana, o mașină, un fond de urgență) și vezi cât trebuie să pui deoparte pe lună ca să ajungi la el." />}
+      ) : <EmptyArt icon="target" title="Pentru ce muncești?" text="Pune o poză cu visul tău (cabana, o mașină, o călătorie) și, dacă vrei, suma. Vezi cât trebuie să pui deoparte pe lună ca să ajungi la el." />}
       {compact
         ? nav && <button type="button" className="link" onClick={() => nav('tab:avere')}>Toate obiectivele <ChevronRight size={15} /></button>
-        : <button type="button" className="ghost-btn" style={{ marginTop: 10, width: '100%' }} onClick={() => openGoal()}><Plus size={16} />Obiectiv nou</button>}
+        : <button type="button" className="ghost-btn" style={{ marginTop: 10, width: '100%' }} onClick={() => openGoal()}><Plus size={16} />Vis nou</button>}
     </section>
   )
 }

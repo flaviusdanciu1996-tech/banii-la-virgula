@@ -173,4 +173,6 @@ export interface Goal {
   saved: number
   deadline: string | null
   archived: boolean
+  photo_path?: string | null // dream board photo (private storage, bucket "dreams")
+  note?: string | null // why you want it
 }

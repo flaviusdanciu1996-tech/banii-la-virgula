@@ -3,7 +3,8 @@ import { History, LayoutGrid, ArrowLeftRight, Lightbulb, ChevronRight, ChevronLe
 import { useStore } from '../store.tsx'
 import { Ring, Bar, Seg, CountUp, EmptyArt } from '../ui.tsx'
 import { TxRow, catColor } from '../helpers.tsx'
-import { upcomingList, UpcomingRows, GoalsSection } from './Plans.tsx'
+import { upcomingList, UpcomingRows } from './Plans.tsx'
+import { DreamStrip } from './Dreams.tsx'
 import { useMyQuotes, asQuotes } from './Reminder.tsx'
 import { ReceiptButton } from './Receipt.tsx'
 import { quoteFor } from '../lib/quotes.ts'
@@ -108,6 +109,8 @@ export function HomeScreen({ nav, period, setPeriod, scope, setScope, openTx, op
         <ChevronRight size={16} className="chev" />
       </button>
 
+      <DreamStrip openGoal={openGoal} nav={nav} />
+
       <div className="add-row">
         <button type="button" className="add out" onClick={() => openTx(undefined, 'out')}><Minus size={18} />Cheltuială</button>
         <button type="button" className="add in" onClick={() => openTx(undefined, 'in')}><Plus size={18} />Venit</button>
@@ -144,7 +147,6 @@ export function HomeScreen({ nav, period, setPeriod, scope, setScope, openTx, op
         </section>
       )}
 
-      <GoalsSection openGoal={openGoal} compact nav={nav} />
 
       <section>
         <h2>Categoriile cu cele mai mari cheltuieli</h2>

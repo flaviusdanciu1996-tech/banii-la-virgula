@@ -45,7 +45,7 @@ export interface Store extends State {
   refreshRates(force?: boolean): Promise<void>
   saveRecurring(r: Partial<Recurring>): Promise<void>
   deleteRecurring(id: string): Promise<void>
-  saveGoal(g: Partial<Goal>): Promise<void>
+  saveGoal(g: Partial<Goal>): Promise<Goal>
   deleteGoal(id: string): Promise<void>
   toRonNow(minor: number, cur: Currency): number
 }
@@ -214,9 +214,12 @@ export function StoreProvider({ repo, user, children }: { repo: Repo; user: User
       const saved = g.id ? await repo.update<Goal>('goals', { id: g.id }, row) : await repo.insert<Goal>('goals', row)
       saved.target = num(saved.target); saved.saved = num(saved.saved)
       setS(p => ({ ...p, goals: [...p.goals.filter(x => x.id !== saved.id), saved] }))
+      return saved
     },
     async deleteGoal(id) {
+      const g = s.goals.find(x => x.id === id)
       await repo.remove('goals', { id })
+      if (g?.photo_path && supabase && !g.photo_path.startsWith('data:')) supabase.storage.from('dreams').remove([g.photo_path]).catch(() => {})
       setS(p => ({ ...p, goals: p.goals.filter(x => x.id !== id) }))
     },
     async refreshRates(force = false) {

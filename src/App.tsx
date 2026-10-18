@@ -1,3 +1,4 @@
+import { DreamsScreen } from './screens/Dreams.tsx'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Home, PieChart, ReceiptText, Gem, User, ChevronLeft, Download, X } from 'lucide-react'
 import { supabase, supabaseRepo, demoRepo, DEMO, type Repo } from './db.ts'
@@ -24,7 +25,7 @@ type Theme = 'system' | 'light' | 'dark'
 
 const SUB_TITLES: Record<string, string> = {
   history: 'Istoric', categories: 'Pe categorii', finante: 'Finanțe', familie: 'Familia mea',
-  aspect: 'Aspect', setari: 'Setări cont', despre: 'Despre aplicație', recurente: 'Plăți recurente', import: 'Import extras BT', notificari: 'Notificări și citate',
+  aspect: 'Aspect', setari: 'Setări cont', despre: 'Despre aplicație', recurente: 'Plăți recurente', import: 'Import extras BT', notificari: 'Notificări și citate', visuri: 'Visurile mele',
 }
 
 function readTheme(): Theme {
@@ -178,6 +179,7 @@ function Shell({ theme, setTheme }: { theme: Theme; setTheme: (t: Theme) => void
       case 'recurente': inner = <RecurringScreen openRecurring={openRecurring} />; break
       case 'notificari': inner = <ReminderScreen notify={notify} />; break
       case 'import': inner = <ImportScreen notify={notify} />; break
+      case 'visuri': inner = <DreamsScreen openGoal={openGoal} />; break
       default: inner = <AboutScreen />
     }
     body = (
