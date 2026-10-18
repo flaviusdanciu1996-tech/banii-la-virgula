@@ -9,6 +9,8 @@ import { todayIso, diffDays, MONTHS_SHORT } from '../lib/period.ts'
 import { netWorth, snapshotAt, monthlySeries } from '../lib/calc.ts'
 import { SECTIONS, kindOf, type Asset, type AssetSection, type Goal } from '../lib/types.ts'
 import { GoalsSection } from './Plans.tsx'
+import { BrokerSummaryCard } from './BrokerImport.tsx'
+import { FiCard } from './Fi.tsx'
 import { CountUp, EmptyArt } from '../ui.tsx'
 
 export function AvereScreen({ scope, openAsset, openGoal, nav }: { scope: 'all' | 'me'; openAsset: (a?: Asset, section?: AssetSection, quick?: boolean) => void; openGoal: (g?: Goal, add?: boolean) => void; nav: Nav }) {
@@ -18,7 +20,6 @@ export function AvereScreen({ scope, openAsset, openGoal, nav }: { scope: 'all' 
   const nw = netWorth(assets, st.rates)
   const monthAgo = scope === 'all' ? snapshotAt(st.snapshots, new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10)) : null
   const series = monthlySeries(st.snapshots, today, 12).map(p => ({ label: MONTHS_SHORT[Number(p.label.slice(5, 7)) - 1], value: p.value }))
-  const profit = nw.investValue - nw.invested
   const parts = [
     { value: nw.liquid, color: 'var(--s-liquid)', label: 'Lichidități' },
     { value: nw.invest, color: 'var(--s-invest)', label: 'Investiții' },
@@ -45,6 +46,8 @@ export function AvereScreen({ scope, openAsset, openGoal, nav }: { scope: 'all' 
         <p className="note">Curs {st.settings.rates_date ? `din ${st.settings.rates_date.split('-').reverse().join('.')}` : 'manual'}: 1 € = {String(st.rates.EUR).replace('.', ',')} lei · 1 $ = {String(st.rates.USD).replace('.', ',')} lei</p>
       </section>
 
+      <FiCard />
+
       <GoalsSection openGoal={openGoal} />
 
       {assets.length === 0 ? (
@@ -64,13 +67,20 @@ export function AvereScreen({ scope, openAsset, openGoal, nav }: { scope: 'all' 
           return (
             <section key={s.id}>
               <h2 className="grp-h"><span><i className="dot" style={{ background: s.color }} />{s.name}</span><span className="num">{s.id === 'debt' && total ? '−' : ''}{fmtNum(total)}</span></h2>
-              {s.id === 'invest' && items.length > 0 && (
-                <div className="card inv-sum">
-                  <div><span>Ai băgat</span><b className="num">{fmtNum(nw.invested)}</b></div>
-                  <div><span>Valorează</span><b className="num">{fmtNum(nw.investValue)}</b></div>
-                  <div><span>Profit</span><b className={'num ' + (profit >= 0 ? 'in' : 'bad')}>{fmtSigned(profit).replace(' lei', '')}{nw.invested ? ` (${profit >= 0 ? '+' : ''}${(Math.round((profit / nw.invested) * 1000) / 10).toString().replace('.', ',')}%)` : ''}</b></div>
-                </div>
-              )}
+              {s.id === 'invest' && items.some(a => a.invest_summary) && <BrokerSummaryCard assets={items.filter(a => a.invest_summary)} />}
+              {s.id === 'invest' && items.some(a => !a.invest_summary) && (() => {
+                const other = items.filter(a => !a.invest_summary)
+                const inv = other.reduce((acc, a) => acc + toRon(a.invested || 0, a.currency, st.rates), 0)
+                const val = other.reduce((acc, a) => acc + toRon(a.value, a.currency, st.rates), 0)
+                const pr = val - inv
+                return inv > 0 ? (
+                  <div className="card inv-sum">
+                    <div><span>{items.some(a => a.invest_summary) ? 'Alte investiții: ai băgat' : 'Ai băgat'}</span><b className="num">{fmtNum(inv)}</b></div>
+                    <div><span>Valorează</span><b className="num">{fmtNum(val)}</b></div>
+                    <div><span>Profit</span><b className={'num ' + (pr >= 0 ? 'in' : 'bad')}>{fmtSigned(pr).replace(' lei', '')} ({pr >= 0 ? '+' : ''}{(Math.round((pr / inv) * 1000) / 10).toString().replace('.', ',')}%)</b></div>
+                  </div>
+                ) : null
+              })()}
               <div className="rows">
                 {items.map(a => <AssetRow key={a.id} a={a} today={today} onOpen={() => openAsset(a)} onQuick={() => openAsset(a, undefined, !a.holdings?.length)} />)}
                 <button type="button" className="row add-line" onClick={() => openAsset(undefined, s.id)}><Plus size={16} />Adaugă la {s.name.toLowerCase()}</button>
@@ -94,7 +104,7 @@ function AssetRow({ a, today, onOpen, onQuick }: { a: Asset; today: string; onOp
   const how = a.holdings?.length ? `${a.holdings.length} acțiuni · preț BVB` : a.value_source === 'market' ? `preț online · ${(a.market_offers ?? []).filter(o => o.used).length} oferte`
     : a.value_source === 'depreciation' ? `estimat · −${a.dep_rate}%/an` : null
   const ron = toRon(a.value, a.currency, st.rates)
-  const profitPct = k.section === 'invest' && a.invested ? Math.round(((a.value - a.invested) / a.invested) * 1000) / 10 : null
+  const profitPct = k.section === 'invest' && a.invested && !a.invest_summary ? Math.round(((a.value - a.invested) / a.invested) * 1000) / 10 : null
   return (
     <div className="row asset-row">
       <button type="button" className="asset-main" onClick={onOpen}>

@@ -28,6 +28,7 @@ export interface InvestSummary {
   first: string | null
   last: string | null
   count: number
+  flows?: { d: string; amt: number }[] // deposits (+) and withdrawals (−), for the yearly return
 }
 
 const bani = (v: number) => Math.round(v * 100)
@@ -170,14 +171,14 @@ export function parseTradeville(bytes: Uint8Array, fileName = ''): ParsedReport 
 export function summarize(txs: InvestTx[]): { holdings: Holding[]; summary: InvestSummary } {
   const list = [...txs].sort((a, b) => a.at.localeCompare(b.at) || (a.op === 'out' ? -1 : b.op === 'out' ? 1 : 0))
   const pos = new Map<string, { qty: number; cost: number }>()
-  const s: InvestSummary = { deposits: 0, withdrawals: 0, dividends: 0, commissions: 0, realized: 0, cash: 0, first: null, last: null, count: list.length }
+  const s: InvestSummary = { deposits: 0, withdrawals: 0, dividends: 0, commissions: 0, realized: 0, cash: 0, first: null, last: null, count: list.length, flows: [] }
   let moved: { cost: number; at: string } | null = null
   for (const t of list) {
     s.first ??= t.at.slice(0, 10); s.last = t.at.slice(0, 10)
     s.commissions += t.commission
     if (t.symbol === 'RON' || t.op === 'div') {
-      if (t.op === 'in' && /depunere/i.test(t.note)) s.deposits += t.net
-      else if (t.op === 'out' && /retragere/i.test(t.note)) s.withdrawals += -t.net
+      if (t.op === 'in' && /depunere/i.test(t.note)) { s.deposits += t.net; s.flows!.push({ d: t.at.slice(0, 10), amt: t.net }) }
+      else if (t.op === 'out' && /retragere/i.test(t.note)) { s.withdrawals += -t.net; s.flows!.push({ d: t.at.slice(0, 10), amt: t.net }) }
       else if (t.op === 'div') s.dividends += t.net
       else if (t.op === 'in') s.deposits += 0 // other cash in (fractions bought back) counts as gain via cash
       s.cash += t.net

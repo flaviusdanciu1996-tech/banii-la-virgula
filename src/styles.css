@@ -527,3 +527,36 @@ section > h2.grp-h::before { display: none; }
 .pos-mid, .pos-end { display: flex; flex-direction: column; min-width: 0; font-size: 13.5px; }
 .pos-end { align-items: flex-end; }
 .dep-h svg { vertical-align: -3px; margin-right: 4px; }
+
+/* Broker summary */
+.broker-card { gap: 12px; }
+.bk-three { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; }
+.bk-three > div, .bk-gain > div { display: flex; flex-direction: column; gap: 2px; }
+.bk-three span, .bk-gain span { font-size: 12.5px; color: var(--muted); }
+.bk-three b { font-size: 18px; }
+.bk-gain { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding: 10px 12px; border-radius: 14px; background: var(--surface-2); }
+.bk-gain b { font-size: 20px; }
+.bk-from { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.alloc-bar { display: flex; height: 12px; border-radius: 99px; overflow: hidden; gap: 2px; }
+.alloc-bar i { display: block; height: 100%; }
+.alloc-list { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 13px; }
+.alloc-list span { display: inline-flex; align-items: center; gap: 5px; }
+.alloc-list i { width: 9px; height: 9px; border-radius: 3px; display: inline-block; }
+.alloc-list em { font-style: normal; font-size: 12px; }
+.note.warn { color: var(--warn, #F59E0B); }
+
+/* Financial independence */
+.fi-card { gap: 12px; }
+.fi-head { display: flex; justify-content: space-between; align-items: center; }
+.fi-card .eyebrow { display: inline-flex; align-items: center; gap: 6px; }
+.fi-intro { margin: 0; }
+.fi-table { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; }
+.fi-table > div { display: flex; flex-direction: column; gap: 2px; }
+.fi-table span { font-size: 12.5px; color: var(--muted); }
+.fi-table b { font-size: 19px; }
+.fi-bar { height: 12px; border-radius: 99px; background: var(--track); overflow: hidden; }
+.fi-bar i { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
+.fi-calc { display: flex; flex-direction: column; gap: 8px; }
+.fi-calc .chips { flex-wrap: nowrap; overflow-x: auto; scrollbar-width: none; margin: 0 -16px; padding: 0 16px; }
+.fi-when { font-size: 16px; padding: 10px 12px; border-radius: 12px; background: color-mix(in srgb, var(--accent) 12%, var(--surface)); }
+.fi-facts p { margin: 4px 0; font-size: 13.5px; }

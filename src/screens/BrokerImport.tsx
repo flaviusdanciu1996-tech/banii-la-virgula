@@ -1,4 +1,5 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { xirr } from '../lib/fi.ts'
 import { FileUp, RefreshCw, TrendingUp } from 'lucide-react'
 import { useStore } from '../store.tsx'
 import { fmt, fmtNum } from '../lib/money.ts'
@@ -154,6 +155,67 @@ export function InvestPanel({ asset, notify }: { asset: Asset; notify: (m: strin
       </div>
       <button type="button" className="ghost-btn" disabled={busy} onClick={refresh}><RefreshCw size={16} />{busy ? 'Iau prețurile…' : 'Actualizează prețurile acum'}</button>
       <p className="hint">Pentru operațiuni noi, importă din nou raportul din Tradeville (Avere → Investiții → Import Tradeville).</p>
+    </div>
+  )
+}
+
+const PALETTE = ['#60A5FA', '#34D399', '#F59E0B', '#F472B6', '#A78BFA', '#22D3EE', '#FB7185', '#94A3B8']
+
+/** Avere → Investiții: the clear picture of everything imported from brokers. */
+export function BrokerSummaryCard({ assets }: { assets: Asset[] }) {
+  const st = useStore()
+  const today = new Date().toISOString().slice(0, 10)
+  // Older imports have no deposit dates yet: rebuild them once from the stored operations.
+  useEffect(() => {
+    for (const a of assets) if (a.invest_summary && !a.invest_summary.flows) st.importBroker({ rows: [], cashEnd: null, broker: 'Tradeville' }, a.id).catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [assets.map(a => a.id + !!a.invest_summary?.flows).join()])
+  const sum = assets.reduce((acc, a) => {
+    const s = a.invest_summary
+    if (!s) return acc
+    acc.dep += s.deposits; acc.wd += s.withdrawals; acc.div += s.dividends; acc.real += s.realized; acc.com += s.commissions
+    acc.flows.push(...(s.flows ?? []))
+    return acc
+  }, { dep: 0, wd: 0, div: 0, real: 0, com: 0, flows: [] as { d: string; amt: number }[] })
+  const value = assets.reduce((a, x) => a + x.value, 0)
+  const hold = assets.flatMap(a => a.holdings ?? [])
+  const posVal = (h: typeof hold[number]) => (h.price ? Math.round(h.qty * h.price * 100) : h.cost)
+  const posTotal = hold.reduce((a, h) => a + posVal(h), 0)
+  const unreal = posTotal - hold.reduce((a, h) => a + h.cost, 0)
+  const gain = value + sum.wd - sum.dep
+  const yr = sum.flows.length ? xirr(sum.flows, value, today) : null
+  const parts = [...hold].map(h => ({ h, v: posVal(h) })).sort((a, b) => b.v - a.v)
+  const big = parts.find(p => posTotal && p.v / posTotal > 0.3 && !/ETF/i.test(p.h.symbol)) // an ETF is already many companies
+  const pctOf = (v: number) => (posTotal ? Math.round((v / posTotal) * 100) : 0)
+  return (
+    <div className="card broker-card">
+      <div className="eyebrow">Banii tăi la bursă · lei</div>
+      <div className="bk-three">
+        <div><span>Ai pus</span><b className="num">{fmtNum(sum.dep).replace(/,\d\d$/, '')}</b></div>
+        <div><span>Ai scos</span><b className="num">{fmtNum(sum.wd).replace(/,\d\d$/, '')}</b></div>
+        <div><span>Mai ai</span><b className="num">{fmtNum(value).replace(/,\d\d$/, '')}</b></div>
+      </div>
+      <div className="bk-gain">
+        <div><span>Câștig total</span><b className={'num ' + (gain >= 0 ? 'in' : 'bad')}>{signed(gain).replace(/,\d\d lei$/, ' lei')}</b></div>
+        <div><span>Randament pe an</span><b className={'num ' + ((yr ?? 0) >= 0 ? 'in' : 'bad')}>{yr === null ? '…' : `${yr >= 0 ? '+' : ''}${String(Math.round(yr * 1000) / 10).replace('.', ',')}%`}</b></div>
+      </div>
+      <div className="bk-from muted small">
+        <span>din vânzări <b className={sum.real >= 0 ? 'in' : 'bad'}>{signed(sum.real).replace(/,\d\d lei$/, '')}</b></span>
+        <span>dividende <b className="in">+{fmtNum(sum.div).replace(/,\d\d$/, '')}</b></span>
+        <span>pe ce ai acum <b className={unreal >= 0 ? 'in' : 'bad'}>{signed(unreal).replace(/,\d\d lei$/, '')}</b></span>
+        <span>comisioane <b className="bad">−{fmtNum(sum.com).replace(/,\d\d$/, '')}</b></span>
+      </div>
+      {parts.length > 0 && <>
+        <div className="alloc-bar" aria-hidden="true">{parts.map((p, i) => <i key={p.h.symbol} style={{ width: pctOf(p.v) + '%', background: PALETTE[i % PALETTE.length] }} />)}</div>
+        <div className="alloc-list">
+          {parts.map((p, i) => {
+            const pl = p.v - p.h.cost, pc = p.h.cost ? Math.round((pl / p.h.cost) * 100) : 0
+            return <span key={p.h.symbol}><i style={{ background: PALETTE[i % PALETTE.length] }} /><b>{p.h.symbol}</b> {pctOf(p.v)}% <em className={pl >= 0 ? 'in' : 'bad'}>{pc >= 0 ? '+' : ''}{pc}%</em></span>
+          })}
+        </div>
+        {big && <p className="note warn">⚠️ {big.h.symbol} e {pctOf(big.v)}% din portofoliu. Peste 30% într-o singură firmă înseamnă risc mare dacă ea scade.</p>}
+      </>}
+      <p className="hint">Randamentul pe an ține cont de când ai pus și când ai scos fiecare leu. Câștig total = ce mai ai + ce ai scos − ce ai pus.</p>
     </div>
   )
 }

@@ -167,6 +167,7 @@ export function StoreProvider({ repo, user, children }: { repo: Repo; user: User
     },
     async importBroker(report, targetId) {
       const today = todayIso()
+      if ((DEMO || !supabase) && !report.rows.length) throw new Error('Nimic de importat.')
       const prev = targetId ? s.assets.find(a => a.id === targetId) : undefined
       let asset = prev ?? normAsset(await repo.insert<Asset>('assets', {
         owner_id: user.id, household_id: s.householdId, name: report.broker, kind: 'actiuni', platform: report.broker, broker: report.broker,
@@ -189,6 +190,7 @@ export function StoreProvider({ repo, user, children }: { repo: Repo; user: User
       const { holdings, summary } = summarize(all)
       const reportLast = report.rows.reduce((m, r) => (r.at > m ? r.at : m), '')
       if (report.cashEnd !== null && reportLast.slice(0, 10) >= (summary.last ?? '')) summary.cash = report.cashEnd
+      else if (!report.rows.length && prev?.invest_summary) summary.cash = prev.invest_summary.cash
       const oldPrice = new Map((prev?.holdings ?? []).map(h => [h.symbol, h.price]))
       const priced = holdings.map(h => ({ ...h, price: oldPrice.get(h.symbol) ?? null }))
       const patch: Partial<Asset> = {

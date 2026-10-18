@@ -45,6 +45,12 @@ export interface Settings {
   eur_rate: number // RON per 1 EUR
   usd_rate: number // RON per 1 USD
   rates_date: string | null
+  // Financial independence goal
+  fi_target?: number | null // minor units in fi_currency
+  fi_currency?: 'EUR' | 'RON'
+  fi_monthly?: number | null // planned monthly investment, minor units in fi_currency
+  fi_return?: number // assumed yearly return, %
+  fi_include_liquid?: boolean
 }
 
 export type AssetSection = 'liquid' | 'invest' | 'goods' | 'debt'
@@ -75,7 +81,7 @@ export interface Asset {
   // Investments imported from a broker report (Tradeville): positions priced daily from BVB.
   broker?: string | null
   holdings?: { symbol: string; qty: number; cost: number; price?: number | null }[] | null
-  invest_summary?: { deposits: number; withdrawals: number; dividends: number; commissions: number; realized: number; cash: number; first: string | null; last: string | null; count: number } | null
+  invest_summary?: { deposits: number; withdrawals: number; dividends: number; commissions: number; realized: number; cash: number; first: string | null; last: string | null; count: number; flows?: { d: string; amt: number }[] } | null
   prices_on?: string | null
 }
 

@@ -267,3 +267,15 @@ test('Tradeville numbers, dates and BVB price', () => {
   assert.equal(parseWhen('10/25/21 10:00:18'), '2021-10-25T10:00:18')
   assert.equal(parseBvbPrice('<tr> <td>Ultimul pret</td><td align="right" style="font-weight:bold;">35,9800</td> </tr>'), 35.98)
 })
+
+import { xirr, monthsToTarget, safeMonthly } from './fi.ts'
+
+test('yearly return with money in and out (XIRR) and the road to a target', () => {
+  // 1.000 in, a year later worth 1.100 → 10%/year
+  assert.ok(Math.abs(xirr([{ d: '2025-01-01', amt: 100000 }], 110000, '2026-01-01')! - 0.1) < 0.002)
+  // 1.000 in, 500 out after 6 months, 600 left after a year → ~13%
+  const r = xirr([{ d: '2025-01-01', amt: 100000 }, { d: '2025-07-02', amt: -50000 }], 60000, '2026-01-01')!
+  assert.ok(r > 0.12 && r < 0.15)
+  assert.equal(monthsToTarget(633000, 100000, 7, 30000000), 170) // 6.330 € + 1.000 €/month at 7% → ~14 years
+  assert.equal(safeMonthly(30000000), 100000) // 300.000 € → 1.000 €/month at 4%
+})
