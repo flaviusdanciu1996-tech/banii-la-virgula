@@ -52,7 +52,9 @@ export function demoSeed(): Record<Table, any[]> {
   add(0, 'Mâncare acasă', 304, 'Pâine')
   const assets = [
     { id: 'a1', household_id: H, owner_id: U, name: 'Revolut', kind: 'cont_bancar', platform: 'Revolut', currency: 'EUR', value: 182040, invested: 0, note: '', updated_on: addDays(today, -2), archived: false },
-    { id: 'a2', household_id: H, owner_id: U, name: 'Portofoliu ETF', kind: 'actiuni', platform: 'Tradeville', currency: 'RON', value: 1248000, invested: 1100000, note: '', updated_on: addDays(today, -5), archived: false },
+    { id: 'a2', household_id: H, owner_id: U, name: 'Tradeville', kind: 'actiuni', platform: 'Tradeville', broker: 'Tradeville', currency: 'RON', value: 1031600, invested: 1100000, note: '', updated_on: today, archived: false, prices_on: today,
+      holdings: [{ symbol: 'TVBETETF', qty: 220, cost: 520000, price: 26.1 }, { symbol: 'TLV', qty: 120, cost: 380000, price: 35.98 }, { symbol: 'SNP', qty: 250, cost: 200000, price: 0.95 }],
+      invest_summary: { deposits: 1500000, withdrawals: 400000, dividends: 61200, commissions: 9800, realized: 85400, cash: 1890, first: '2022-01-10', last: addDays(today, -12), count: 84 } },
     { id: 'a3', household_id: H, owner_id: U, name: 'Bitcoin', kind: 'crypto', platform: 'Binance', currency: 'USD', value: 241000, invested: 300000, note: '', updated_on: addDays(today, -40), archived: false },
     { id: 'a4', household_id: H, owner_id: U, name: 'Dacia Logan', kind: 'masina', platform: '', currency: 'EUR', value: 850000, invested: 0, note: '', updated_on: addDays(today, -60), archived: false },
     { id: 'a7', household_id: H, owner_id: U, name: 'Samsung S25 Ultra', kind: 'electronice', platform: '', currency: 'RON', value: 333000, invested: 0, note: '', updated_on: addDays(today, -3), archived: false,
@@ -77,7 +79,7 @@ export function demoSeed(): Record<Table, any[]> {
     households: [{ id: H, name: 'Familia mea', owner_id: U }],
     members: [{ household_id: H, user_id: U, display_name: 'Flavius Danciu', role: 'owner' }, { household_id: H, user_id: U2, display_name: 'Ana Pop', role: 'member' }],
     settings: [{ household_id: H, payday: 1, total_budget: null, savings_target_pct: 20, eur_rate: 4.9768, usd_rate: 4.2851, rates_date: today }],
-    categories, transactions, assets, snapshots, invites: [], push_subs: [], import_rules: [],
+    categories, transactions, assets, snapshots, invites: [], push_subs: [], import_rules: [], invest_tx: [],
     asset_values: [
       { id: 'v1', household_id: H, asset_id: 'a7', day: addDays(today, -95), value: 400000, source: 'purchase' },
       { id: 'v2', household_id: H, asset_id: 'a7', day: addDays(today, -64), value: 380000, source: 'depreciation' },

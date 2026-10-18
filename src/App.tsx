@@ -1,3 +1,4 @@
+import { BrokerImportScreen } from './screens/BrokerImport.tsx'
 import { DreamsScreen } from './screens/Dreams.tsx'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Home, PieChart, ReceiptText, Gem, User, ChevronLeft, Download, X } from 'lucide-react'
@@ -25,7 +26,7 @@ type Theme = 'system' | 'light' | 'dark'
 
 const SUB_TITLES: Record<string, string> = {
   history: 'Istoric', categories: 'Pe categorii', finante: 'Finanțe', familie: 'Familia mea',
-  aspect: 'Aspect', setari: 'Setări cont', despre: 'Despre aplicație', recurente: 'Plăți recurente', import: 'Import extras BT', notificari: 'Notificări și citate', visuri: 'Visurile mele',
+  aspect: 'Aspect', setari: 'Setări cont', despre: 'Despre aplicație', recurente: 'Plăți recurente', import: 'Import extras BT', notificari: 'Notificări și citate', visuri: 'Visurile mele', 'import-broker': 'Import Tradeville',
 }
 
 function readTheme(): Theme {
@@ -179,6 +180,7 @@ function Shell({ theme, setTheme }: { theme: Theme; setTheme: (t: Theme) => void
       case 'recurente': inner = <RecurringScreen openRecurring={openRecurring} />; break
       case 'notificari': inner = <ReminderScreen notify={notify} />; break
       case 'import': inner = <ImportScreen notify={notify} />; break
+      case 'import-broker': inner = <BrokerImportScreen nav={nav} notify={notify} />; break
       case 'visuri': inner = <DreamsScreen openGoal={openGoal} notify={notify} celebrate={celebrate} />; break
       default: inner = <AboutScreen />
     }
@@ -196,7 +198,7 @@ function Shell({ theme, setTheme }: { theme: Theme; setTheme: (t: Theme) => void
     body = tab === 'home' ? <HomeScreen nav={nav} period={period} setPeriod={n => setOffset(o => o + n)} scope={scope} setScope={setScope} openTx={openTx} openRecurring={openRecurring} openGoal={openGoal} notify={notify} />
       : tab === 'stats' ? <StatsScreen period={period} anchor={anchor} />
       : tab === 'exp' ? <ExpensesTab nav={nav} openTx={openTx} notify={notify} />
-      : tab === 'avere' ? <AvereScreen scope={scope} openAsset={openAsset} openGoal={openGoal} />
+      : tab === 'avere' ? <AvereScreen scope={scope} openAsset={openAsset} openGoal={openGoal} nav={nav} />
       : <AccountScreen nav={nav} onLogout={logout} />
   }
 

@@ -33,6 +33,7 @@ export function ExpensesTab({ nav, openTx, notify }: { nav: Nav; openTx: (t?: Tx
       </section>
       <div className="menu">
         <button type="button" className="menu-row" onClick={() => nav('import')}><FileUp size={18} />Import extras BT<ChevronRight size={16} className="chev" /></button>
+        <button type="button" className="menu-row" onClick={() => nav('import-broker')}><FileUp size={18} />Import Tradeville (investiții)<ChevronRight size={16} className="chev" /></button>
         <button type="button" className="menu-row" onClick={() => nav('recurente')}><Repeat size={18} />Plăți recurente<ChevronRight size={16} className="chev" /></button>
         <button type="button" className="menu-row" onClick={() => nav('finante')}><Settings2 size={18} />Setări finanțe<ChevronRight size={16} className="chev" /></button>
       </div>

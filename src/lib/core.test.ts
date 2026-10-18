@@ -230,3 +230,40 @@ test('reads OLX and Publi24 result pages', () => {
   const p = parsePubli24(p24.replace('\\n', '\n'))
   assert.equal(p.length, 1); assert.equal(p[0].price, 3750); assert.equal(p[0].url, 'https://www.publi24.ro/anunturi/x.html')
 })
+
+import { parseTradeville, summarize as tvSummarize, num as tvNum, parseWhen } from './tradeville.ts'
+import { parseBvbPrice } from './bvb.ts'
+
+test('Tradeville activity report: saved page (.mht) → portfolio at average cost', () => {
+  const rows = [
+    ['10/22/21 23:19:53', 'in', 'RON', '', '3,000.00', '', '3,000.00', '', '', '', 'DEPUNERE CONT CLIENT Pret dirty:'],
+    ['10/25/21 10:00:18', 'cump', 'ABC', '10.00', '100', '2.00', '-1,002.00', '', '', '0.10', 'Pret dirty:'],
+    ['10/26/21 10:00:18', 'cump', 'ABC', '12.00', '100', '2.00', '-1,202.00', '', '', '0.10', 'Pret dirty:'],
+    ['01/10/22 10:00:00', 'vanz', 'ABC', '15.00', '50', '1.50', '748.50', '197.50', '', '0.00', 'Pret dirty:'],
+    ['02/18/22 11:44:40', 'div', 'RON', '', '19.94', '', '19.94', '', '', '', 'dividend ABC Pret dirty:'],
+    ['07/14/22 09:01:06', 'in', 'ABC', '0.0000', '15', '', '0.00', '', '', '0.00', 'mcs gratuite Pret dirty:'],
+    ['08/18/22 09:00:00', 'out', 'ABC', '', '165', '', '0.00', '', '', '0.00', 'Consolidare (raport 1/5) Pret dirty:'],
+    ['08/18/22 09:00:46', 'in', 'ABC', '0', '33', '', '0.00', '', '', '0.00', 'Consolidare (raport 1/5) Pret dirty:'],
+    ['04/05/23 07:32:51', 'out', 'RON', '', '500.00', '', '-500.00', '', '', '0.00', 'RETRAGERE CONT CLIENT X1AB12.RO Pret dirty:'],
+  ]
+  const head = ['Data', 'Oper', 'Ticker', 'Pret', 'Cantitate', 'comision', 'Valoare net', 'Profit/Pierdere', 'Impozit', 'taxa piata', 'Observatii / nrtz']
+  const html = `<html><body><table><tr>${head.map(h => `<td>${h}</td>`).join('')}</tr>${rows.map(r => `<tr>${r.map(c => `<td>${c}</td>`).join('')}</tr>`).join('')}</table>
+    <table><tr><td><span>Sold final bani</span>:<b>1,064.44</b> <b>RON</b></td></tr></table></body></html>`
+  const mht = `From: <Saved by Blink>\r\nMIME-Version: 1.0\r\nContent-Type: multipart/related;\r\n\tboundary="----B----"\r\n\r\n------B----\r\nContent-Type: text/html\r\nContent-Transfer-Encoding: binary\r\n\r\n${html}\r\n------B------\r\n`
+  const rep = parseTradeville(new TextEncoder().encode(mht))
+  assert.equal(rep.rows.length, 9)
+  assert.equal(rep.cashEnd, 106444)
+  assert.equal(rep.rows[8].note, 'Retragere')
+  const { holdings, summary } = tvSummarize(rep.rows)
+  assert.equal(summary.deposits, 300000); assert.equal(summary.withdrawals, 50000)
+  assert.equal(summary.dividends, 1994); assert.equal(summary.realized, 19750)
+  assert.deepEqual(holdings.map(h => [h.symbol, h.qty]), [['ABC', 33]])
+  assert.equal(holdings[0].cost, 165300) // 150 shares at 11,02 average; free shares and the 1:5 consolidation keep the cost
+  assert.equal(summary.cash, 106444)
+})
+
+test('Tradeville numbers, dates and BVB price', () => {
+  assert.equal(tvNum('1,128.03'), 1128.03); assert.equal(tvNum('2,696'), 2696); assert.equal(tvNum('35,9800'), 35.98); assert.equal(tvNum('1.234,5'), 1234.5)
+  assert.equal(parseWhen('10/25/21 10:00:18'), '2021-10-25T10:00:18')
+  assert.equal(parseBvbPrice('<tr> <td>Ultimul pret</td><td align="right" style="font-weight:bold;">35,9800</td> </tr>'), 35.98)
+})

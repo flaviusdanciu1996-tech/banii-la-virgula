@@ -5,6 +5,7 @@ import { duePostings } from './lib/schedule.ts'
 import type { Currency } from './lib/money.ts'
 import { netWorth } from './lib/calc.ts'
 import { todayIso } from './lib/period.ts'
+import { summarize, holdingsValue, type ParsedReport, type InvestTx } from './lib/tradeville.ts'
 
 export interface User { id: string; email: string; name: string }
 
@@ -37,7 +38,8 @@ export interface Store extends State {
   saveSettings(p: Partial<Settings>): Promise<void>
   saveAsset(a: Partial<Asset>): Promise<void>
   deleteAsset(id: string): Promise<void>
-  checkAssetOnline(id: string): Promise<{ value: number | null; source: string; count: number; found: number; error?: string }>
+  checkAssetOnline(id: string): Promise<{ value: number | null; source?: string; count?: number; found?: number; priced?: number; positions?: number; error?: string }>
+  importBroker(report: ParsedReport, targetId?: string): Promise<{ asset: Asset; added: number; priced: number }>
   createInvite(email: string): Promise<Invite>
   deleteInvite(id: string): Promise<void>
   removeMember(userId: string): Promise<void>
@@ -55,6 +57,7 @@ export const useStore = () => useContext(Ctx)!
 
 const num = (v: unknown) => (typeof v === 'string' ? Number(v) : (v as number))
 const normAsset = (a: Asset): Asset => ({ ...a, value: num(a.value), invested: num(a.invested), purchase_price: a.purchase_price == null ? null : num(a.purchase_price) })
+const txNum = (r: any): InvestTx => ({ ref: r.ref, at: String(r.at).slice(0, 19), op: r.op, symbol: r.symbol, price: r.price == null ? null : num(r.price), qty: num(r.qty), commission: num(r.commission), net: num(r.net), profit: r.profit == null ? null : num(r.profit), note: r.note ?? '' })
 
 export function StoreProvider({ repo, user, children }: { repo: Repo; user: User; children: ReactNode }) {
   const [s, setS] = useState<State>({
@@ -161,6 +164,50 @@ export function StoreProvider({ repo, user, children }: { repo: Repo; user: User
     async deleteAsset(id) {
       await repo.remove('assets', { id })
       setS(p => ({ ...p, assets: p.assets.filter(x => x.id !== id), assetValues: p.assetValues.filter(v => v.asset_id !== id) }))
+    },
+    async importBroker(report, targetId) {
+      const today = todayIso()
+      const prev = targetId ? s.assets.find(a => a.id === targetId) : undefined
+      let asset = prev ?? normAsset(await repo.insert<Asset>('assets', {
+        owner_id: user.id, household_id: s.householdId, name: report.broker, kind: 'actiuni', platform: report.broker, broker: report.broker,
+        currency: 'RON', value: 0, invested: 0, note: '', updated_on: today, archived: false,
+      }))
+      // 1) Store the rows (the same row twice is ignored), 2) rebuild the portfolio from everything stored.
+      let all: InvestTx[] = report.rows, added = report.rows.length
+      if (supabase && !DEMO) {
+        added = 0
+        const rows = report.rows.map(r => ({ ...r, household_id: s.householdId, asset_id: asset.id }))
+        for (let i = 0; i < rows.length; i += 400) {
+          const { data, error } = await supabase.from('invest_tx').upsert(rows.slice(i, i + 400), { onConflict: 'asset_id,ref', ignoreDuplicates: true }).select('id')
+          if (error) throw new Error(error.message)
+          added += data?.length ?? 0
+        }
+        const { data, error } = await supabase.from('invest_tx').select('*').eq('asset_id', asset.id).order('at').limit(20000)
+        if (error) throw new Error(error.message)
+        all = (data ?? []).map(txNum)
+      }
+      const { holdings, summary } = summarize(all)
+      const reportLast = report.rows.reduce((m, r) => (r.at > m ? r.at : m), '')
+      if (report.cashEnd !== null && reportLast.slice(0, 10) >= (summary.last ?? '')) summary.cash = report.cashEnd
+      const oldPrice = new Map((prev?.holdings ?? []).map(h => [h.symbol, h.price]))
+      const priced = holdings.map(h => ({ ...h, price: oldPrice.get(h.symbol) ?? null }))
+      const patch: Partial<Asset> = {
+        broker: report.broker, platform: prev?.platform || report.broker, holdings: priced, invest_summary: summary,
+        invested: priced.reduce((a, h) => a + h.cost, 0), value: holdingsValue(priced) + Math.max(0, summary.cash), updated_on: today,
+      }
+      asset = normAsset(await repo.update<Asset>('assets', { id: asset.id }, patch))
+      setS(p => ({ ...p, assets: [...p.assets.filter(x => x.id !== asset.id), asset] }))
+      // 3) Today's prices from BVB (server side).
+      let n = 0
+      if (supabase && !DEMO) {
+        try {
+          const { data } = await supabase.functions.invoke('asset-value', { body: { asset_id: asset.id } })
+          n = data?.priced ?? 0
+          const fresh = await supabase.from('assets').select('*').eq('id', asset.id).single()
+          if (fresh.data) { asset = normAsset(fresh.data as Asset); setS(p => ({ ...p, assets: [...p.assets.filter(x => x.id !== asset.id), asset] })) }
+        } catch { /* prices come with the nightly update */ }
+      }
+      return { asset, added, priced: n }
     },
     async checkAssetOnline(id) {
       if (DEMO || !supabase) throw new Error('În modul demo nu se caută online.')

@@ -7,6 +7,7 @@ import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import webpush from "npm:web-push@3.6.7";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { marketValue, anchorPoint, estimateOn, checkDue, olxUrl, publi24Url, parseOlx, parsePubli24, pickOffers, type Offer, type ValuePoint } from "./valuation.ts";
+import { bvbUrl, parseBvbPrice, holdingsValue, type Holding } from "./bvb.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -48,7 +49,30 @@ async function notify(userId: string, title: string, body: string) {
   }
 }
 
+/** Investments: today's BVB price for every position, value = positions + cash left in the account. */
+async function priceInvestments(a: any) {
+  const today = todayRo();
+  const holdings: Holding[] = (a.holdings ?? []).map((h: any) => ({ ...h }));
+  let priced = 0;
+  for (const h of holdings) {
+    for (let attempt = 0; attempt < 3; attempt++) {
+      try {
+        const r = await fetch(bvbUrl(h.symbol), { headers: UA, signal: AbortSignal.timeout(15000) });
+        const p = r.ok ? parseBvbPrice(await r.text()) : null;
+        if (p) { h.price = p; priced++; }
+        break;
+      } catch (e) { console.log("bvb", h.symbol, attempt, String(e)); await new Promise(res => setTimeout(res, 800)); }
+    }
+  }
+  const cash = Number(a.invest_summary?.cash ?? 0);
+  const value = holdingsValue(holdings) + Math.max(0, cash);
+  await db.from("assets").update({ holdings, value, updated_on: today, prices_on: today, value_source: "market" }).eq("id", a.id);
+  await db.from("asset_values").upsert({ household_id: a.household_id, asset_id: a.id, day: today, value, source: "market" }, { onConflict: "asset_id,day" });
+  return { id: a.id, value, priced, positions: holdings.length };
+}
+
 async function valueAsset(a: any, push: boolean) {
+  if (Array.isArray(a.holdings) && a.holdings.length) return priceInvestments(a);
   const today = todayRo();
   const { data: set } = await db.from("settings").select("eur_rate,usd_rate").eq("household_id", a.household_id).maybeSingle();
   const rates: Record<string, number> = { RON: 1, EUR: Number(set?.eur_rate) || 5, USD: Number(set?.usd_rate) || 4.6 };
@@ -105,8 +129,8 @@ Deno.serve(async (req) => {
 
   // From pg_cron: every asset whose monthly check is due.
   const today = todayRo();
-  const { data: assets } = await db.from("assets").select("*").eq("archived", false).or("market_on.eq.true,dep_rate.gt.0");
-  const due = (assets ?? []).filter((a: any) => checkDue(a.market_checked_on, today)).slice(0, 10);
+  const { data: assets } = await db.from("assets").select("*").eq("archived", false).or("market_on.eq.true,dep_rate.gt.0,holdings.not.is.null");
+  const due = (assets ?? []).filter((a: any) => Array.isArray(a.holdings) && a.holdings.length ? a.prices_on !== today : checkDue(a.market_checked_on, today)).slice(0, 15);
   const out = [];
   for (const a of due) { try { out.push(await valueAsset(a, true)); } catch (e) { console.log("asset", a.id, String(e)); } }
   return json({ checked: out.length });

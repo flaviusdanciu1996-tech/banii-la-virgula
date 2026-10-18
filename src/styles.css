@@ -514,3 +514,16 @@ section > h2.grp-h::before { display: none; }
 .dream-empty { align-items: center; text-align: center; padding: 28px 18px; color: var(--accent); }
 .dream-empty p { margin: 0; }
 .bulk-progress { display: flex; flex-direction: column; gap: 8px; }
+
+/* Broker import */
+.steps-list { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
+.inv-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px 14px; }
+.inv-grid > div { display: flex; flex-direction: column; gap: 2px; }
+.inv-grid span { font-size: 12.5px; color: var(--muted); }
+.inv-grid b { font-size: 15.5px; }
+.positions { display: flex; flex-direction: column; gap: 6px; }
+.pos { display: grid; grid-template-columns: 58px 1fr auto; gap: 10px; align-items: center; padding: 10px 12px; border-radius: 12px; background: var(--surface); }
+.pos-sym { font-weight: 700; font-size: 14px; color: var(--s-invest); }
+.pos-mid, .pos-end { display: flex; flex-direction: column; min-width: 0; font-size: 13.5px; }
+.pos-end { align-items: flex-end; }
+.dep-h svg { vertical-align: -3px; margin-right: 4px; }

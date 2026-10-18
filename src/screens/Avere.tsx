@@ -1,5 +1,6 @@
 import { useMemo } from 'react'
-import { Plus, RefreshCw } from 'lucide-react'
+import { Plus, RefreshCw, FileUp } from 'lucide-react'
+import type { Nav } from '../App.tsx'
 import { useStore } from '../store.tsx'
 import { Donut, LineChart, CatIcon } from '../ui.tsx'
 import { Icon } from '../icons.tsx'
@@ -10,7 +11,7 @@ import { SECTIONS, kindOf, type Asset, type AssetSection, type Goal } from '../l
 import { GoalsSection } from './Plans.tsx'
 import { CountUp, EmptyArt } from '../ui.tsx'
 
-export function AvereScreen({ scope, openAsset, openGoal }: { scope: 'all' | 'me'; openAsset: (a?: Asset, section?: AssetSection, quick?: boolean) => void; openGoal: (g?: Goal, add?: boolean) => void }) {
+export function AvereScreen({ scope, openAsset, openGoal, nav }: { scope: 'all' | 'me'; openAsset: (a?: Asset, section?: AssetSection, quick?: boolean) => void; openGoal: (g?: Goal, add?: boolean) => void; nav: Nav }) {
   const st = useStore()
   const today = todayIso()
   const assets = useMemo(() => st.assets.filter(a => !a.archived && (scope === 'all' || a.owner_id === st.user.id)), [st.assets, scope, st.user.id])
@@ -49,6 +50,7 @@ export function AvereScreen({ scope, openAsset, openGoal }: { scope: 'all' | 'me
       {assets.length === 0 ? (
         <EmptyArt icon="gem" title="Adaugă primul lucru pe care îl ai" text="Un cont (Revolut, banca), o investiție (Tradeville, Binance), mașina sau o datorie. Le aduni pe toate și vezi cât valorezi de fapt.">
           <button type="button" className="primary" onClick={() => openAsset()}><Plus size={17} /> Adaugă</button>
+          <button type="button" className="link" onClick={() => nav('import-broker')}><FileUp size={15} /> Import din Tradeville</button>
         </EmptyArt>
       ) : <>
         <section className="card">
@@ -70,8 +72,9 @@ export function AvereScreen({ scope, openAsset, openGoal }: { scope: 'all' | 'me
                 </div>
               )}
               <div className="rows">
-                {items.map(a => <AssetRow key={a.id} a={a} today={today} onOpen={() => openAsset(a)} onQuick={() => openAsset(a, undefined, true)} />)}
+                {items.map(a => <AssetRow key={a.id} a={a} today={today} onOpen={() => openAsset(a)} onQuick={() => openAsset(a, undefined, !a.holdings?.length)} />)}
                 <button type="button" className="row add-line" onClick={() => openAsset(undefined, s.id)}><Plus size={16} />Adaugă la {s.name.toLowerCase()}</button>
+                {s.id === 'invest' && <button type="button" className="row add-line" onClick={() => nav('import-broker')}><FileUp size={16} />Import din Tradeville</button>}
               </div>
             </section>
           )
@@ -85,10 +88,10 @@ function AssetRow({ a, today, onOpen, onQuick }: { a: Asset; today: string; onOp
   const st = useStore()
   const k = kindOf(a.kind)
   const age = diffDays(a.updated_on, today)
-  const auto = k.section === 'goods' && (a.market_on || !!a.dep_rate)
+  const auto = (k.section === 'goods' && (a.market_on || !!a.dep_rate)) || !!a.holdings?.length
   const stale = age > 30 && !auto
   const lost = a.purchase_price ? Math.round((1 - a.value / a.purchase_price) * 100) : null
-  const how = a.value_source === 'market' ? `preț online · ${(a.market_offers ?? []).filter(o => o.used).length} oferte`
+  const how = a.holdings?.length ? `${a.holdings.length} acțiuni · preț BVB` : a.value_source === 'market' ? `preț online · ${(a.market_offers ?? []).filter(o => o.used).length} oferte`
     : a.value_source === 'depreciation' ? `estimat · −${a.dep_rate}%/an` : null
   const ron = toRon(a.value, a.currency, st.rates)
   const profitPct = k.section === 'invest' && a.invested ? Math.round(((a.value - a.invested) / a.invested) * 1000) / 10 : null

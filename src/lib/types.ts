@@ -72,6 +72,11 @@ export interface Asset {
   market_checked_on?: string | null
   market_offers?: { title: string; price: number; currency: string; source: string; url: string; used?: boolean }[] | null
   value_source?: 'manual' | 'market' | 'depreciation' | 'purchase'
+  // Investments imported from a broker report (Tradeville): positions priced daily from BVB.
+  broker?: string | null
+  holdings?: { symbol: string; qty: number; cost: number; price?: number | null }[] | null
+  invest_summary?: { deposits: number; withdrawals: number; dividends: number; commissions: number; realized: number; cash: number; first: string | null; last: string | null; count: number } | null
+  prices_on?: string | null
 }
 
 export interface AssetValue {

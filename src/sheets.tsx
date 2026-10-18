@@ -6,6 +6,7 @@ import { parseMoney, fmt, fmtNum, CUR_LABEL, type Currency } from './lib/money.t
 import { Repeat } from 'lucide-react'
 import { ReceiptPhoto } from './screens/Receipt.tsx'
 import { DepreciationFields, AssetValuePanel } from './screens/AssetValue.tsx'
+import { InvestPanel } from './screens/BrokerImport.tsx'
 import { DEFAULT_DEP, estimateOn } from './lib/valuation.ts'
 import { todayIso } from './lib/period.ts'
 import { GROUPS, ASSET_KINDS, SECTIONS, PLATFORMS, kindOf, type Tx, type Kind, type Category, type Group, type Asset, type AssetSection } from './lib/types.ts'
@@ -278,6 +279,7 @@ export function AssetSheet({ asset, section = 'liquid', quick, onClose, notify }
         <div className="chips">{PLATFORMS.map(p => <button key={p} type="button" className="chip" aria-pressed={p === platform} onClick={() => setPlatform(p)}>{p}</button>)}</div>
       </>}
       <Seg label="Moneda" value={currency} onChange={setCurrency} options={[{ id: 'RON', label: 'Lei' }, { id: 'EUR', label: 'Euro' }, { id: 'USD', label: 'Dolari' }]} />
+      {asset?.holdings?.length ? <InvestPanel asset={st.assets.find(x => x.id === asset.id) ?? asset} notify={notify} /> : <>
       <label className="field">{sec === 'debt' ? 'Cât mai ai de dat' : 'Valoare actuală'}</label>
       <MoneyField id="asset-value" big value={value} onChange={setValue} suffix={CUR_LABEL[currency]} />
       {sec === 'goods' && !depKind && <p className="hint">Pune cât ai lua pe el dacă l-ai vinde azi (caută anunțuri cu ceva asemănător). Actualizează-l o dată la câteva luni.</p>}
@@ -287,6 +289,7 @@ export function AssetSheet({ asset, section = 'liquid', quick, onClose, notify }
         <label className="field">Cât ai băgat în total (opțional)</label>
         <MoneyField id="asset-invested" value={invested} onChange={setInvested} suffix={CUR_LABEL[currency]} />
         <p className="hint">Din diferența dintre valoare și cât ai băgat se calculează profitul.</p>
+      </>}
       </>}
       <label className="field">Notă<input id="asset-note" maxLength={80} placeholder="opțional" value={note} onChange={e => setNote(e.target.value)} /></label>
       {err && <p className="err">{err}</p>}
