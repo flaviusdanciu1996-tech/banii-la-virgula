@@ -303,6 +303,7 @@ export const STRATEGIES: Record<StrategyId, { name: string; about: string; rank:
 
 export interface BacktestResult {
   months: number
+  signalMonths: number // months where the strategy found something (else the money was spread over all)
   invested: number
   radar: { value: number; series: { day: number; value: number }[]; picks: { day: number; symbols: string[] }[] }
   equal: { value: number; series: { day: number; value: number }[] }
@@ -315,11 +316,12 @@ export interface BacktestResult {
  * Prices are adjusted (dividends reinvested). P/E and P/BV aren't known historically, so the score uses
  * dividend + technical + risk only.
  */
-export function backtest(stocks: StockData[], startDay: number, endDay: number, monthly = 1000, top = 3, strategy: StrategyId = 'radar'): BacktestResult {
+export type RankFn = (s: StockData, i: number) => number | null
+export function backtest(stocks: StockData[], startDay: number, endDay: number, monthly = 1000, top = 3, strategy: StrategyId | RankFn = 'radar'): BacktestResult {
   const usable = stocks.filter(s => s.t.length > 260)
   const pos = { radar: new Map<string, number>(), equal: new Map<string, number>() }
-  const res: BacktestResult = { months: 0, invested: 0, radar: { value: 0, series: [], picks: [] }, equal: { value: 0, series: [] } }
-  const rank = STRATEGIES[strategy].rank
+  const res: BacktestResult = { months: 0, signalMonths: 0, invested: 0, radar: { value: 0, series: [], picks: [] }, equal: { value: 0, series: [] } }
+  const rank = typeof strategy === 'function' ? strategy : STRATEGIES[strategy].rank
   const valueAt = (m: Map<string, number>, day: number) => {
     let v = 0
     for (const [sym, units] of m) { const s = usable.find(x => x.symbol === sym)!; const j = indexAt(s, day); if (j >= 0) v += units * s.a[j] }
@@ -333,7 +335,8 @@ export function backtest(stocks: StockData[], startDay: number, endDay: number, 
     if (live.length) {
       res.months++; res.invested += monthly
       let ranked = live.map(x => ({ ...x, r: rank(x.s, x.i) })).filter(x => x.r != null).sort((a, b) => b.r! - a.r!).slice(0, top)
-      if (!ranked.length) ranked = live.map(x => ({ ...x, r: 0 })) // nothing qualifies: spread it
+      if (ranked.length) res.signalMonths++
+      else ranked = live.map(x => ({ ...x, r: 0 })) // nothing qualifies: spread it
       for (const x of ranked) pos.radar.set(x.s.symbol, (pos.radar.get(x.s.symbol) ?? 0) + monthly / ranked.length / x.s.a[x.i])
       for (const x of live) pos.equal.set(x.s.symbol, (pos.equal.get(x.s.symbol) ?? 0) + monthly / live.length / x.s.a[x.i])
       res.radar.picks.push({ day, symbols: ranked.map(x => x.s.symbol) })
