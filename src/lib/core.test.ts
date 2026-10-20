@@ -394,3 +394,24 @@ test('sectors, fees and dividends', async () => {
   assert.equal(d.nextEstimate, '2026-05-20')
   assert.equal(d.buyBy, '2026-05-19')
 })
+
+test('lab: channel breakout + pullback is detected on a textbook chart', async () => {
+  const { channelBreakoutPullback, eventStudy, marketIndex } = await import('./lab.ts')
+  // 200 days flat, 100 days falling channel (zig-zag), breakout on volume, then a quiet pullback to the line.
+  const t: number[] = [], c: number[] = [], v: number[] = []
+  let day = 20000
+  const push = (p: number, vol = 1000) => { t.push(day++); c.push(+p.toFixed(4)); v.push(vol) }
+  for (let k = 0; k < 200; k++) push(100 + Math.sin(k / 4))
+  for (let k = 0; k < 100; k++) push(100 - k * 0.2 - 3 + 3 * Math.cos(k / 4)) // falls ~20%, touches upper line every ~25 days
+  const lineEnd = 100 - 99 * 0.2
+  push(lineEnd + 3, 4000); push(lineEnd + 4, 3000); push(lineEnd + 3.5, 900); push(lineEnd + 1.6, 600); push(lineEnd + 1.2, 500)
+  const s = { symbol: 'X', t, c, a: c, h: c.map(x => x * 1.003), v } as any
+  const sig = channelBreakoutPullback(s, t.length - 1)
+  assert.ok(sig, 'signal expected')
+  assert.ok(sig!.touches >= 3)
+  // A rule that always fires on a rising stock beats a flat market.
+  const up = { symbol: 'UP', t: t.map((_, k) => 20000 + k), c: t.map((_, k) => 10 * 1.001 ** k), a: t.map((_, k) => 10 * 1.001 ** k) } as any
+  const flat = { symbol: 'FL', t: up.t, c: up.t.map(() => 10), a: up.t.map(() => 10) } as any
+  const r = eventStudy([up, flat], s2 => (s2.symbol === 'UP' ? 1 : null), marketIndex([up, flat]), [21])
+  assert.ok(r.events > 0 && r.stats[0].avgExcess > 0 && r.stats[0].beatRate === 100)
+})

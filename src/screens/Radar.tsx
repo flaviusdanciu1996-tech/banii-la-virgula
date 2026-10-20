@@ -5,6 +5,7 @@ import { supabase, DEMO } from '../db.ts'
 import { Sheet, Seg } from '../ui.tsx'
 import { weeklyCandles, score, passesRules, backtest, indexAt, isoOf, LABELS, STRATEGIES, marketReturns, setMarket, type StockData, type Score, type Rules, type StrategyId } from '../lib/radar.ts'
 import { xirr } from '../lib/fi.ts'
+import { LabTab } from './Lab.tsx'
 import { dividendInfo, sectorOf } from '../lib/market-extra.ts'
 import { todayIso } from '../lib/period.ts'
 import { demoStocks } from '../demoMarket.ts'
@@ -66,7 +67,7 @@ export function RadarScreen({ nav, notify }: { nav: Nav; notify: (m: string) => 
 
   return (
     <div className="screen">
-      <Seg label="Secțiune" value={tab} onChange={setTab} options={[{ id: 'top', label: 'Clasament' }, { id: 'rules', label: 'Regulile mele' }, { id: 'test', label: 'Test pe trecut' }]} />
+      <Seg label="Secțiune" value={tab} onChange={setTab} options={[{ id: 'top', label: 'Clasament' }, { id: 'rules', label: 'Regulile mele' }, { id: 'test', label: 'Laborator' }]} />
       {err && <p className="err">{err}</p>}
       {!stocks && !err && <p className="muted">Încarc datele bursei…</p>}
       {stocks && !scored.length && <div className="card"><p>Datele bursei se adună chiar acum (prima dată durează 1–2 minute).</p><button type="button" className="ghost-btn" onClick={reload}><RefreshCw size={16} />Reîncarcă</button></div>}
@@ -85,7 +86,7 @@ export function RadarScreen({ nav, notify }: { nav: Nav; notify: (m: string) => 
       </>}
 
       {tab === 'rules' && <RulesTab rules={rules} alerts={radar.alerts !== false} scored={scored} save={saveRadar} notify={notify} />}
-      {tab === 'test' && <BacktestTab stocks={(stocks ?? []).filter(s => s.symbol !== 'TVBETETF')} />}
+      {tab === 'test' && <LabTab stocks={(stocks ?? []).filter(s => s.symbol !== 'TVBETETF')} />}
 
       {open && (() => {
         const x = scored.find(y => y.s.symbol === open)
@@ -288,52 +289,3 @@ function RulesTab({ rules, alerts, scored, save, notify }: { rules: Rules; alert
   )
 }
 
-function BacktestTab({ stocks }: { stocks: StockData[] }) {
-  const st = useStore()
-  const [years, setYears] = useState<'3' | '5'>('5')
-  const [top, setTop] = useState<'1' | '3' | '5'>('5')
-  const [strat, setStrat] = useState<StrategyId>('radar')
-  const monthly = 1000
-  const res = useMemo(() => {
-    if (!stocks.length) return null
-    const end = Math.max(...stocks.map(s => s.t[s.t.length - 1]))
-    const start = end - Number(years) * 365
-    const r = backtest(stocks, start, end, monthly, Number(top), strat)
-    const flows = r.radar.series.map(p => ({ d: isoOf(p.day), amt: monthly * 100 }))
-    return { r, end, x1: xirr(flows, Math.round(r.radar.value * 100), isoOf(end)), x2: xirr(flows, Math.round(r.equal.value * 100), isoOf(end)) }
-  }, [stocks, years, top, strat])
-  void st
-  if (!res) return <p className="muted">Încarc datele…</p>
-  const { r } = res
-  const W = 340, H = 150, pad = 8
-  const all = [...r.radar.series.map(p => p.value), ...r.equal.series.map(p => p.value), ...r.radar.series.map((_, k) => (k + 1) * monthly)]
-  const hi = Math.max(...all, 1)
-  const X = (k: number) => pad + (k * (W - 2 * pad)) / Math.max(1, r.radar.series.length - 1)
-  const Y = (v: number) => pad + (1 - v / hi) * (H - 2 * pad)
-  const path = (vals: number[]) => vals.map((v, k) => `${k ? 'L' : 'M'}${X(k).toFixed(1)},${Y(v).toFixed(1)}`).join('')
-  const gain = (v: number) => (r.invested ? Math.round(((v - r.invested) / r.invested) * 1000) / 10 : 0)
-  const lei = (v: number) => Math.round(v).toLocaleString('ro-RO')
-  return (
-    <section className="card">
-      <h2>Dacă urmai o strategie</h2>
-      <div className="chips">{(Object.keys(STRATEGIES) as StrategyId[]).map(k => <button key={k} type="button" className="chip" aria-pressed={strat === k} onClick={() => setStrat(k)}>{STRATEGIES[k].name}</button>)}</div>
-      <p className="hint">În fiecare lună pui {monthly.toLocaleString('ro-RO')} lei. <b>{STRATEGIES[strat].name}</b>: în primele {top} acțiuni din acea zi — {STRATEGIES[strat].about} (doar cu datele știute atunci). <b>Toate</b>: în toate acțiunile din Radar, în părți egale.</p>
-      <Seg label="Perioada" value={years} onChange={setYears} options={[{ id: '3', label: '3 ani' }, { id: '5', label: '5 ani' }]} />
-      <Seg label="Câte acțiuni" value={top} onChange={setTop} options={[{ id: '1', label: 'Top 1' }, { id: '3', label: 'Top 3' }, { id: '5', label: 'Top 5' }]} />
-      <div className="bt-grid">
-        <div><span>Ai fi pus</span><b className="num">{lei(r.invested)} lei</b></div>
-        <div><span>{STRATEGIES[strat].name}</span><b className="num in">{lei(r.radar.value)} lei</b><em className="small">{gain(r.radar.value) >= 0 ? '+' : ''}{n1(gain(r.radar.value))}% · {res.x1 != null ? `${n1(res.x1 * 100)}%/an` : ''}</em></div>
-        <div><span>Toate, egal</span><b className="num">{lei(r.equal.value)} lei</b><em className="small">{gain(r.equal.value) >= 0 ? '+' : ''}{n1(gain(r.equal.value))}% · {res.x2 != null ? `${n1(res.x2 * 100)}%/an` : ''}</em></div>
-      </div>
-      <svg viewBox={`0 0 ${W} ${H}`} className="chart" role="img" aria-label="Valoarea în timp: Radar față de la grămadă">
-        <path d={path(r.radar.series.map((_, k) => (k + 1) * monthly))} fill="none" stroke="var(--muted)" strokeWidth="1.2" strokeDasharray="3 4" />
-        <path d={path(r.equal.series.map(p => p.value))} fill="none" stroke="#94A3B8" strokeWidth="2" />
-        <path d={path(r.radar.series.map(p => p.value))} fill="none" stroke="var(--accent)" strokeWidth="2.6" />
-      </svg>
-      <div className="legend"><span><i style={{ background: 'var(--accent)' }} />{STRATEGIES[strat].name}</span><span><i style={{ background: '#94A3B8' }} />Toate, egal</span><span><i style={{ background: 'var(--muted)' }} />Bani puși</span></div>
-      <p className={'note ' + (r.radar.value >= r.equal.value ? 'in' : 'bad')}>{r.radar.value >= r.equal.value ? `Strategia ar fi adus cu ${lei(r.radar.value - r.equal.value)} lei mai mult decât toate, în părți egale.` : `Strategia ar fi adus cu ${lei(r.equal.value - r.radar.value)} lei mai puțin decât dacă puneai în toate, în părți egale. Pe BVB, diversificarea a fost greu de bătut.`}</p>
-      {r.radar.picks.length > 0 && <p className="hint">Luna asta ar alege: <b>{r.radar.picks[r.radar.picks.length - 1].symbols.join(', ')}</b></p>}
-      <p className="hint">Prețurile includ dividendele reinvestite. P/E și P/BV nu se știu pentru trecut, așa că testul folosește dividendul, partea tehnică și riscul. Rezultatele din trecut nu garantează viitorul.</p>
-    </section>
-  )
-}
