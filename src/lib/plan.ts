@@ -81,7 +81,7 @@ export function buildPlan(p: PlanInput): Plan {
   const ranked: typeof sorted = [], usedSec = new Set<string>()
   for (const x of sorted) { if (ranked.length >= n) break; const sec = sectorOf(x.s.symbol); if (sec !== 'Altele') { if (usedSec.has(sec)) continue; usedSec.add(sec) } ranked.push(x) }
   if (satCash > 0 && satCash < minOrder) notes.push(`Suma pentru acțiuni e mică: sub ${minOrder} lei comisionul trece de 1%.`)
-  if (!ranked.length && satCash > 0) { notes.push('Nicio acțiune nu trece metoda ta luna asta. Pune banii în ETF sau așteaptă.'); coreCash = core ? p.cash : 0 }
+  if (!ranked.length && satCash > 0) { notes.push('Nicio acțiune nu trece metoda ta luna asta. Pune banii în ETF sau așteaptă.'); coreCash = core && p.corePct > 0 ? p.cash : 0 }
 
   const add = (x: { s: StockData; sc: Score }, lei: number, role: PlanItem['role'], why: string[]) => {
     const price = x.s.c[x.s.c.length - 1]

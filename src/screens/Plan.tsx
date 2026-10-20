@@ -26,7 +26,7 @@ export function PlanScreen({ notify }: { notify: (m: string) => void }) {
   const s = st.settings
   const defLei = s.fi_monthly ? Math.round((s.fi_monthly / 100) * (s.fi_currency === 'EUR' ? st.rates.EUR : 1)) : 1000
   const [amount, setAmount] = useState(String(defLei))
-  const [core, setCore] = useState<'30' | '50' | '70'>(String(s.radar?.plan?.core ?? 50) as any)
+  const [core, setCore] = useState<'0' | '15' | '30' | '50'>(String(s.radar?.plan?.core ?? 15) as any)
   const [plan, setPlan] = useState<Plan | null>(null)
   const [ai, setAi] = useState<Record<string, string>>({})
   const [busy, setBusy] = useState<'' | 'ai' | 'save'>('')
@@ -50,6 +50,7 @@ export function PlanScreen({ notify }: { notify: (m: string) => void }) {
     if (!stocks) return
     if (lei < 100) return setErr('Pune cel puțin 100 de lei.')
     setErr(''); setAi({}); setEditAmount(false)
+    if (Number(core) !== (s.radar?.plan?.core ?? 15)) st.saveSettings({ radar: { ...s.radar, plan: { ...s.radar?.plan, core: Number(core) } } }).catch(() => {})
     const p = buildPlan({ stocks: scored, holdings, cash: lei, rules: s.radar?.rules ?? {}, corePct: Number(core), fee })
     setPlan(p)
     explain(p)
@@ -170,8 +171,8 @@ Fără sfaturi de tip „sigur va crește”. Fără secțiunea „Ce aș urmăr
             <label className="field">Cât investești luna asta (lei)
               <input inputMode="decimal" value={amount} onChange={e => setAmount(e.target.value)} />
             </label>
-            <Seg label="Cât merge în ETF (nucleu)" value={core} onChange={setCore} options={[{ id: '30', label: '30% ETF' }, { id: '50', label: '50% ETF' }, { id: '70', label: '70% ETF' }]} />
-            <p className="muted small">ETF-ul BET = 20 de firme mari dintr-o dată (risc împărțit). Restul merge pe acțiunile cu cel mai bun scor.</p>
+            <Seg label="Cât merge în ETF (nucleu)" value={core} onChange={setCore} options={[{ id: '0', label: 'Fără' }, { id: '15', label: '15% ETF' }, { id: '30', label: '30%' }, { id: '50', label: '50%' }]} />
+            <p className="muted small">{core === '0' ? 'Toți banii merg pe acțiuni alese de metodă. Câștig posibil mai mare, dar și scăderi mai mari când o firmă o ia în jos.' : 'ETF-ul BET = 20 de firme mari dintr-o dată (risc împărțit). Restul merge pe acțiunile cu cel mai bun scor.'}</p>
             <button type="button" className="primary" disabled={!stocks} onClick={make}>{stocks ? 'Fă planul' : 'Încarc bursa…'}</button>
           </> : <p className="plan-sum"><b className="num">{n(plan.invested)} lei</b> de investit <span className="muted">· comision ~{n(plan.fees, 2)} lei · rămân {n(plan.leftover)} lei</span></p>}
         </section>
