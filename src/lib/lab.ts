@@ -158,3 +158,50 @@ export function runLab(stocks: StockData[], years: number, top: number, monthly 
 }
 
 export { indexAt }
+
+// ---------- Does the signal itself work? (event study) ----------
+export interface EventStats { horizon: number; n: number; avgRet: number; avgExcess: number; winRate: number; beatRate: number }
+/**
+ * Every time the rule fires on a stock (at most once per `gap` trading days per stock), look at what the
+ * stock did in the next 1/3/6/12 months versus the whole market (equal weight) over the same days.
+ */
+export function eventStudy(stocks: StockData[], rank: RankFn, market: Map<number, number>, horizons = [21, 63, 126, 252], gap = 20, step = 2): { events: number; stats: EventStats[] } {
+  const mDays = [...market.keys()].sort((a, b) => a - b)
+  const mAt = (day: number) => { let lo = 0, hi = mDays.length - 1, ans = -1; while (lo <= hi) { const m = (lo + hi) >> 1; if (mDays[m] <= day) { ans = m; lo = m + 1 } else hi = m - 1 } return ans >= 0 ? market.get(mDays[ans])! : null }
+  const acc = horizons.map(h => ({ horizon: h, rets: [] as number[], ex: [] as number[] }))
+  let events = 0
+  for (const s of stocks) {
+    if (s.t.length < 300 || /ETF/.test(s.symbol)) continue
+    let last = -1e9
+    for (let i = 260; i < s.t.length - 21; i += step) {
+      if (i - last < gap) continue
+      if (rank(s, i) == null) continue
+      last = i; events++
+      acc.forEach(a => {
+        const j = i + a.horizon
+        if (j >= s.t.length) return
+        const r = s.a[j] / s.a[i] - 1
+        const m0 = mAt(s.t[i]), m1 = mAt(s.t[j])
+        a.rets.push(r)
+        if (m0 && m1) a.ex.push(r - (m1 / m0 - 1))
+      })
+    }
+  }
+  const avg = (xs: number[]) => (xs.length ? xs.reduce((x, y) => x + y, 0) / xs.length : 0)
+  return { events, stats: acc.map(a => ({ horizon: a.horizon, n: a.rets.length, avgRet: Math.round(avg(a.rets) * 1000) / 10, avgExcess: Math.round(avg(a.ex) * 1000) / 10,
+    winRate: a.rets.length ? Math.round((a.rets.filter(x => x > 0).length / a.rets.length) * 100) : 0, beatRate: a.ex.length ? Math.round((a.ex.filter(x => x > 0).length / a.ex.length) * 100) : 0 })) }
+}
+
+/** Equal-weight market index (level by day), built from daily changes of all non-ETF stocks. */
+export function marketIndex(stocks: StockData[]): Map<number, number> {
+  const ch = new Map<number, number[]>()
+  for (const s of stocks) {
+    if (/ETF/.test(s.symbol)) continue
+    for (let i = 1; i < s.t.length; i++) { const r = s.a[i] / s.a[i - 1] - 1; if (Math.abs(r) < 0.5) { const a = ch.get(s.t[i]) ?? []; a.push(r); ch.set(s.t[i], a) } }
+  }
+  const days = [...ch.keys()].sort((a, b) => a - b)
+  const out = new Map<number, number>()
+  let lvl = 100
+  for (const d of days) { const a = ch.get(d)!; lvl *= 1 + a.reduce((x, y) => x + y, 0) / a.length; out.set(d, lvl) }
+  return out
+}
