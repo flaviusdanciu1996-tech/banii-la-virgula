@@ -9,9 +9,12 @@ import { score, LABELS, dayOf, indexAt, marketChange, getMarket } from '../lib/r
 import { buildPlan, splitBySymbol, monthKey, type Plan } from '../lib/plan.ts'
 import { autoReviews, ideaReturn, type JournalEntry } from '../lib/journal.ts'
 import { todayIso } from '../lib/period.ts'
+import { fitFee, limitPrice, priceDecimals, dividendInfo, DEFAULT_FEE, type FeeModel } from '../lib/market-extra.ts'
 
 const n = (x: number, d = 0) => x.toLocaleString('ro-RO', { minimumFractionDigits: d, maximumFractionDigits: d })
 const pct = (x: number | null) => (x == null ? '–' : `${x >= 0 ? '+' : ''}${n(x, 1)}%`)
+const dmy = (d: string) => d.split('-').reverse().join('.')
+const addDays = (iso: string, k: number) => new Date(Date.parse(iso) + k * 864e5).toISOString().slice(0, 10)
 const MONTHS = ['ianuarie', 'februarie', 'martie', 'aprilie', 'mai', 'iunie', 'iulie', 'august', 'septembrie', 'octombrie', 'noiembrie', 'decembrie']
 
 export function PlanScreen({ notify }: { notify: (m: string) => void }) {
@@ -30,6 +33,11 @@ export function PlanScreen({ notify }: { notify: (m: string) => void }) {
   const [err, setErr] = useState('')
   const [editAmount, setEditAmount] = useState(false)
   const [redo, setRedo] = useState(false)
+  const [fee, setFee] = useState<FeeModel>(DEFAULT_FEE)
+  // Broker fee learned from the user's own Tradeville orders.
+  useEffect(() => {
+    st.repo.list<any>('invest_tx', st.householdId).then(rows => setFee(fitFee(rows.filter(r => r.op === 'cump' && r.price != null && r.qty).map(r => ({ value: Math.abs(Number(r.price) * Number(r.qty)), fee: Number(r.commission ?? 0) / 100 }))))).catch(() => {})
+  }, [st.householdId])
 
   const lei = Number(amount.replace(/\./g, '').replace(',', '.')) || 0
   const holdings = useMemo(() => st.assets.flatMap(a => a.holdings ?? []).map(h => ({ symbol: h.symbol, value: h.price ? h.qty * h.price : h.cost / 100 })), [st.assets])
@@ -42,7 +50,7 @@ export function PlanScreen({ notify }: { notify: (m: string) => void }) {
     if (!stocks) return
     if (lei < 100) return setErr('Pune cel puțin 100 de lei.')
     setErr(''); setAi({}); setEditAmount(false)
-    const p = buildPlan({ stocks: scored, holdings, cash: lei, rules: s.radar?.rules ?? {}, corePct: Number(core) })
+    const p = buildPlan({ stocks: scored, holdings, cash: lei, rules: s.radar?.rules ?? {}, corePct: Number(core), fee })
     setPlan(p)
     explain(p)
   }
@@ -131,13 +139,13 @@ Fără sfaturi de tip „sigur va crește”. Fără secțiunea „Ce aș urmăr
       {!showPlan && accepted.length > 0 && (
         <section className="card">
           <h2><ShoppingCart size={16} /> Ce cumperi în Tradeville · {monthName}</h2>
-          <p className="muted small">Aplicația nu poate cumpăra în locul tău. Deschide Tradeville și pune ordinele de mai jos (preț orientativ — poate fi puțin diferit).</p>
+          <p className="muted small">Aplicația nu poate cumpăra în locul tău. În Tradeville pune pentru fiecare un ordin <b>limită</b> (nu „la piață”) la prețul maxim de mai jos. Dacă prețul a urcat peste el, nu te grăbi — reverifică planul.</p>
           <div className="buy-list">
             {accepted.map(e => (
               <div key={e.id} className="buy-row">
                 <b className="sym">{e.symbol}</b>
                 <span className="num">{e.shares != null ? n(e.shares) : '–'} buc</span>
-                <span className="muted small num">× ~{n(e.price_at, e.price_at < 10 ? 3 : 2)} lei</span>
+                <span className="muted small num">limită max {n(limitPrice(e.price_at), priceDecimals(e.price_at))} lei</span>
                 <b className="num">{n((e.amount ?? 0) / 100)} lei</b>
               </div>
             ))}
@@ -165,11 +173,24 @@ Fără sfaturi de tip „sigur va crește”. Fără secțiunea „Ce aș urmăr
             <Seg label="Cât merge în ETF (nucleu)" value={core} onChange={setCore} options={[{ id: '30', label: '30% ETF' }, { id: '50', label: '50% ETF' }, { id: '70', label: '70% ETF' }]} />
             <p className="muted small">ETF-ul BET = 20 de firme mari dintr-o dată (risc împărțit). Restul merge pe acțiunile cu cel mai bun scor.</p>
             <button type="button" className="primary" disabled={!stocks} onClick={make}>{stocks ? 'Fă planul' : 'Încarc bursa…'}</button>
-          </> : <p className="plan-sum"><b className="num">{n(plan.invested)} lei</b> de investit <span className="muted">· rămân {n(plan.leftover)} lei</span></p>}
+          </> : <p className="plan-sum"><b className="num">{n(plan.invested)} lei</b> de investit <span className="muted">· comision ~{n(plan.fees, 2)} lei · rămân {n(plan.leftover)} lei</span></p>}
         </section>
 
         {plan && !editAmount && <>
           {plan.notes.map(t => <p key={t} className="note">{t}</p>)}
+          {plan.sectors.length > 0 && (
+            <div className="card sector-box">
+              <b className="small">Pe sectoare, după plan</b>
+              {plan.sectors.slice(0, 5).map(x => (
+                <div key={x.name} className={'sector-row' + (x.after > 40 ? ' over' : '')}>
+                  <span className="small">{x.name}</span>
+                  <span className="sector-bar"><i style={{ width: Math.min(100, x.after) + '%' }} /><em style={{ left: '40%' }} /></span>
+                  <span className="small num">{x.before}% → <b>{x.after}%</b></span>
+                </div>
+              ))}
+              <span className="muted small">Linia verticală = limita de 40% pe un sector. ETF-ul nu intră aici, e deja diversificat.</span>
+            </div>
+          )}
           {ai._intro && <div className="card ai-box"><Rich text={ai._intro} /></div>}
           {plan.items.map(i => (
             <section key={i.symbol} className="card plan-item">
@@ -183,7 +204,9 @@ Fără sfaturi de tip „sigur va crește”. Fără secțiunea „Ce aș urmăr
                   <div className="muted small num">{n(i.shares)} buc × {n(i.price, i.price < 10 ? 3 : 2)}</div>
                 </div>
               </div>
-              <div className="plan-meta muted small">Scor {i.score} · din portofoliu: {n(i.weightBefore, 0)}% → <b>{n(i.weightAfter, 0)}%</b></div>
+              <div className="plan-meta muted small">Scor {i.score} · {i.sector} · din portofoliu: {n(i.weightBefore, 0)}% → <b>{n(i.weightAfter, 0)}%</b></div>
+              <div className="plan-meta small">Ordin <b>limită</b> la maximum <b className="num">{n(i.limit, priceDecimals(i.limit))} lei</b> · comision ~{n(i.fee, 2)} lei</div>
+              {(() => { const sd = stocks?.find(x => x.symbol === i.symbol); const d = sd && dividendInfo(sd, today); return d?.buyBy && d.nextEstimate && d.nextEstimate <= addDays(today, 45) ? <div className="plan-meta small div-soon">💰 Dividend estimat curând (ex-dividend ~{dmy(d.nextEstimate)}). Ca să-l primești, cumpără până pe {dmy(d.buyBy)}.</div> : null })()}
               {ai[i.symbol] ? <div className="ai-box"><Rich text={ai[i.symbol]} /></div>
                 : busy === 'ai' ? <p className="muted small"><Sparkles size={14} /> AI-ul scrie analiza…</p>
                 : <ul className="small">{i.why.map(w => <li key={w}>{w}</li>)}</ul>}

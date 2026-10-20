@@ -27,6 +27,8 @@ export function demoStocks(): StockData[] {
       p *= Math.exp((mu - sig * sig / 2) / 252 + (sig / Math.sqrt(252)) * z)
       t.push(d); a.push(+p.toFixed(4)); c.push(+p.toFixed(4)); o.push(+prev.toFixed(4)); h.push(+(Math.max(prev, p) * (1 + r() * sig / 25)).toFixed(4)); l.push(+(Math.min(prev, p) * (1 - r() * sig / 25)).toFixed(4)); v.push(Math.round(20000 + r() * 200000))
     }
-    return { symbol, name, per, pbv, divy, t, a, c, o, h, l, v, divs: [] }
+    const divs: { d: number; a: number }[] = []
+    if (divy) for (let y = 0; y < 6; y++) { const d = t[0] + 140 + y * 365; const i = t.findIndex(x => x >= d); if (i > 0) divs.push({ d: t[i], a: +(c[i] * divy / 100).toFixed(4) }) }
+    return { symbol, name, per, pbv, divy, t, a, c, o, h, l, v, divs }
   })
 }

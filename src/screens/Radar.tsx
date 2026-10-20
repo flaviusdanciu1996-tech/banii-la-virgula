@@ -5,6 +5,8 @@ import { supabase, DEMO } from '../db.ts'
 import { Sheet, Seg } from '../ui.tsx'
 import { weeklyCandles, score, passesRules, backtest, indexAt, isoOf, LABELS, STRATEGIES, marketReturns, setMarket, type StockData, type Score, type Rules, type StrategyId } from '../lib/radar.ts'
 import { xirr } from '../lib/fi.ts'
+import { dividendInfo, sectorOf } from '../lib/market-extra.ts'
+import { todayIso } from '../lib/period.ts'
 import { demoStocks } from '../demoMarket.ts'
 import type { Nav } from '../App.tsx'
 
@@ -175,6 +177,22 @@ function CandleChart({ s }: { s: StockData }) {
   )
 }
 
+function DividendBox({ s }: { s: StockData }) {
+  const d = dividendInfo(s, todayIso())
+  if (!d) return /ETF/.test(s.symbol) ? null : <p className="muted small">💰 Nu a dat dividende în ultimii ani.</p>
+  const dmy = (x: string) => x.split('-').reverse().join('.')
+  return (
+    <div className="card div-box">
+      <b className="small">💰 Dividende{d.perYear > 1 ? ` (~${d.perYear} pe an)` : ''}</b>
+      <div className="div-list small">
+        {d.last.map(x => <div key={x.date}><span>ex-dividend {dmy(x.date)}</span><span className="num">{n1(x.amount, x.amount < 1 ? 4 : 2)} lei{x.yieldPct != null ? ` · ${n1(x.yieldPct)}%` : ''}</span></div>)}
+      </div>
+      {d.nextEstimate && d.buyBy && <p className="small">Următorul, <b>estimat după istoric</b>: ex-dividend ~{dmy(d.nextEstimate)}. Ca să-l primești, trebuie să ai acțiunile cumpărate cel târziu pe <b>{dmy(d.buyBy)}</b>. Data oficială o anunță firma pe bvb.ro.</p>}
+      <p className="muted small">În ziua ex-dividend prețul scade cam cu valoarea dividendului — e normal, nu e o veste proastă. Scorul Radar ține cont de asta.</p>
+    </div>
+  )
+}
+
 /** Price over the last year with the 200-day average. */
 function PriceChart({ s }: { s: StockData }) {
   const W = 340, H = 150, pad = 8
@@ -224,6 +242,8 @@ function StockSheet({ s, sc, rules, watched, mine, onWatch, onAsk, onJournal, on
         <div><span>Bollinger (20 zile)</span><b className="num">{sc.ind.boll ? `${Math.round(sc.ind.boll.pctB * 100)}% din bandă` : '–'}</b></div>
         <div><span>Volum față de normal</span><b className="num">{sc.ind.volRatio == null ? '–' : n1(sc.ind.volRatio) + '×'}</b></div>
       </div>
+      <p className="muted small">Sector: <b>{sectorOf(s.symbol)}</b></p>
+      <DividendBox s={s} />
       <details className="explain"><summary>Ce înseamnă indicatorii?</summary>
         <p><b>P/E</b> — de câți ani de profit plătești prețul. Mic = ieftin. <b>P/BV</b> — preț față de valoarea din bilanț. <b>ROE</b> — cât profit face firma din 100 de lei capital propriu. <b>Dividend</b> — cât îți dă pe an, în % din preț.</p>
         <p><b>Media 50/200</b> — prețul mediu pe 50 și 200 de zile; peste ele = trend de creștere. <b>RSI</b> — sub 30 a scăzut mult, peste 70 a crescut prea repede. <b>MACD</b> — dacă impulsul e de creștere sau de scădere. <b>Bollinger</b> — 0% = la marginea de jos a mișcării obișnuite, 100% = la marginea de sus.</p>

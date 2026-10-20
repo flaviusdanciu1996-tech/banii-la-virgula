@@ -649,3 +649,12 @@ textarea { width: 100%; background: var(--surface); color: var(--ink); border: 1
 .candle-info.down { border-left-color: var(--bad, #EF4444); }
 .candle-info .ohlc { display: grid; grid-template-columns: 1fr 1fr; gap: 2px 12px; font-size: .88rem; }
 .candle-info .ohlc span { display: flex; justify-content: space-between; }
+.sector-box { display: flex; flex-direction: column; gap: 6px; }
+.sector-row { display: grid; grid-template-columns: 1fr 90px auto; gap: 8px; align-items: center; }
+.sector-bar { position: relative; height: 8px; border-radius: 4px; background: var(--chip, rgba(127,127,127,.15)); overflow: visible; }
+.sector-bar i { position: absolute; inset: 0 auto 0 0; border-radius: 4px; background: var(--accent); }
+.sector-row.over .sector-bar i { background: #F97316; }
+.sector-bar em { position: absolute; top: -3px; bottom: -3px; width: 2px; background: var(--text, #fff); opacity: .6; }
+.div-soon { color: var(--good, #16a34a); }
+.div-list { display: flex; flex-direction: column; gap: 4px; }
+.div-list > div { display: flex; justify-content: space-between; }

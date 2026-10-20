@@ -349,11 +349,18 @@ test('monthly plan: core ETF + capped satellites, whole shares', async () => {
   const p = buildPlan({ stocks, holdings: [{ symbol: 'HEAVY', value: 30000 }], cash: 5000, rules: {}, corePct: 50 })
   const core = p.items.find(i => i.role === 'nucleu')!
   assert.equal(core.symbol, 'TVBETETF')
-  assert.ok(core.lei <= 2500 && core.shares === Math.floor(2500 / core.price))
+  assert.ok(core.lei + core.fee <= 2500 && core.shares >= Math.floor(2500 / core.price) - 2)
   assert.ok(!p.items.some(i => i.symbol === 'HEAVY'), 'already above 25% is skipped')
   assert.ok(p.skipped.some(s => s.symbol === 'HEAVY'))
   for (const i of p.items) assert.equal(Number.isInteger(i.shares), true)
-  assert.ok(Math.abs(p.invested + p.leftover - 5000) < 0.01)
+  // Sector cap: with 90% in energy, no new energy stock is added.
+  const en = [mk('TVBETETF', 20, 0.1), mk('SNP', 1, 0.15), mk('TLV', 30, 0.12)].map(s => ({ s, sc: score(s) }))
+  const p2 = buildPlan({ stocks: en, holdings: [{ symbol: 'H2O', value: 9000 }, { symbol: 'TLV', value: 1000 }], cash: 3000, rules: {}, corePct: 30 })
+  assert.ok(!p2.items.some(i => i.symbol === 'SNP'))
+  assert.ok(p2.items.some(i => i.symbol === 'TLV'))
+  assert.ok(p2.notes.some(n => /energie/.test(n)))
+  assert.ok(Math.abs(p.invested + p.fees + p.leftover - 5000) < 0.01)
+  assert.ok(p.items.every(i => i.fee > 0 && i.limit >= i.price))
   const parts = splitBySymbol('Intro\n### AAA — Firma\nbun\n### BBB\nrisc', ['AAA', 'BBB'])
   assert.equal(parts.AAA, 'bun'); assert.equal(parts.BBB, 'risc'); assert.equal(parts._intro, 'Intro')
 })
@@ -367,4 +374,23 @@ test('weekly candles: open of Monday, close of Friday, extreme high/low', async 
   assert.equal(w.length, 2)
   assert.deepEqual(w[0], { day: m, o: 10, h: 15, l: 8, c: 12.5, v: 6 })
   assert.equal(w[1].o, 13)
+})
+
+test('sectors, fees and dividends', async () => {
+  const { sectorWeights, fitFee, feeFor, minSensibleOrder, limitPrice, dividendInfo } = await import('./market-extra.ts')
+  const w = sectorWeights([{ symbol: 'H2O', value: 60 }, { symbol: 'SNP', value: 20 }, { symbol: 'TLV', value: 20 }])
+  assert.equal(Math.round(w.get('Energie și utilități')! * 100), 80)
+  // Fee fitted on orders like the user's Tradeville history.
+  const f = fitFee([[13.99, 1.66], [489.45, 3.67], [209.4, 2.4], [552, 3.9], [154.35, 2.16], [307.2, 2.81]].map(([value, fee]) => ({ value, fee })))
+  assert.ok(f.fromHistory && f.fixed > 1.3 && f.fixed < 1.9 && f.pct > 0.003 && f.pct < 0.005)
+  assert.ok(Math.abs(feeFor(500, f) - 3.7) < 0.3)
+  assert.ok(minSensibleOrder(f) >= 250 && minSensibleOrder(f) <= 400)
+  assert.equal(limitPrice(35.98), 36.34)
+  assert.equal(limitPrice(0.6), 0.606)
+  const day = (iso: string) => Date.parse(iso) / 864e5
+  const s = { symbol: 'X', t: [day('2025-05-01'), day('2025-06-01')], c: [10, 10], a: [10, 10], divs: [{ d: day('2025-05-20'), a: 0.5 }] } as any
+  const d = dividendInfo(s, '2026-04-01')!
+  assert.equal(d.last[0].yieldPct, 5)
+  assert.equal(d.nextEstimate, '2026-05-20')
+  assert.equal(d.buyBy, '2026-05-19')
 })
