@@ -3,7 +3,7 @@ import { RefreshCw, Search, Zap, ArrowUp, ArrowDown, Minus, Check, X } from 'luc
 import { useStore } from '../store.tsx'
 import { Sheet } from '../ui.tsx'
 import { supabase, DEMO } from '../db.ts'
-import { ZONE_LABEL, type RadarRow, type Zone, type Dir } from '../lib/cryptoRadar.ts'
+import { ZONE_LABEL, STOCK_TOKEN, type RadarRow, type Zone, type Dir } from '../lib/cryptoRadar.ts'
 
 const ZONES: Zone[] = ['buy', 'wait', 'watch', 'avoid']
 const ZONE_ORDER: Record<Zone, number> = { buy: 0, wait: 1, watch: 2, avoid: 3 }
@@ -34,7 +34,7 @@ export function CryptoRadarScreen({ notify }: { notify: (m: string) => void }) {
     const { data } = await supabase.from('crypto_radar').select('coin, d, at')
     const list = (data ?? []) as { coin: string; d: any; at: string }[]
     setTotal(list.find(r => r.coin === '__universe__')?.d?.coins?.length ?? 0)
-    setRows(list.filter(r => r.coin !== '__universe__' && r.d?.zone).map(r => r.d as RadarRow))
+    setRows(list.filter(r => r.coin !== '__universe__' && r.d?.zone && !STOCK_TOKEN.test(r.coin)).map(r => r.d as RadarRow))
   }
   async function refresh(silent = false) {
     if (!supabase || DEMO) return

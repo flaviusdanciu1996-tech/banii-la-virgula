@@ -3,7 +3,7 @@
 // The app calls it too when the radar is old. Binance public market data, no key.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { analyze, toCandles, RADAR_COINS, SKIP } from "./radar.ts";
+import { analyze, toCandles, RADAR_COINS, SKIP, STOCK_TOKEN } from "./radar.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -36,7 +36,7 @@ async function universe(force: boolean): Promise<Uni> {
   if (!Array.isArray(all)) return old ?? { coins: RADAR_COINS, tick: {}, at: new Date(0).toISOString() };
   const rows = all.filter((t: any) => typeof t.symbol === "string" && t.symbol.endsWith("USDT"))
     .map((t: any) => ({ coin: t.symbol.slice(0, -4), ch: Number(t.priceChangePercent), vol: Number(t.quoteVolume), n: Number(t.count) }))
-    .filter(t => t.coin && !SKIP.test(t.coin) && t.vol > 0 && t.n > 0)
+    .filter(t => t.coin && !SKIP.test(t.coin) && !STOCK_TOKEN.test(t.coin) && t.vol > 0 && t.n > 0)
     .sort((a, b) => b.vol - a.vol);
   const top = rows.slice(0, TOP);
   for (const c of RADAR_COINS) if (!top.some(t => t.coin === c)) { const r = rows.find(t => t.coin === c); if (r) top.push(r); }
