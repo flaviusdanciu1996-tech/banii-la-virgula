@@ -66,9 +66,14 @@ export interface FiscalLine {
   details?: { day: string; text: string; amount: number }[]
 }
 export interface Step { mult: number; at: number; due: number }
+/** One income as it happened, for the month-by-month list. */
+export interface FiscalEvent { day: string; source: 'rent' | 'bvb_gain' | 'dividend' | 'interest' | 'crypto' | 'other'; label: string; platform: string; gross: number; cass: number; withheld: number }
+export const SOURCE_LABEL: Record<FiscalEvent['source'], string> = { rent: 'Chirii', bvb_gain: 'Acțiuni vândute', dividend: 'Dividende', interest: 'Dobânzi', crypto: 'Crypto', other: 'Altele' }
 export interface FiscalReport {
   year: number
   platforms: { name: string; income: number; withheld: number; toPay: number }[] // where each leu comes from
+  events: FiscalEvent[] // every income of the year, in date order
+  bySource: { source: FiscalEvent['source']; cass: number }[] // what fills the CASS bar
   rules: FiscalRules
   lines: FiscalLine[]
   withheld: number
@@ -123,6 +128,7 @@ export function fiscalReport(year: number, broker: BrokerRow[], crypto: CryptoTx
   const R = rulesFor(year)
   const lines: FiscalLine[] = []
   const notes: string[] = []
+  const events: FiscalEvent[] = []
 
   // 1) Shares sold through Tradeville: tax withheld by the broker (final), the net gain counts for CASS.
   const sales = broker.filter(r => r.op === 'vanz' && yearOf(r.at) === year && r.profit != null)
@@ -133,6 +139,7 @@ export function fiscalReport(year: number, broker: BrokerRow[], crypto: CryptoTx
       const rate = longShare * R.bvbLong + (1 - longShare) * R.bvbShort
       const tax = s.profit! > 0 ? Math.round(s.profit! * rate) : 0
       gain += s.profit!; withheld += tax
+      events.push({ day: s.at.slice(0, 10), source: 'bvb_gain', label: `Vânzare ${s.symbol}`, platform: 'Tradeville', gross: s.profit!, cass: s.profit!, withheld: tax })
       return { day: s.at.slice(0, 10), text: `${s.symbol} · ${Math.round(s.qty * 1000) / 1000} acț. · ${longShare >= 0.999 ? 'ținute peste 1 an' : longShare <= 0.001 ? 'ținute sub 1 an' : 'parțial peste 1 an'}`, amount: s.profit! }
     })
     lines.push({ key: 'bvb_gain', platform: 'Tradeville', label: 'Câștiguri din acțiuni (Tradeville)', gross: gain, withheld, toPay: 0, cassBase: Math.max(0, gain), casBase: 0, estimated: true,
@@ -147,6 +154,7 @@ export function fiscalReport(year: number, broker: BrokerRow[], crypto: CryptoTx
       const received = Math.round(d.qty * 100) // lei credited before the broker's fee
       const g = Math.round(received / (1 - R.divRate))
       gross += g; withheld += g - received
+      events.push({ day: d.at.slice(0, 10), source: 'dividend', label: d.note || 'Dividend', platform: 'Tradeville', gross: g, cass: g, withheld: g - received })
       return { day: d.at.slice(0, 10), text: d.note || 'dividend', amount: g }
     })
     lines.push({ key: 'bvb_div', platform: 'Tradeville', label: 'Dividende de la acțiunile BVB (Tradeville)', gross, withheld, toPay: 0, cassBase: gross, casBase: 0, estimated: true,
@@ -159,6 +167,7 @@ export function fiscalReport(year: number, broker: BrokerRow[], crypto: CryptoTx
     const net = cg.reduce((a, x) => a + x.gain, 0)
     const exempt = cg.every(x => x.gain < R.cryptoExempt.perTx) && net <= R.cryptoExempt.perYear
     const taxable = exempt ? 0 : Math.max(0, net)
+    for (const x of cg) events.push({ day: x.day, source: 'crypto', label: `Vânzare ${x.coin}`, platform: x.platform, gross: x.gain, cass: exempt ? 0 : x.gain, withheld: 0 })
     const split = [...cg.reduce((m, x) => m.set(x.platform || 'Crypto', (m.get(x.platform || 'Crypto') ?? 0) + x.gain), new Map<string, number>())].map(([platform, amount]) => ({ platform, amount }))
     lines.push({ key: 'crypto', split, label: `Câștiguri din crypto${split.length ? ` (${split.map(x => x.platform).join(' + ')})` : ''}`, gross: net, withheld: 0, toPay: Math.round(taxable * R.cryptoRate), cassBase: taxable, casBase: 0,
       note: exempt ? 'Scutit: fiecare vânzare sub 200 lei și totalul pe an sub 600 lei.' : net <= 0 ? 'Pierdere pe an: nu datorezi impozit. Pierderea nu se reportează.' : `Impozit ${pct(R.cryptoRate)} din câștigul net pe an, plătit de tine prin declarație.`,
@@ -174,6 +183,7 @@ export function fiscalReport(year: number, broker: BrokerRow[], crypto: CryptoTx
     const before = lines.length
     const gross = list.reduce((a, m) => a + m.amount, 0), withheld = list.reduce((a, m) => a + m.tax_withheld, 0)
     const details = list.map(m => ({ day: m.day, text: m.note || MANUAL_LABEL[kind], amount: m.amount }))
+    for (const m of list) events.push({ day: m.day, source: kind === 'rent' ? 'rent' : kind === 'interest' ? 'interest' : kind === 'srl_div' ? 'dividend' : 'other', label: m.note || MANUAL_LABEL[kind], platform: platform ?? '', gross: m.amount, cass: kind === 'rent' ? Math.round(m.amount * 0.8) : m.amount, withheld: m.tax_withheld })
     if (kind === 'srl_div') lines.push({ key: kind, label: MANUAL_LABEL[kind], gross, withheld, toPay: 0, cassBase: gross, casBase: 0, note: `Impozit ${pct(R.divRate)}, reținut și plătit de firmă (D100). Contează la CASS.`, details })
     else if (kind === 'interest') lines.push({ key: kind, label: MANUAL_LABEL[kind], gross, withheld, toPay: 0, cassBase: gross, casBase: 0, note: 'Impozitul îl reține banca (Revolut: 10% dacă contul e pe sucursala din România, 15% dacă e încă în Lituania). Contează la CASS.', details })
     else if (kind === 'rent') { const net = Math.round(gross * 0.8); lines.push({ key: kind, label: MANUAL_LABEL[kind], gross, withheld, toPay: Math.max(0, Math.round(net * R.rentRate) - withheld), cassBase: net, casBase: 0, note: withheld > 0 ? `Chirie plătită de o firmă: firma a reținut ${pct(R.rentRate)} din 80% (impozit final). Contează la CASS cu 80% din sumă.` : `Venit net = 80% din chirie; impozit ${pct(R.rentRate)} din net, plătit de tine.`, details }) }
@@ -196,8 +206,14 @@ export function fiscalReport(year: number, broker: BrokerRow[], crypto: CryptoTx
     if (l.split?.length) { const pos = l.split.reduce((a, x) => a + Math.max(0, x.amount), 0); for (const x of l.split) addP(x.platform, x.amount, 0, pos > 0 ? Math.round((l.toPay * Math.max(0, x.amount)) / pos) : 0) }
     else addP(l.platform || (l.key.startsWith('srl_div') ? 'Firma ta' : 'Altele'), l.gross, l.withheld, l.toPay)
   }
+  events.sort((a, b) => a.day.localeCompare(b.day))
+  const srcMap = new Map<FiscalEvent['source'], number>()
+  for (const l of lines) {
+    const src: FiscalEvent['source'] = l.key.startsWith('rent') ? 'rent' : l.key === 'bvb_gain' ? 'bvb_gain' : l.key === 'bvb_div' || l.key.startsWith('srl_div') ? 'dividend' : l.key.startsWith('interest') ? 'interest' : l.key === 'crypto' ? 'crypto' : 'other'
+    srcMap.set(src, (srcMap.get(src) ?? 0) + l.cassBase)
+  }
   return {
-    year, platforms: [...pm.values()], rules: R, lines, withheld, taxToPay,
+    year, platforms: [...pm.values()], events, bySource: [...srcMap].map(([source, cass]) => ({ source, cass })).filter(x => x.cass !== 0).sort((a, b) => b.cass - a.cass), rules: R, lines, withheld, taxToPay,
     cassBase, cassStep: cass.step, cassDue: cass.step?.due ?? 0, cassNext: cass.next,
     casBase, casStep: cas.step, casDue: cas.step?.due ?? 0,
     totalToPay: taxToPay + (cass.step?.due ?? 0) + (cas.step?.due ?? 0),

@@ -5,7 +5,7 @@ import { Seg, Bar, BarsChart, Sheet, MoneyField, ConfirmButton } from '../ui.tsx
 import { fmt, fmtNum, fmtSigned, parseMoney } from '../lib/money.ts'
 import { todayIso, periodFor, shiftPeriod, periodLabel, MONTHS, MONTHS_SHORT, iso, daysInMonth, inPeriod, type Period } from '../lib/period.ts'
 import { summarize, savingsRate, snapshotAt } from '../lib/calc.ts'
-import { fiscalReport, monthlyReserve, MANUAL_LABEL, RULES_CHECKED, type BrokerRow, type ManualIncome, type ManualKind, type FiscalReport } from '../lib/fiscal.ts'
+import { fiscalReport, monthlyReserve, MANUAL_LABEL, RULES_CHECKED, SOURCE_LABEL, type BrokerRow, type ManualIncome, type ManualKind, type FiscalReport } from '../lib/fiscal.ts'
 import type { CryptoTx } from '../lib/crypto.ts'
 import { toLei, withBnr } from '../lib/crypto.ts'
 import { loadBnr } from '../bnr.ts'
@@ -16,9 +16,11 @@ const pctTxt = (x: number | null) => (x == null ? '–' : `${String(x).replace('
 const dateRo = (d: string) => d.split('-').reverse().join('.')
 
 /** Everything the reports need that isn't already in the store. */
-function useInvestData() {
+type InvestData = { broker: BrokerRow[]; crypto: CryptoTx[]; manual: ManualIncome[] }
+let lastData: InvestData | null = null // shown instantly next time, refreshed in the background
+export function useInvestData() {
   const st = useStore()
-  const [d, setD] = useState<{ broker: BrokerRow[]; crypto: CryptoTx[]; manual: ManualIncome[] } | null>(null)
+  const [d, setD] = useState<InvestData | null>(lastData)
   const [tick, setTick] = useState(0)
   useEffect(() => {
     let alive = true
@@ -30,7 +32,7 @@ function useInvestData() {
         loadBnr().catch(() => null),
       ])
       if (!alive) return
-      setD({
+      setD(lastData = {
         broker: b.map(r => ({ at: String(r.at), op: r.op, symbol: r.symbol, qty: Number(r.qty), price: n(r.price), commission: Number(r.commission ?? 0), net: Number(r.net ?? 0), profit: n(r.profit), note: r.note ?? '' })),
         crypto: withBnr(c.map(r => ({ ...r, qty: Number(r.qty), price: n(r.price), fee: Number(r.fee ?? 0), fx: n(r.fx) })), bnr),
         manual: m.map(r => ({ ...r, amount: Number(r.amount), tax_withheld: Number(r.tax_withheld ?? 0) })),
@@ -285,6 +287,8 @@ function FiscalTab({ data, reload, notify }: { data: ReturnType<typeof useInvest
         {r.lines.some(l => l.estimated) && <p className="hint">* estimat din datele importate; cifra exactă e în fișa anuală de la broker.</p>}
       </section>
 
+      <IncomeByMonth r={r} />
+
       {r.platforms.length > 1 && (
         <section className="card">
           <h2>Pe platforme</h2>
@@ -371,5 +375,63 @@ function ManualSheet({ m, year, divRate, notify, onClose, onSaved }: { m?: Manua
         <button type="button" className="primary" onClick={save}>Salvează</button>
       </div>
     </Sheet>
+  )
+}
+
+const MONTH_RO = ['Ianuarie', 'Februarie', 'Martie', 'Aprilie', 'Mai', 'Iunie', 'Iulie', 'August', 'Septembrie', 'Octombrie', 'Noiembrie', 'Decembrie']
+
+/** Every income of the year, month by month, with what it adds to the CASS bar. */
+function IncomeByMonth({ r }: { r: FiscalReport }) {
+  const months = new Map<number, typeof r.events>()
+  for (const e of r.events) { const m = Number(e.day.slice(5, 7)) - 1; months.set(m, [...(months.get(m) ?? []), e]) }
+  if (!months.size) return null
+  let run = 0
+  return (
+    <section className="card">
+      <h2>Veniturile mele {r.year}, pe luni</h2>
+      <p className="hint">Brut = cât ai câștigat înainte de impozit. „La CASS” = cât se adună la prag (la chirii 80% din brut).</p>
+      {[...months.entries()].sort((a, b) => a[0] - b[0]).map(([m, list]) => {
+        const cass = list.reduce((a, e) => a + e.cass, 0)
+        run += cass
+        return (
+          <div key={m} className="inc-month">
+            <div className="inc-head"><b>{MONTH_RO[m]}</b><span className="num small">+{fmtNum(cass).replace(/,\d+$/, '')} · total {fmtNum(run).replace(/,\d+$/, '')} lei</span></div>
+            {list.map((e, i) => (
+              <div key={i} className="rep-line">
+                <span>{dateRo(e.day).slice(0, 5)} · {SOURCE_LABEL[e.source]}{e.platform ? ` · ${e.platform}` : ''}<em className="muted small"> · brut {fmt(e.gross)}{e.withheld ? `, reținut ${fmt(e.withheld)}` : ''}</em></span>
+                <b className={'num ' + (e.cass < 0 ? 'bad' : '')}>{fmt(e.cass)}</b>
+              </div>
+            ))}
+          </div>
+        )
+      })}
+    </section>
+  )
+}
+
+/** Home card: how close this year's incomes are to the first CASS step. */
+export function CassCard({ onOpen }: { onOpen: () => void }) {
+  const { data } = useInvestData()
+  const st = useStore()
+  const y = Number(todayIso().slice(0, 4))
+  const platformOf = useMemo(() => { const m = new Map(st.assets.map(a => [a.id, a.platform || a.name])); return (id?: string) => (id ? m.get(id) ?? '' : '') }, [st.assets])
+  const r = useMemo(() => (data ? fiscalReport(y, data.broker, data.crypto, data.manual, platformOf) : null), [data, y, platformOf])
+  if (!r || (!r.events.length && !r.cassBase)) return null
+  const mw = r.rules.minWage
+  const first = r.rules.cassSteps[0] * mw
+  const target = r.cassNext?.at ?? first
+  const base = r.cassStep ? r.cassStep.at : 0
+  const pctFill = Math.max(0, Math.min(100, ((r.cassBase - base) / Math.max(1, target - base)) * 100))
+  const tone = r.cassStep ? 'over' : r.cassNext && r.cassNext.left < 300000 ? 'warn' : 'ok'
+  return (
+    <button type="button" className={'card cass-card ' + tone} onClick={onOpen}>
+      <div className="cass-top"><span className="muted"><HeartPulse size={15} /> Prag CASS {y}</span><b className="num">{fmtNum(r.cassBase).replace(/,\d+$/, '')} / {fmtNum(target).replace(/,\d+$/, '')} lei</b></div>
+      <div className="cass-track"><i style={{ width: `${pctFill}%` }} /></div>
+      <div className="cass-src">{r.bySource.map(x => <span key={x.source}>{SOURCE_LABEL[x.source]} <b className="num">{fmtNum(x.cass).replace(/,\d+$/, '')}</b></span>)}</div>
+      <span className="small">{r.cassStep
+        ? <>Ai trecut de {r.cassStep.mult} salarii minime: <b>CASS {fmt(r.cassDue)}</b> de plătit până la {dateRo(r.deadline)}.{r.cassNext ? ` Următoarea treaptă peste ${fmt(r.cassNext.left)}.` : ''}</>
+        : <>Mai ai <b>{fmt(r.cassNext!.left)}</b> până la prag. Sub el nu plătești CASS.</>}</span>
+      <ChevronRight size={16} className="chev" />
+    </button>
   )
 }
