@@ -69,18 +69,27 @@ export function AvereScreen({ scope, openAsset, openGoal, nav }: { scope: 'all' 
             <section key={s.id}>
               <h2 className="grp-h"><span><i className="dot" style={{ background: s.color }} />{s.name}</span><span className="num">{s.id === 'debt' && total ? '−' : ''}{fmtNum(total)}</span></h2>
               {s.id === 'invest' && items.some(a => a.invest_summary) && <BrokerSummaryCard assets={items.filter(a => a.invest_summary)} />}
-              {s.id === 'invest' && items.some(a => !a.invest_summary) && (() => {
-                const other = items.filter(a => !a.invest_summary)
-                const inv = other.reduce((acc, a) => acc + toRon(a.invested || 0, a.currency, st.rates), 0)
-                const val = other.reduce((acc, a) => acc + toRon(a.value, a.currency, st.rates), 0)
-                const pr = val - inv
-                return inv > 0 ? (
-                  <div className="card inv-sum">
-                    <div><span>{items.some(a => a.invest_summary) ? 'Alte investiții: ai băgat' : 'Ai băgat'}</span><b className="num">{fmtNum(inv)}</b></div>
-                    <div><span>Valorează</span><b className="num">{fmtNum(val)}</b></div>
-                    <div><span>Profit</span><b className={'num ' + (pr >= 0 ? 'in' : 'bad')}>{fmtSigned(pr).replace(' lei', '')} ({pr >= 0 ? '+' : ''}{(Math.round((pr / inv) * 1000) / 10).toString().replace('.', ',')}%)</b></div>
+              {s.id === 'invest' && items.some(a => !a.invest_summary && a.invested > 0) && (() => {
+                const other = items.filter(a => !a.invest_summary && a.invested > 0)
+                const rows = other.map(a => ({ id: a.id, name: a.name, inv: toRon(a.invested, a.currency, st.rates), val: toRon(a.value, a.currency, st.rates) }))
+                const inv = rows.reduce((t, r) => t + r.inv, 0), val = rows.reduce((t, r) => t + r.val, 0)
+                const lei = (v: number) => fmtNum(Math.round(v / 100) * 100).replace(',00', '')
+                const Line = ({ name, inv, val, total }: { name: string; inv: number; val: number; total?: boolean }) => {
+                  const pr = val - inv, pct = inv ? Math.round((pr / inv) * 1000) / 10 : 0
+                  return (
+                    <div className={'oi-row' + (total ? ' total' : '')}>
+                      <div className="oi-l"><b>{name}</b><span className="muted small">pus {lei(inv)} → acum {lei(val)} lei</span></div>
+                      <div className="oi-r"><b className={'num ' + (pr >= 0 ? 'in' : 'bad')}>{pr >= 0 ? '+' : '−'}{lei(Math.abs(pr))} lei</b><span className={'num small ' + (pr >= 0 ? 'in' : 'bad')}>{pr >= 0 ? '+' : ''}{String(pct).replace('.', ',')}%</span></div>
+                    </div>
+                  )
+                }
+                return (
+                  <div className="card other-inv">
+                    <h3>{items.some(a => a.invest_summary) ? 'Celelalte investiții (fără Tradeville)' : 'Investițiile tale'}</h3>
+                    {rows.map(r => <Line key={r.id} name={r.name} inv={r.inv} val={r.val} />)}
+                    {rows.length > 1 && <Line name="Total" inv={inv} val={val} total />}
                   </div>
-                ) : null
+                )
               })()}
               <div className="rows">
                 {items.map(a => a.kind === 'crypto'
