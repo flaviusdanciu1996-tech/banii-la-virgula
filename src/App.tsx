@@ -7,7 +7,7 @@ import { DreamsScreen } from './screens/Dreams.tsx'
 import { CryptoScreen } from './screens/Crypto.tsx'
 import { ReportsScreen } from './screens/Reports.tsx'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Home, PieChart, ReceiptText, Gem, User, ChevronLeft, Download, X } from 'lucide-react'
+import { Home, PieChart, ReceiptText, Gem, User, ChevronLeft, Download, X, RefreshCw } from 'lucide-react'
 import { supabase, supabaseRepo, demoRepo, DEMO, type Repo } from './db.ts'
 import { StoreProvider, useStore, type User as AppUser } from './store.tsx'
 import { demoSeed, DEMO_USER } from './demo.ts'
@@ -228,6 +228,7 @@ function Shell({ theme, setTheme }: { theme: Theme; setTheme: (t: Theme) => void
     <div className="app">
       {DEMO && <div className="demo-bar">Previzualizare cu date de exemplu</div>}
       <main className="wrap">
+        <UpdateBanner />
         <InstallHint />
         {body}
       </main>
@@ -247,6 +248,33 @@ function Shell({ theme, setTheme }: { theme: Theme; setTheme: (t: Theme) => void
       {assetSheet && <AssetSheet asset={assetSheet.a} section={assetSheet.section} quick={assetSheet.quick} notify={notify} onClose={closeSheet(() => setAssetSheet(null))} />}
       {toast}
     </div>
+  )
+}
+
+/** Phones keep the old app in memory; when a newer build is published, offer a one-tap reload. */
+function UpdateBanner() {
+  const [fresh, setFresh] = useState(false)
+  useEffect(() => {
+    if (DEMO) return
+    const check = async () => {
+      try {
+        const r = await fetch(import.meta.env.BASE_URL + 'version.json?t=' + Date.now(), { cache: 'no-store' })
+        if (!r.ok) return
+        const j = await r.json()
+        if (j?.build && j.build !== __BUILD__ && j.build > __BUILD__) setFresh(true)
+      } catch { /* offline */ }
+    }
+    check()
+    const onVis = () => { if (document.visibilityState === 'visible') check() }
+    document.addEventListener('visibilitychange', onVis)
+    const t = setInterval(check, 5 * 60 * 1000)
+    return () => { document.removeEventListener('visibilitychange', onVis); clearInterval(t) }
+  }, [])
+  if (!fresh) return null
+  return (
+    <button type="button" className="update-bar" onClick={() => location.reload()}>
+      <RefreshCw size={16} /> Versiune nouă a aplicației. Apasă aici ca s-o încarci.
+    </button>
   )
 }
 

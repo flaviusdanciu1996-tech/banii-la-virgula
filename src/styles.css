@@ -796,3 +796,4 @@ a.primary { text-decoration: none; }
 .oi-r { align-items: flex-end; flex: none; }
 .oi-l b { font-size: 15px; }
 .oi-row.total .oi-l b { font-size: 15px; text-transform: uppercase; letter-spacing: .03em; }
+.update-bar { width: 100%; display: flex; align-items: center; gap: 8px; justify-content: center; padding: 12px 14px; margin-bottom: 12px; border-radius: 14px; border: 0; background: var(--accent); color: var(--accent-ink); font-weight: 600; font-size: 14.5px; text-align: left; }
