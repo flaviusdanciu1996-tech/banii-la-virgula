@@ -3,6 +3,7 @@ import { RefreshCw, Search, Zap, ArrowUp, ArrowDown, Minus, Check, X } from 'luc
 import { useStore } from '../store.tsx'
 import { Sheet } from '../ui.tsx'
 import { supabase, DEMO } from '../db.ts'
+import { CryptoChart } from './CryptoChart.tsx'
 import { ZONE_LABEL, STOCK_TOKEN, type RadarRow, type Zone, type Dir } from '../lib/cryptoRadar.ts'
 
 const ZONES: Zone[] = ['buy', 'wait', 'watch', 'avoid']
@@ -111,6 +112,7 @@ function RadarSheet({ r, rate, onClose }: { r: RadarRow; rate: number; onClose: 
   return (
     <Sheet title={`${r.coin} · ${usd(r.price)} USDT`} onClose={onClose}>
       <div className={'verdict z-' + r.zone}><b>{ZONE_LABEL[r.zone]}</b><span>{r.note}</span></div>
+      <CryptoChart coin={r.coin} plan={r} />
       <p className="muted small">≈ {(r.price * rate).toLocaleString('ro-RO', { maximumSignificantDigits: 5 })} lei · 24 h {pctS(r.ch24)} · {r.score}/9 reguli trec{r.breakout ? ' · ⚡ sparge azi' : ''}</p>
 
       <h3 className="sub-h">De la 1 oră la 1 an</h3>

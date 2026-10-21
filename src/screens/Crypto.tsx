@@ -6,6 +6,7 @@ import { todayIso } from '../lib/period.ts'
 import { positions, portfolio, KIND_LABEL, toLei, feeHint, withBnr, type CryptoTx, type CryptoKind, type Position, type CoinQuote } from '../lib/crypto.ts'
 import type { Asset } from '../lib/types.ts'
 import { loadBnr } from '../bnr.ts'
+import { CryptoChart } from './CryptoChart.tsx'
 import { yearStories, type YearStory } from '../lib/cryptoYears.ts'
 import { DECLARED_UNTIL } from '../lib/fiscal.ts'
 
@@ -174,6 +175,7 @@ function CoinSheet({ coin, pos, quote, txs, onClose, onAdd, onEdit }: { coin: st
           {quote.spark && <span className="muted small">Ultimele 30 de zile · {quote.pair} pe {quote.pair?.endsWith('/USDT') ? 'Binance' : 'Revolut X'}</span>}
         </div>
       )}
+      <CryptoChart coin={coin} />
       {pos && (
         <div className="coin-box">
           <div><span>Valoarea participațiilor</span><b className="num">{lei(pos.value)}</b></div>
