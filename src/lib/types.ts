@@ -88,7 +88,11 @@ export interface Asset {
   prices_on?: string | null
   // Crypto wallets: live prices per coin (from Revolut X), written by the server; positions come from crypto_tx.
   coins?: CoinQuote[] | null
+  // One entry split into rows (e.g. BT Pay = BT Index + Pensia Mea); value/invested are their sums.
+  parts?: AssetPart[] | null
 }
+
+export interface AssetPart { name: string; value: number; invested: number; note?: string }
 
 export interface AssetValue {
   id: string

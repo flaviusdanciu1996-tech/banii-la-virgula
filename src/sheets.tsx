@@ -3,13 +3,13 @@ import { useStore } from './store.tsx'
 import { Sheet, Seg, MoneyField, ConfirmButton } from './ui.tsx'
 import { Icon } from './icons.tsx'
 import { parseMoney, fmt, fmtNum, CUR_LABEL, type Currency } from './lib/money.ts'
-import { Repeat } from 'lucide-react'
+import { Repeat, Plus, Trash2, ChevronDown } from 'lucide-react'
 import { ReceiptPhoto } from './screens/Receipt.tsx'
 import { DepreciationFields, AssetValuePanel } from './screens/AssetValue.tsx'
 import { InvestPanel } from './screens/BrokerImport.tsx'
 import { DEFAULT_DEP, estimateOn } from './lib/valuation.ts'
 import { todayIso } from './lib/period.ts'
-import { GROUPS, ASSET_KINDS, SECTIONS, PLATFORMS, kindOf, type Tx, type Kind, type Category, type Group, type Asset, type AssetSection } from './lib/types.ts'
+import { GROUPS, ASSET_KINDS, SECTIONS, PLATFORMS, kindOf, type Tx, type Kind, type Category, type Group, type Asset, type AssetSection, type AssetPart } from './lib/types.ts'
 import { ICON_CHOICES } from './icons.tsx'
 
 /* ---------------- Transaction ---------------- */
@@ -200,6 +200,7 @@ export function AssetSheet({ asset, section = 'liquid', quick, onClose, notify }
   const [value, setValue] = useState(asset ? fmtNum(asset.value) : '')
   const [invested, setInvested] = useState(asset?.invested ? fmtNum(asset.invested) : '')
   const [note, setNote] = useState(asset?.note ?? '')
+  const [parts, setParts] = useState<PartDraft[]>(() => (asset?.parts ?? []).map(toDraft))
   const [err, setErr] = useState('')
   const [dep, setDepState] = useState({
     price: asset?.purchase_price ? fmtNum(asset.purchase_price) : '',
@@ -223,6 +224,21 @@ export function AssetSheet({ asset, section = 'liquid', quick, onClose, notify }
       if (!name.trim()) return setErr('Scrie un nume, de ex. „Revolut Crypto”.')
       try { await st.saveAsset({ id: asset.id, name: name.trim(), platform: platform.trim(), note: note.trim() }); notify('Salvat'); onClose() }
       catch (e: any) { setErr(e?.message || 'Nu s-a putut salva.') }
+      return
+    }
+    if (parts.length) {
+      const parsed = parseParts(parts)
+      if (typeof parsed === 'string') return setErr(parsed)
+      if (!quick && !name.trim()) return setErr('Scrie un nume, de ex. „BT Pay”.')
+      const v = parsed.reduce((t, p) => t + p.value, 0), inv = parsed.reduce((t, p) => t + p.invested, 0)
+      const changed = !asset || asset.value !== v
+      try {
+        await st.saveAsset(quick && asset
+          ? { id: asset.id, parts: parsed, value: v, invested: inv, updated_on: todayIso(), value_source: 'manual' }
+          : { id: asset?.id, name: name.trim(), kind, platform: platform.trim(), currency, value: v, invested: inv, parts: parsed, note: note.trim(), archived: false,
+              ...(changed ? { updated_on: todayIso(), value_source: 'manual' as const } : {}) })
+        notify('Salvat'); onClose()
+      } catch (e: any) { setErr(e?.message || 'Nu s-a putut salva.') }
       return
     }
     let v = parseMoney(value)
@@ -258,6 +274,22 @@ export function AssetSheet({ asset, section = 'liquid', quick, onClose, notify }
     } catch (e: any) { setErr(e?.message || 'Nu s-a putut salva.') }
   }
 
+  if (quick && asset && parts.length) {
+    return (
+      <Sheet title={`Actualizează: ${asset.name}`} onClose={onClose}>
+        <p className="hint">Cât valorează azi fiecare?</p>
+        {parts.map((p, i) => (
+          <div key={i} className="part-quick">
+            <label className="field">{p.name}</label>
+            <MoneyField id={'part-q-' + i} value={p.value} onChange={x => setParts(ps => ps.map((q, j) => j === i ? { ...q, value: x } : q))} suffix={CUR_LABEL[asset.currency]} />
+          </div>
+        ))}
+        {err && <p className="err">{err}</p>}
+        <div className="actions"><button type="button" className="primary" onClick={save}>Actualizează</button></div>
+      </Sheet>
+    )
+  }
+
   if (quick && asset) {
     return (
       <Sheet title={`Actualizează: ${asset.name}`} onClose={onClose}>
@@ -286,7 +318,7 @@ export function AssetSheet({ asset, section = 'liquid', quick, onClose, notify }
         <div className="chips">{PLATFORMS.map(p => <button key={p} type="button" className="chip" aria-pressed={p === platform} onClick={() => setPlatform(p)}>{p}</button>)}</div>
       </>}
       {!coinWallet && <Seg label="Moneda" value={currency} onChange={setCurrency} options={[{ id: 'RON', label: 'Lei' }, { id: 'EUR', label: 'Euro' }, { id: 'USD', label: 'Dolari' }]} />}
-      {coinWallet ? <p className="hint">Valoarea se calculează singură din monedele tale și prețurile Revolut X. Le modifici din ecranul portofelului.</p> : asset?.holdings?.length ? <InvestPanel asset={st.assets.find(x => x.id === asset.id) ?? asset} notify={notify} /> : <>
+      {coinWallet ? <p className="hint">Valoarea se calculează singură din monedele tale și prețurile Revolut X. Le modifici din ecranul portofelului.</p> : asset?.holdings?.length ? <InvestPanel asset={st.assets.find(x => x.id === asset.id) ?? asset} notify={notify} /> : parts.length ? <PartsEditor parts={parts} setParts={setParts} currency={currency} /> : <>
       <label className="field">{sec === 'debt' ? 'Cât mai ai de dat' : 'Valoare actuală'}</label>
       <MoneyField id="asset-value" big value={value} onChange={setValue} suffix={CUR_LABEL[currency]} />
       {sec === 'goods' && !depKind && <p className="hint">Pune cât ai lua pe el dacă l-ai vinde azi (caută anunțuri cu ceva asemănător). Actualizează-l o dată la câteva luni.</p>}
@@ -296,6 +328,7 @@ export function AssetSheet({ asset, section = 'liquid', quick, onClose, notify }
         <label className="field">Cât ai băgat în total (opțional)</label>
         <MoneyField id="asset-invested" value={invested} onChange={setInvested} suffix={CUR_LABEL[currency]} />
         <p className="hint">Din diferența dintre valoare și cât ai băgat se calculează profitul.</p>
+        <button type="button" className="ghost-btn" onClick={() => setParts([{ name: name.trim() || 'Rândul 1', value, invested, note: '' }, { name: '', value: '', invested: '', note: '' }])}><Plus size={16} />Împarte pe rânduri (ex. două fonduri)</button>
       </>}
       </>}
       <label className="field">Notă<input id="asset-note" maxLength={80} placeholder="opțional" value={note} onChange={e => setNote(e.target.value)} /></label>
@@ -305,5 +338,57 @@ export function AssetSheet({ asset, section = 'liquid', quick, onClose, notify }
         <button type="button" className="primary" onClick={save}>Salvează</button>
       </div>
     </Sheet>
+  )
+}
+
+/* ---------- One entry split into rows (e.g. BT Pay = BT Index + Pensia Mea) ---------- */
+
+type PartDraft = { name: string; value: string; invested: string; note: string }
+const toDraft = (p: AssetPart): PartDraft => ({ name: p.name, value: fmtNum(p.value), invested: p.invested ? fmtNum(p.invested) : '', note: p.note ?? '' })
+function parseParts(ps: PartDraft[]): AssetPart[] | string {
+  const out: AssetPart[] = []
+  for (const [i, p] of ps.entries()) {
+    if (!p.name.trim()) return `Scrie un nume pentru rândul ${i + 1}.`
+    const v = parseMoney(p.value), inv = p.invested.trim() ? parseMoney(p.invested) : 0
+    if (v === null || v < 0) return `Valoarea pentru „${p.name.trim()}” nu e validă.`
+    if (inv === null || inv < 0) return `Suma investită pentru „${p.name.trim()}” nu e validă.`
+    out.push({ name: p.name.trim(), value: v, invested: inv, ...(p.note.trim() ? { note: p.note.trim() } : {}) })
+  }
+  return out
+}
+
+function PartsEditor({ parts, setParts, currency }: { parts: PartDraft[]; setParts: (f: (p: PartDraft[]) => PartDraft[]) => void; currency: Currency }) {
+  const [open, setOpen] = useState<number | null>(() => (parts.some(p => !p.name) ? parts.findIndex(p => !p.name) : null))
+  const set = (i: number, patch: Partial<PartDraft>) => setParts(ps => ps.map((p, j) => (j === i ? { ...p, ...patch } : p)))
+  const vals = parts.map(p => ({ v: parseMoney(p.value) ?? 0, inv: parseMoney(p.invested) ?? 0 }))
+  const total = vals.reduce((t, x) => t + x.v, 0), totalInv = vals.reduce((t, x) => t + x.inv, 0)
+  const pct = (v: number, inv: number) => (inv ? Math.round(((v - inv) / inv) * 1000) / 10 : null)
+  const P = ({ p }: { p: number | null }) => p === null ? null : <span className={'num small ' + (p >= 0 ? 'in' : 'bad')}>{p >= 0 ? '+' : ''}{String(p).replace('.', ',')}%</span>
+  return (
+    <div className="parts">
+      {parts.map((p, i) => (
+        <div key={i} className={'part' + (open === i ? ' open' : '')}>
+          <button type="button" className="part-head" onClick={() => setOpen(open === i ? null : i)} aria-expanded={open === i}>
+            <span className="row-main"><b>{p.name || 'Rând nou'}</b>{p.note && <span className="muted small">{p.note}</span>}</span>
+            <span className="row-side"><b className="num">{fmtNum(vals[i].v)} {CUR_LABEL[currency]}</b>{vals[i].inv ? <span className="muted small num">investit {fmtNum(vals[i].inv)}</span> : null}<P p={pct(vals[i].v, vals[i].inv)} /></span>
+            <ChevronDown size={16} className="chev" />
+          </button>
+          {open === i && <div className="part-edit">
+            <label className="field">Nume<input maxLength={50} value={p.name} placeholder="ex. BT Index ROTX" onChange={e => set(i, { name: e.target.value })} /></label>
+            <label className="field">Valoare actuală</label>
+            <MoneyField id={'part-v-' + i} value={p.value} onChange={x => set(i, { value: x })} suffix={CUR_LABEL[currency]} />
+            <label className="field">Cât ai băgat</label>
+            <MoneyField id={'part-i-' + i} value={p.invested} onChange={x => set(i, { invested: x })} suffix={CUR_LABEL[currency]} />
+            <label className="field">Notă<input maxLength={120} value={p.note} placeholder="opțional (unități, VUAN…)" onChange={e => set(i, { note: e.target.value })} /></label>
+            <button type="button" className="ghost-btn" onClick={() => { setParts(ps => ps.filter((_, j) => j !== i)); setOpen(null) }}><Trash2 size={16} />Scoate rândul</button>
+          </div>}
+        </div>
+      ))}
+      <button type="button" className="ghost-btn" onClick={() => { setParts(ps => [...ps, { name: '', value: '', invested: '', note: '' }]); setOpen(parts.length) }}><Plus size={16} />Adaugă rând</button>
+      <div className="part-total">
+        <span>Total</span>
+        <span className="row-side"><b className="num">{fmtNum(total)} {CUR_LABEL[currency]}</b>{totalInv ? <span className="muted small num">investit {fmtNum(totalInv)}</span> : null}<P p={pct(total, totalInv)} /></span>
+      </div>
+    </div>
   )
 }

@@ -56,7 +56,8 @@ const Ctx = createContext<Store | null>(null)
 export const useStore = () => useContext(Ctx)!
 
 const num = (v: unknown) => (typeof v === 'string' ? Number(v) : (v as number))
-const normAsset = (a: Asset): Asset => ({ ...a, value: num(a.value), invested: num(a.invested), purchase_price: a.purchase_price == null ? null : num(a.purchase_price) })
+const normAsset = (a: Asset): Asset => ({ ...a, value: num(a.value), invested: num(a.invested), purchase_price: a.purchase_price == null ? null : num(a.purchase_price),
+  parts: a.parts?.length ? a.parts.map(p => ({ ...p, value: num(p.value), invested: num(p.invested) })) : null })
 const txNum = (r: any): InvestTx => ({ ref: r.ref, at: String(r.at).slice(0, 19), op: r.op, symbol: r.symbol, price: r.price == null ? null : num(r.price), qty: num(r.qty), commission: num(r.commission), net: num(r.net), profit: r.profit == null ? null : num(r.profit), note: r.note ?? '' })
 
 export function StoreProvider({ repo, user, children }: { repo: Repo; user: User; children: ReactNode }) {

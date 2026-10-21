@@ -72,6 +72,8 @@ export function demoSeed(): Record<Table, any[]> {
         { title: 'S25 Ultra 512 ca nou', price: 3600, currency: 'RON', source: 'Lajumate', url: 'https://lajumate.ro/', used: true },
         { title: 'S25 Ultra 512GB display spart', price: 1500, currency: 'RON', source: 'OLX', url: 'https://www.olx.ro/', used: false },
       ] },
+    { id: 'a8', household_id: H, owner_id: U, name: 'BT Pay', kind: 'fonduri', platform: 'BT Pay', currency: 'RON', value: 427033, invested: 389000, note: 'BT Asset Management + BT Pensii', updated_on: addDays(today, -2), archived: false,
+      parts: [{ name: 'BT Index România ROTX', value: 406990, invested: 370000, note: '59,191 unități · VUAN 68,759' }, { name: 'Pensia Mea (Pilon III)', value: 20043, invested: 19000, note: '6,116 unități · VUAN 32,7709' }] },
     { id: 'a5', household_id: H, owner_id: U, name: 'Numerar acasă', kind: 'numerar', platform: 'Numerar', currency: 'RON', value: 150000, invested: 0, note: '', updated_on: today, archived: false },
     { id: 'a6', household_id: H, owner_id: U, name: 'Leasing mașină', kind: 'leasing', platform: '', currency: 'EUR', value: 320000, invested: 0, note: '', updated_on: addDays(today, -10), archived: false },
   ]

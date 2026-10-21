@@ -769,3 +769,14 @@ a.primary { text-decoration: none; }
 .sec-log li { display: flex; flex-direction: column; gap: 2px; padding-left: 10px; border-left: 3px solid var(--line); }
 .sec-log li.bad { border-left-color: var(--bad); }
 .sec-log li span { color: var(--muted); }
+.parts { display: flex; flex-direction: column; gap: 8px; }
+.part { border: 1px solid var(--line); border-radius: 14px; background: var(--surface); overflow: hidden; }
+.part-head { width: 100%; display: flex; align-items: center; gap: 10px; padding: 12px; background: none; border: 0; text-align: left; color: var(--ink); }
+.part-head .row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.part-head .row-side { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.part-head .chev { color: var(--muted); transition: transform .15s; flex: none; }
+.part.open .part-head .chev { transform: rotate(180deg); }
+.part-edit { display: flex; flex-direction: column; gap: 10px; padding: 0 12px 12px; }
+.part-total { display: flex; justify-content: space-between; align-items: center; padding: 10px 12px; border-top: 1px dashed var(--line); font-weight: 600; }
+.part-total .row-side { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.part-quick { display: flex; flex-direction: column; gap: 4px; }

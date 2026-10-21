@@ -109,7 +109,7 @@ function AssetRow({ a, today, onOpen, onQuick }: { a: Asset; today: string; onOp
   const auto = (k.section === 'goods' && (a.market_on || !!a.dep_rate)) || !!a.holdings?.length || !!a.coins?.length
   const stale = age > 30 && !auto
   const lost = a.purchase_price ? Math.round((1 - a.value / a.purchase_price) * 100) : null
-  const how = a.coins?.length ? cryptoSummary(a) : a.holdings?.length ? `${a.holdings.length} acțiuni · preț BVB` : a.value_source === 'market' ? `preț online · ${(a.market_offers ?? []).filter(o => o.used).length} oferte`
+  const how = a.parts?.length ? a.parts.map(p => p.name.replace(/\s*\(.*\)$/, '').split(/\s+/).slice(0, 2).join(' ')).join(' + ') : a.coins?.length ? cryptoSummary(a) : a.holdings?.length ? `${a.holdings.length} acțiuni · preț BVB` : a.value_source === 'market' ? `preț online · ${(a.market_offers ?? []).filter(o => o.used).length} oferte`
     : a.value_source === 'depreciation' ? `estimat · −${a.dep_rate}%/an` : null
   const ron = toRon(a.value, a.currency, st.rates)
   const profitPct = k.section === 'invest' && a.invested && !a.invest_summary ? Math.round(((a.value - a.invested) / a.invested) * 1000) / 10 : null
