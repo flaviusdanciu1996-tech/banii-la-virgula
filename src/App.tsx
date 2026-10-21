@@ -4,6 +4,7 @@ import { RadarScreen } from './screens/Radar.tsx'
 import { AssistantScreen } from './screens/Assistant.tsx'
 import { BrokerImportScreen } from './screens/BrokerImport.tsx'
 import { DreamsScreen } from './screens/Dreams.tsx'
+import { CryptoScreen } from './screens/Crypto.tsx'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Home, PieChart, ReceiptText, Gem, User, ChevronLeft, Download, X } from 'lucide-react'
 import { supabase, supabaseRepo, demoRepo, DEMO, type Repo } from './db.ts'
@@ -30,7 +31,7 @@ type Theme = 'system' | 'light' | 'dark'
 
 const SUB_TITLES: Record<string, string> = {
   history: 'Istoric', categories: 'Pe categorii', finante: 'Finanțe', familie: 'Familia mea',
-  aspect: 'Aspect', setari: 'Setări cont', despre: 'Despre aplicație', recurente: 'Plăți recurente', import: 'Import extras BT', notificari: 'Notificări și citate', visuri: 'Visurile mele', 'import-broker': 'Import Tradeville', radar: 'Radar BVB', jurnal: 'Jurnal de investiții', plan: 'Planul lunii', asistent: 'Asistent investiții',
+  aspect: 'Aspect', setari: 'Setări cont', despre: 'Despre aplicație', recurente: 'Plăți recurente', import: 'Import extras BT', notificari: 'Notificări și citate', visuri: 'Visurile mele', 'import-broker': 'Import Tradeville', radar: 'Radar BVB', jurnal: 'Jurnal de investiții', plan: 'Planul lunii', asistent: 'Asistent investiții', crypto: 'Crypto',
 }
 
 function readTheme(): Theme {
@@ -189,6 +190,7 @@ function Shell({ theme, setTheme }: { theme: Theme; setTheme: (t: Theme) => void
       case 'radar': inner = <RadarScreen nav={nav} notify={notify} />; break
       case 'asistent': inner = <AssistantScreen initial={sub.params?.q} />; break
       case 'import-broker': inner = <BrokerImportScreen nav={nav} notify={notify} />; break
+      case 'crypto': inner = <CryptoScreen key={sub.params?.id} assetId={sub.params?.id ?? ''} notify={notify} openAsset={a => openAsset(a)} />; break
       case 'visuri': inner = <DreamsScreen openGoal={openGoal} notify={notify} celebrate={celebrate} />; break
       default: inner = <AboutScreen />
     }

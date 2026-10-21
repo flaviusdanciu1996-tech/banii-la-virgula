@@ -415,3 +415,35 @@ test('lab: channel breakout + pullback is detected on a textbook chart', async (
   const r = eventStudy([up, flat], s2 => (s2.symbol === 'UP' ? 1 : null), marketIndex([up, flat]), [21])
   assert.ok(r.events > 0 && r.stats[0].avgExcess > 0 && r.stats[0].beatRate === 100)
 })
+
+import { positions, portfolio, pickPair, quoteFromTickers } from './crypto.ts'
+test('crypto: average cost, rewards, sells, live prices', () => {
+  const tx = (o: any) => ({ currency: 'RON', fee: 0, fx: null, note: '', price: null, ...o })
+  const txs = [
+    tx({ coin: 'DOT', kind: 'buy', qty: 10, price: 30, fee: 6, at: '2024-01-01T10:00:00Z' }),
+    tx({ coin: 'DOT', kind: 'buy', qty: 10, price: 2, currency: 'EUR', fx: 5, at: '2025-01-01T10:00:00Z' }), // 100 lei
+    tx({ coin: 'DOT', kind: 'reward', qty: 2, at: '2025-02-01T10:00:00Z' }),
+    tx({ coin: 'DOT', kind: 'sell', qty: 11, price: 10, fee: 1, at: '2025-03-01T10:00:00Z' }),
+    tx({ coin: 'XRP', kind: 'buy', qty: 5, price: 10, at: '2025-01-01T10:00:00Z' }),
+    tx({ coin: 'XRP', kind: 'adjust', qty: -5, at: '2025-04-01T10:00:00Z' }),
+  ]
+  const p = positions(txs, [{ coin: 'DOT', pair: 'DOT/EUR', price: 5.5, ch24: 10, at: null }])
+  const dot = p.find(x => x.coin === 'DOT')!
+  // cost 406 for 22 coins → avg 18.4545…; sold 11 → 203 cost left for 11 coins
+  assert.equal(Math.round(dot.cost * 100) / 100, 203)
+  assert.equal(dot.qty, 11)
+  assert.equal(Math.round(dot.realized * 100) / 100, Math.round((110 - 1 - 203) * 100) / 100)
+  assert.equal(dot.value, 60.5)
+  assert.ok(dot.live)
+  const xrp = p.find(x => x.coin === 'XRP')!
+  assert.equal(xrp.qty, 0); assert.equal(xrp.cost, 0)
+  const pf = portfolio(p)
+  assert.equal(pf.value, 60.5)
+  assert.equal(Math.round(pf.day! * 100) / 100, 5.5) // 60.5 − 60.5/1.1
+  assert.equal(pickPair('egld', ['EGLD/USD', 'DOT/EUR']), 'EGLD/USD')
+  assert.equal(pickPair('DOT', ['DOT/USD', 'DOT/EUR']), 'DOT/EUR')
+  assert.equal(pickPair('XYZ', ['DOT/EUR']), null)
+  const q = quoteFromTickers('DOT/EUR', [{ symbol: 'DOT/EUR', mid: '1.1', price_change_24h: '0.1', region: 'UK' }, { symbol: 'DOT/EUR', mid: '1.0322', price_change_24h: '-0.0007', region: 'EEA' }], { EUR: 5.3308, USD: 4.75 })!
+  assert.equal(Math.round(q.price * 100) / 100, 5.5)
+  assert.ok(q.ch24! < 0)
+})

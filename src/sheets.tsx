@@ -217,7 +217,14 @@ export function AssetSheet({ asset, section = 'liquid', quick, onClose, notify }
   }
   const depKind = sec === 'goods' && kind !== 'casa' && kind !== 'teren'
 
+  const coinWallet = !!asset?.coins?.length
   async function save() {
+    if (coinWallet && asset && !quick) {
+      if (!name.trim()) return setErr('Scrie un nume, de ex. „Revolut Crypto”.')
+      try { await st.saveAsset({ id: asset.id, name: name.trim(), platform: platform.trim(), note: note.trim() }); notify('Salvat'); onClose() }
+      catch (e: any) { setErr(e?.message || 'Nu s-a putut salva.') }
+      return
+    }
     let v = parseMoney(value)
     if (!value.trim() && !quick && depKind) {
       // No current value typed: use the estimate from the purchase price.
@@ -278,8 +285,8 @@ export function AssetSheet({ asset, section = 'liquid', quick, onClose, notify }
         <label className="field">Unde (aplicație / bancă)<input id="asset-platform" maxLength={40} value={platform} onChange={e => setPlatform(e.target.value)} /></label>
         <div className="chips">{PLATFORMS.map(p => <button key={p} type="button" className="chip" aria-pressed={p === platform} onClick={() => setPlatform(p)}>{p}</button>)}</div>
       </>}
-      <Seg label="Moneda" value={currency} onChange={setCurrency} options={[{ id: 'RON', label: 'Lei' }, { id: 'EUR', label: 'Euro' }, { id: 'USD', label: 'Dolari' }]} />
-      {asset?.holdings?.length ? <InvestPanel asset={st.assets.find(x => x.id === asset.id) ?? asset} notify={notify} /> : <>
+      {!coinWallet && <Seg label="Moneda" value={currency} onChange={setCurrency} options={[{ id: 'RON', label: 'Lei' }, { id: 'EUR', label: 'Euro' }, { id: 'USD', label: 'Dolari' }]} />}
+      {coinWallet ? <p className="hint">Valoarea se calculează singură din monedele tale și prețurile Revolut X. Le modifici din ecranul portofelului.</p> : asset?.holdings?.length ? <InvestPanel asset={st.assets.find(x => x.id === asset.id) ?? asset} notify={notify} /> : <>
       <label className="field">{sec === 'debt' ? 'Cât mai ai de dat' : 'Valoare actuală'}</label>
       <MoneyField id="asset-value" big value={value} onChange={setValue} suffix={CUR_LABEL[currency]} />
       {sec === 'goods' && !depKind && <p className="hint">Pune cât ai lua pe el dacă l-ai vinde azi (caută anunțuri cu ceva asemănător). Actualizează-l o dată la câteva luni.</p>}

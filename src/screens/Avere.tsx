@@ -11,6 +11,7 @@ import { SECTIONS, kindOf, type Asset, type AssetSection, type Goal } from '../l
 import { GoalsSection } from './Plans.tsx'
 import { BrokerSummaryCard } from './BrokerImport.tsx'
 import { FiCard } from './Fi.tsx'
+import { cryptoSummary } from './Crypto.tsx'
 import { CountUp, EmptyArt } from '../ui.tsx'
 
 export function AvereScreen({ scope, openAsset, openGoal, nav }: { scope: 'all' | 'me'; openAsset: (a?: Asset, section?: AssetSection, quick?: boolean) => void; openGoal: (g?: Goal, add?: boolean) => void; nav: Nav }) {
@@ -82,7 +83,9 @@ export function AvereScreen({ scope, openAsset, openGoal, nav }: { scope: 'all' 
                 ) : null
               })()}
               <div className="rows">
-                {items.map(a => <AssetRow key={a.id} a={a} today={today} onOpen={() => openAsset(a)} onQuick={() => openAsset(a, undefined, !a.holdings?.length)} />)}
+                {items.map(a => a.kind === 'crypto'
+                  ? <AssetRow key={a.id} a={a} today={today} onOpen={() => nav('crypto', { id: a.id })} onQuick={() => nav('crypto', { id: a.id })} />
+                  : <AssetRow key={a.id} a={a} today={today} onOpen={() => openAsset(a)} onQuick={() => openAsset(a, undefined, !a.holdings?.length)} />)}
                 <button type="button" className="row add-line" onClick={() => openAsset(undefined, s.id)}><Plus size={16} />Adaugă la {s.name.toLowerCase()}</button>
                 {s.id === 'invest' && <button type="button" className="row add-line" onClick={() => nav('import-broker')}><FileUp size={16} />Import din Tradeville</button>}
                 {s.id === 'invest' && <button type="button" className="row add-line plan-line" onClick={() => nav('plan')}><CalendarCheck size={16} />Planul lunii · ce cumpăr acum</button>}
@@ -102,10 +105,10 @@ function AssetRow({ a, today, onOpen, onQuick }: { a: Asset; today: string; onOp
   const st = useStore()
   const k = kindOf(a.kind)
   const age = diffDays(a.updated_on, today)
-  const auto = (k.section === 'goods' && (a.market_on || !!a.dep_rate)) || !!a.holdings?.length
+  const auto = (k.section === 'goods' && (a.market_on || !!a.dep_rate)) || !!a.holdings?.length || !!a.coins?.length
   const stale = age > 30 && !auto
   const lost = a.purchase_price ? Math.round((1 - a.value / a.purchase_price) * 100) : null
-  const how = a.holdings?.length ? `${a.holdings.length} acțiuni · preț BVB` : a.value_source === 'market' ? `preț online · ${(a.market_offers ?? []).filter(o => o.used).length} oferte`
+  const how = a.coins?.length ? cryptoSummary(a) : a.holdings?.length ? `${a.holdings.length} acțiuni · preț BVB` : a.value_source === 'market' ? `preț online · ${(a.market_offers ?? []).filter(o => o.used).length} oferte`
     : a.value_source === 'depreciation' ? `estimat · −${a.dep_rate}%/an` : null
   const ron = toRon(a.value, a.currency, st.rates)
   const profitPct = k.section === 'invest' && a.invested && !a.invest_summary ? Math.round(((a.value - a.invested) / a.invested) * 1000) / 10 : null

@@ -1,4 +1,4 @@
-// Monthly value of things that lose value (phone, car…).
+// Monthly value of things that lose value (phone, car…). Daily: BVB prices for brokers, Revolut X prices for crypto.
 // 1) Reads current second-hand listings for the exact model from OLX and Publi24 (public search pages).
 // 2) With at least 5 listings: median price minus a discount (asking price → selling price).
 // 3) Otherwise: yearly depreciation from the last known value.
@@ -8,6 +8,7 @@ import webpush from "npm:web-push@3.6.7";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { marketValue, anchorPoint, estimateOn, checkDue, olxUrl, publi24Url, parseOlx, parsePubli24, pickOffers, type Offer, type ValuePoint } from "./valuation.ts";
 import { bvbUrl, parseBvbPrice, holdingsValue, type Holding } from "./bvb.ts";
+import { positions, pickPair, quoteFromTickers, type CoinQuote, type CryptoTx } from "./crypto.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -71,7 +72,68 @@ async function priceInvestments(a: any) {
   return { id: a.id, value, priced, positions: holdings.length };
 }
 
+// ---------- Crypto: positions from the user's transactions, live prices from Revolut X (public, no key) ----------
+const RX = "https://revx.revolut.com/api/1.0/public";
+const sleep = (ms: number) => new Promise(r => setTimeout(r, ms));
+async function rx(path: string): Promise<any | null> {
+  for (let attempt = 0; attempt < 3; attempt++) {
+    try {
+      const r = await fetch(RX + path, { signal: AbortSignal.timeout(15000) });
+      if (r.status === 429) { await sleep(Number(r.headers.get("Retry-After")) || 1200); continue; }
+      if (!r.ok) { console.log("revx", path, r.status); return null; }
+      return await r.json();
+    } catch (e) { console.log("revx", path, String(e)); await sleep(800); }
+  }
+  return null;
+}
+
+async function priceCrypto(a: any) {
+  const today = todayRo();
+  const { data: rows } = await db.from("crypto_tx").select("*").eq("asset_id", a.id).limit(20000);
+  if (!rows?.length) return { id: a.id, value: Number(a.value), priced: 0, positions: 0 }; // typed by hand: leave it alone
+  const txs: CryptoTx[] = rows.map((r: any) => ({ ...r, qty: Number(r.qty), price: r.price == null ? null : Number(r.price), fee: Number(r.fee), fx: r.fx == null ? null : Number(r.fx) }));
+  const { data: set } = await db.from("settings").select("eur_rate,usd_rate").eq("household_id", a.household_id).maybeSingle();
+  const rates = { EUR: Number(set?.eur_rate) || 5, USD: Number(set?.usd_rate) || 4.6 };
+  const held = positions(txs).filter(p => p.qty > 0).map(p => p.coin);
+  const old = new Map<string, CoinQuote>((a.coins ?? []).map((c: CoinQuote) => [c.coin, c]));
+  const quotes: CoinQuote[] = held.map(c => ({ coin: c, pair: old.get(c)?.pair ?? null, price: null, ch24: null, at: null, spark: old.get(c)?.spark, spark_on: old.get(c)?.spark_on ?? null }));
+  if (quotes.some(x => !x.pair)) {
+    const cfg = await rx("/configuration/pairs");
+    const pairs = cfg ? Object.keys(cfg) : [];
+    for (const x of quotes) if (!x.pair) x.pair = pickPair(x.coin, pairs);
+  }
+  const withPair = quotes.filter(x => x.pair);
+  let priced = 0;
+  if (withPair.length) {
+    const t = await rx("/tickers?symbols=" + encodeURIComponent(withPair.map(x => x.pair!.replace("/", "-")).join(",")));
+    const list = Array.isArray(t?.data) ? t.data : [];
+    for (const x of withPair) {
+      const q = quoteFromTickers(x.pair!, list, rates);
+      if (q) { x.price = q.price; x.ch24 = q.ch24; x.at = new Date().toISOString(); priced++; }
+    }
+  }
+  for (const x of quotes) {
+    const o = old.get(x.coin);
+    if (x.price == null && o?.price != null) { x.price = o.price; x.ch24 = o.ch24; x.at = o.at; } // keep the last known price
+  }
+  // 30-day mini chart, once a day per coin (1 request per second is the public limit).
+  for (const x of withPair) {
+    if (x.spark_on === today) continue;
+    await sleep(1100);
+    const c = await rx(`/candles/${x.pair!.replace("/", "-")}?interval=1440&since=${Date.now() - 31 * 864e5}`);
+    const closes = (Array.isArray(c?.data) ? c.data : []).map((k: any) => Number(k.close)).filter((v: number) => v > 0);
+    if (closes.length) { const fx = x.pair!.endsWith("/EUR") ? rates.EUR : rates.USD; x.spark = closes.map((v: number) => Math.round(v * fx * 10000) / 10000); x.spark_on = today; }
+  }
+  const pos = positions(txs, quotes);
+  const value = Math.round(pos.reduce((s, p) => s + p.value, 0) * 100);
+  const invested = Math.round(pos.reduce((s, p) => s + p.cost, 0) * 100);
+  await db.from("assets").update({ coins: quotes, value, invested, updated_on: today, prices_on: today, value_source: "market" }).eq("id", a.id);
+  await db.from("asset_values").upsert({ household_id: a.household_id, asset_id: a.id, day: today, value, source: "market" }, { onConflict: "asset_id,day" });
+  return { id: a.id, value, priced, positions: held.length };
+}
+
 async function valueAsset(a: any, push: boolean) {
+  if (a.kind === "crypto") return priceCrypto(a);
   if (Array.isArray(a.holdings) && a.holdings.length) return priceInvestments(a);
   const today = todayRo();
   const { data: set } = await db.from("settings").select("eur_rate,usd_rate").eq("household_id", a.household_id).maybeSingle();
@@ -129,8 +191,8 @@ Deno.serve(async (req) => {
 
   // From pg_cron: every asset whose monthly check is due.
   const today = todayRo();
-  const { data: assets } = await db.from("assets").select("*").eq("archived", false).or("market_on.eq.true,dep_rate.gt.0,holdings.not.is.null");
-  const due = (assets ?? []).filter((a: any) => Array.isArray(a.holdings) && a.holdings.length ? a.prices_on !== today : checkDue(a.market_checked_on, today)).slice(0, 15);
+  const { data: assets } = await db.from("assets").select("*").eq("archived", false).or("market_on.eq.true,dep_rate.gt.0,holdings.not.is.null,kind.eq.crypto");
+  const due = (assets ?? []).filter((a: any) => a.kind === "crypto" || (Array.isArray(a.holdings) && a.holdings.length) ? a.prices_on !== today : checkDue(a.market_checked_on, today)).slice(0, 15);
   const out = [];
   for (const a of due) { try { out.push(await valueAsset(a, true)); } catch (e) { console.log("asset", a.id, String(e)); } }
   return json({ checked: out.length });

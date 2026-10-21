@@ -56,7 +56,11 @@ export function demoSeed(): Record<Table, any[]> {
       holdings: [{ symbol: 'TVBETETF', qty: 220, cost: 520000, price: 26.1 }, { symbol: 'TLV', qty: 120, cost: 380000, price: 35.98 }, { symbol: 'SNP', qty: 250, cost: 200000, price: 0.95 }],
       invest_summary: { deposits: 1500000, withdrawals: 400000, dividends: 61200, commissions: 9800, realized: 85400, cash: 1890, first: '2022-01-10', last: addDays(today, -12), count: 84,
         flows: [{ d: '2022-01-10', amt: 600000 }, { d: '2022-09-01', amt: 400000 }, { d: '2023-06-01', amt: 300000 }, { d: '2024-03-01', amt: 200000 }, { d: '2025-07-01', amt: -400000 }] } },
-    { id: 'a3', household_id: H, owner_id: U, name: 'Bitcoin', kind: 'crypto', platform: 'Binance', currency: 'USD', value: 241000, invested: 300000, note: '', updated_on: addDays(today, -40), archived: false },
+    { id: 'a3', household_id: H, owner_id: U, name: 'Revolut Crypto', kind: 'crypto', platform: 'Revolut', currency: 'RON', value: 270340, invested: 311800, note: '', updated_on: today, archived: false, prices_on: today,
+      coins: [
+        { coin: 'BTC', pair: 'BTC/EUR', price: 392450, ch24: 0.94, at: new Date().toISOString(), spark: Array.from({ length: 31 }, (_, k) => 360000 + k * 1100 + Math.sin(k / 2) * 9000) },
+        { coin: 'DOT', pair: 'DOT/EUR', price: 5.5, ch24: -0.07, at: new Date().toISOString(), spark: Array.from({ length: 31 }, (_, k) => 4.6 + k * 0.03 + Math.sin(k / 3) * 0.2) },
+      ] },
     { id: 'a4', household_id: H, owner_id: U, name: 'Dacia Logan', kind: 'masina', platform: '', currency: 'EUR', value: 850000, invested: 0, note: '', updated_on: addDays(today, -60), archived: false },
     { id: 'a7', household_id: H, owner_id: U, name: 'Samsung S25 Ultra', kind: 'electronice', platform: '', currency: 'RON', value: 333000, invested: 0, note: '', updated_on: addDays(today, -3), archived: false,
       purchase_price: 400000, purchase_date: addDays(today, -95), dep_rate: 35, market_query: 'Samsung Galaxy S25 Ultra 512GB', market_on: true, market_discount: 10, market_checked_on: addDays(today, -3), value_source: 'market',
@@ -81,6 +85,12 @@ export function demoSeed(): Record<Table, any[]> {
     members: [{ household_id: H, user_id: U, display_name: 'Flavius Danciu', role: 'owner' }, { household_id: H, user_id: U2, display_name: 'Ana Pop', role: 'member' }],
     settings: [{ household_id: H, payday: 1, total_budget: null, savings_target_pct: 20, eur_rate: 4.9768, usd_rate: 4.2851, rates_date: today, fi_target: 30000000, fi_currency: 'EUR', fi_monthly: 100000, fi_return: 7, fi_include_liquid: true }],
     categories, transactions, assets, snapshots, invites: [], push_subs: [], import_rules: [], invest_tx: [], invest_journal: [],
+    crypto_tx: [
+      { id: 'c1', household_id: H, asset_id: 'a3', coin: 'BTC', kind: 'buy', qty: 0.004, price: 300000, currency: 'RON', fee: 6, fx: null, at: addDays(today, -400) + 'T10:00:00Z', note: '' },
+      { id: 'c2', household_id: H, asset_id: 'a3', coin: 'BTC', kind: 'buy', qty: 0.002, price: 350000, currency: 'RON', fee: 6, fx: null, at: addDays(today, -120) + 'T10:00:00Z', note: '' },
+      { id: 'c3', household_id: H, asset_id: 'a3', coin: 'DOT', kind: 'buy', qty: 60, price: 20, currency: 'RON', fee: 6, fx: null, at: addDays(today, -300) + 'T10:00:00Z', note: '' },
+      { id: 'c4', household_id: H, asset_id: 'a3', coin: 'DOT', kind: 'reward', qty: 3.4, price: null, currency: 'RON', fee: 0, fx: null, at: addDays(today, -20) + 'T10:00:00Z', note: 'Recompense staking' },
+    ],
     asset_values: [
       { id: 'v1', household_id: H, asset_id: 'a7', day: addDays(today, -95), value: 400000, source: 'purchase' },
       { id: 'v2', household_id: H, asset_id: 'a7', day: addDays(today, -64), value: 380000, source: 'depreciation' },

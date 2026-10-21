@@ -676,3 +676,23 @@ textarea { width: 100%; background: var(--surface); color: var(--ink); border: 1
 .lab-tr.sel { background: var(--chip, rgba(127,127,127,.12)); border-radius: 8px; }
 .lab-tr.ref { font-style: italic; opacity: .85; }
 .lab-tr em { font-size: .72rem; font-style: normal; }
+
+/* ---------- Crypto wallet ---------- */
+.coin-ic { display: inline-grid; place-items: center; border-radius: 50%; color: #fff; font-weight: 800; letter-spacing: -.02em; flex: none; text-shadow: 0 1px 2px rgb(0 0 0 / .35); }
+.chip .coin-ic { margin-left: -4px; }
+.coin-row { gap: 10px; align-items: center; text-align: left; width: 100%; }
+.coin-row .mini-line { flex: none; }
+.crypto-head .inv-sum { margin: 12px 0 0; }
+.crypto-src { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
+.crypto-src span { flex: 1; }
+.coin-price { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+.coin-price .mini-line { width: 100%; height: auto; }
+.coin-box { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 10px; padding: 14px; border: 1px solid var(--line); border-radius: 14px; background: var(--surface-2); }
+.coin-box div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.coin-box .wide { grid-column: 1 / -1; }
+.coin-box span { font-size: 11.5px; font-weight: 600; letter-spacing: .02em; text-transform: uppercase; color: var(--muted); }
+.coin-box b { font-size: 16px; overflow-wrap: anywhere; }
+.sub-h { font-size: 15px; margin: 16px 0 6px; }
+.tx-hist .row { width: 100%; text-align: left; }
+.spin { animation: spin 1s linear infinite; }
+.coin-row .row-main .small { white-space: normal; }

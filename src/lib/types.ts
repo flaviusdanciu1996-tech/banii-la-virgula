@@ -1,3 +1,4 @@
+import type { CoinQuote } from './crypto.ts'
 import type { Currency } from './money.ts'
 
 export type Group = 'critic' | 'important' | 'optional' | 'economii'
@@ -85,6 +86,8 @@ export interface Asset {
   holdings?: { symbol: string; qty: number; cost: number; price?: number | null }[] | null
   invest_summary?: { deposits: number; withdrawals: number; dividends: number; commissions: number; realized: number; cash: number; first: string | null; last: string | null; count: number; flows?: { d: string; amt: number }[] } | null
   prices_on?: string | null
+  // Crypto wallets: live prices per coin (from Revolut X), written by the server; positions come from crypto_tx.
+  coins?: CoinQuote[] | null
 }
 
 export interface AssetValue {

@@ -295,6 +295,17 @@ export function StoreProvider({ repo, user, children }: { repo: Repo; user: User
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [s.ready, s.householdId])
 
+  // Crypto wallets: live prices from Revolut X every time the app opens (if older than 15 minutes).
+  useEffect(() => {
+    if (!s.ready || s.error || !s.householdId || DEMO) return
+    for (const a of s.assets) {
+      if (a.archived || a.kind !== 'crypto' || !a.coins?.length) continue
+      const last = a.coins.map(c => c.at ?? '').sort().pop()
+      if (!last || Date.now() - Date.parse(last) > 15 * 60000) store.checkAssetOnline(a.id).catch(() => {})
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [s.ready, s.householdId])
+
   // Post automatic recurring entries that fell due since the last run (idempotent: one per item per date).
   useEffect(() => {
     if (!s.ready || s.error || !s.householdId || recurringRan) return
