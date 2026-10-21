@@ -334,7 +334,7 @@ function ManualSheet({ m, year, divRate, notify, onClose, onSaved }: { m?: Manua
   const [note, setNote] = useState(m?.note ?? '')
   const [platform, setPlatform] = useState(m?.platform ?? '')
   const [err, setErr] = useState('')
-  const autoRate = kind === 'srl_div' ? divRate : kind === 'interest' ? 0.1 : 0
+  const autoRate = kind === 'srl_div' ? divRate : kind === 'interest' ? 0.1 : kind === 'rent' ? 0.08 : 0
   const a = parseMoney(amount)
   useEffect(() => { if (!touched) setWithheld(a && autoRate ? fmtNum(Math.round(a * autoRate)) : '') }, [a, autoRate, touched])
   async function save() {
@@ -359,6 +359,7 @@ function ManualSheet({ m, year, divRate, notify, onClose, onSaved }: { m?: Manua
       <MoneyField id="fi-amount" big value={amount} onChange={setAmount} suffix="lei" autoFocus={!m} />
       <label className="field">Impozit reținut deja</label>
       <MoneyField id="fi-tax" value={withheld} onChange={v => { setTouched(true); setWithheld(v) }} suffix="lei" />
+      {kind === 'rent' && <p className="hint">Chiria plătită de o firmă: firma reține 10% din 80% din chirie (adică 8% din brut), impozit final. Pui suma brută din contract; în cont intră 92% din ea.</p>}
       {kind === 'srl_div' && <p className="hint">La dividendele de la firmă, firma reține {Math.round(divRate * 100)}% și îl plătește (D100). Tu le treci în declarație doar pentru CASS.</p>}
       <label className="field">De unde (platformă / bancă / firmă)<input maxLength={40} placeholder="ex. Revolut, BT, firma mea" value={platform} onChange={e => setPlatform(e.target.value)} /></label>
       <div className="chips">{['Revolut', 'Binance', 'Tradeville', 'Banca Transilvania', 'Firma mea'].map(x => <button key={x} type="button" className="chip" aria-pressed={platform === x} onClick={() => setPlatform(x)}>{x}</button>)}</div>

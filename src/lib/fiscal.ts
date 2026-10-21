@@ -45,7 +45,7 @@ export type ManualKind = 'srl_div' | 'interest' | 'rent' | 'independent' | 'fore
 export interface ManualIncome { id?: string; kind: ManualKind; amount: number; tax_withheld: number; day: string; note: string; platform?: string }
 
 export const MANUAL_LABEL: Record<ManualKind, string> = {
-  srl_div: 'Dividende de la firma ta (SRL)', interest: 'Dobânzi bancare', rent: 'Chirii', independent: 'PFA / drepturi de autor (venit net)',
+  srl_div: 'Dividende de la firma ta (SRL)', interest: 'Dobânzi bancare', rent: 'Chirii (inclusiv mașina închiriată firmei)', independent: 'PFA / drepturi de autor (venit net)',
   foreign_gain: 'Câștig la un broker din străinătate (net pe an)', other: 'Alt venit din investiții',
 }
 
@@ -176,7 +176,7 @@ export function fiscalReport(year: number, broker: BrokerRow[], crypto: CryptoTx
     const details = list.map(m => ({ day: m.day, text: m.note || MANUAL_LABEL[kind], amount: m.amount }))
     if (kind === 'srl_div') lines.push({ key: kind, label: MANUAL_LABEL[kind], gross, withheld, toPay: 0, cassBase: gross, casBase: 0, note: `Impozit ${pct(R.divRate)}, reținut și plătit de firmă (D100). Contează la CASS.`, details })
     else if (kind === 'interest') lines.push({ key: kind, label: MANUAL_LABEL[kind], gross, withheld, toPay: 0, cassBase: gross, casBase: 0, note: 'Impozitul îl reține banca (Revolut: 10% dacă contul e pe sucursala din România, 15% dacă e încă în Lituania). Contează la CASS.', details })
-    else if (kind === 'rent') { const net = Math.round(gross * 0.8); lines.push({ key: kind, label: MANUAL_LABEL[kind], gross, withheld, toPay: Math.max(0, Math.round(net * R.rentRate) - withheld), cassBase: net, casBase: 0, note: `Venit net = 80% din chirie; impozit ${pct(R.rentRate)} din net.`, details }) }
+    else if (kind === 'rent') { const net = Math.round(gross * 0.8); lines.push({ key: kind, label: MANUAL_LABEL[kind], gross, withheld, toPay: Math.max(0, Math.round(net * R.rentRate) - withheld), cassBase: net, casBase: 0, note: withheld > 0 ? `Chirie plătită de o firmă: firma a reținut ${pct(R.rentRate)} din 80% (impozit final). Contează la CASS cu 80% din sumă.` : `Venit net = 80% din chirie; impozit ${pct(R.rentRate)} din net, plătit de tine.`, details }) }
     else if (kind === 'independent') { lines.push({ key: kind, label: MANUAL_LABEL[kind], gross, withheld, toPay: Math.max(0, Math.round(gross * 0.1) - withheld), cassBase: gross, casBase: gross, note: 'Impozit 10% din venitul net. Aici se datorează și CAS (pensie).', details }); notes.push('Ai venituri din activități independente: la ele CASS are reguli proprii (minim 6 salarii). Verifică suma cu contabilul.') }
     else if (kind === 'foreign_gain') lines.push({ key: kind, label: MANUAL_LABEL[kind], gross, withheld, toPay: Math.max(0, Math.round(Math.max(0, gross) * R.foreignRate) - withheld), cassBase: Math.max(0, gross), casBase: 0, note: `Impozit ${pct(R.foreignRate)} din câștigul net, plătit de tine. Pierderile se reportează 5 ani.`, details })
     else lines.push({ key: kind, label: MANUAL_LABEL[kind], gross, withheld, toPay: 0, cassBase: Math.max(0, gross), casBase: 0, details })
