@@ -81,7 +81,7 @@ export function StoreProvider({ repo, user, children }: { repo: Repo; user: User
         txs: txs.map(t => ({ ...t, amount: num(t.amount), orig_amount: t.orig_amount == null ? null : num(t.orig_amount) })),
         recurring: recurring.map(r => ({ ...r, amount: num(r.amount) })),
         goals: goals.map(g => ({ ...g, target: num(g.target), saved: num(g.saved) })),
-        assets: assets.map(normAsset),
+        assets: assets.filter(a => !a.archived).map(normAsset),
         assetValues: assetValues.map(v => ({ ...v, value: num(v.value) })),
         snapshots: snapshots.map(x => ({ ...x, liquid: num(x.liquid), invest: num(x.invest), goods: num(x.goods), debts: num(x.debts), net: num(x.net) })),
         members, invites,
