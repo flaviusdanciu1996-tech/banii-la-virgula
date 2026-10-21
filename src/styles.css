@@ -763,3 +763,9 @@ a.primary { text-decoration: none; }
 .pin-pad button { width: 72px; height: 72px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); font-size: 26px; font-weight: 500; display: grid; place-items: center; color: var(--ink); }
 .pin-pad button:active { background: var(--track); }
 .pin-len { display: flex; gap: 8px; }
+.sec-note { display: flex; gap: 8px; align-items: flex-start; }
+.sec-note svg { flex: none; margin-top: 2px; color: var(--accent); }
+.sec-log { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 10px; font-size: 13.5px; }
+.sec-log li { display: flex; flex-direction: column; gap: 2px; padding-left: 10px; border-left: 3px solid var(--line); }
+.sec-log li.bad { border-left-color: var(--bad); }
+.sec-log li span { color: var(--muted); }

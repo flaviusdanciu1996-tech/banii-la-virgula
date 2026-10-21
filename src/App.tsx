@@ -17,9 +17,9 @@ import { HomeScreen } from './screens/Home.tsx'
 import { ExpensesTab, HistoryScreen, CategoriesScreen } from './screens/Expenses.tsx'
 import { StatsScreen } from './screens/Stats.tsx'
 import { AvereScreen } from './screens/Avere.tsx'
-import { AccountScreen, FinanteScreen, FamilyScreen, AspectScreen, AccountSettingsScreen, AboutScreen } from './screens/Account.tsx'
+import { AccountScreen, FinanteScreen, FamilyScreen, AspectScreen, AboutScreen } from './screens/Account.tsx'
 import { AuthScreen, NewPasswordScreen } from './screens/Auth.tsx'
-import { MfaGate, AppLock, SecurityScreen } from './screens/Security.tsx'
+import { MfaGate, AppLock, SecurityScreen, AccountSettingsSecure } from './screens/Security.tsx'
 import { RecurringScreen, RecurringSheet, GoalSheet } from './screens/Plans.tsx'
 import { ReminderScreen } from './screens/Reminder.tsx'
 import { ImportScreen } from './screens/Import.tsx'
@@ -189,7 +189,7 @@ function Shell({ theme, setTheme }: { theme: Theme; setTheme: (t: Theme) => void
       case 'finante': inner = <FinanteScreen openCategory={openCategory} notify={notify} />; break
       case 'familie': inner = <FamilyScreen notify={notify} joinCode={joinCode} />; break
       case 'aspect': inner = <AspectScreen theme={theme} setTheme={setTheme} />; break
-      case 'setari': inner = <AccountSettingsScreen notify={notify} />; break
+      case 'setari': inner = <AccountSettingsSecure uid={st.user.id} email={st.user.email} myName={st.members.find(m => m.user_id === st.user.id)?.display_name || st.user.name} reload={st.reload} renameDemo={st.renameMe} notify={notify} />; break
       case 'recurente': inner = <RecurringScreen openRecurring={openRecurring} />; break
       case 'notificari': inner = <ReminderScreen notify={notify} />; break
       case 'import': inner = <ImportScreen notify={notify} />; break

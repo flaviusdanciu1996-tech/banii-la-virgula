@@ -389,6 +389,8 @@ export function SecurityScreen({ uid, email, notify }: { uid: string; email: str
             }}><Fingerprint size={18} />Activează amprenta</button>)}
       </section>
 
+      <SecurityLog />
+
       <section className="card">
         <h2><LogOut size={18} /> Alte dispozitive</h2>
         <p className="muted small">Închide contul pe orice alt telefon sau calculator unde ai intrat vreodată. Aici rămâi conectat.</p>
@@ -399,5 +401,211 @@ export function SecurityScreen({ uid, email, notify }: { uid: string; email: str
         }}>Deconectează celelalte dispozitive</button>
       </section>
     </div>
+  )
+}
+
+/* ================= Cont → Setări cont: changes need the email code (+ SMS when switched on) ================= */
+
+type What = 'nume' | 'telefon' | 'parola'
+const WHAT_LABEL: Record<What, string> = { nume: 'numele', telefon: 'numărul de telefon', parola: 'parola' }
+const device = () => {
+  const ua = navigator.userAgent
+  const os = /Android/.test(ua) ? 'Android' : /iPhone|iPad/.test(ua) ? 'iPhone' : /Windows/.test(ua) ? 'Windows' : /Mac/.test(ua) ? 'Mac' : /Linux/.test(ua) ? 'Linux' : 'alt dispozitiv'
+  const br = /SamsungBrowser/.test(ua) ? 'Samsung Internet' : /Edg\//.test(ua) ? 'Edge' : /Firefox/.test(ua) ? 'Firefox' : /Chrome/.test(ua) ? 'Chrome' : /Safari/.test(ua) ? 'Safari' : 'browser'
+  return `${os} · ${br}`
+}
+const maskEmail = (e: string) => e.replace(/^(.{2}).*(@.*)$/, '$1…$2')
+const SC_ERR: Record<string, string> = {
+  bad_code: 'Codul de pe email e greșit sau a expirat (e valabil 15 minute).',
+  bad_sms: 'Codul din SMS e greșit sau a expirat.',
+  too_many: 'Prea multe coduri greșite. Așteaptă 15 minute și cere un cod nou.',
+  aal: 'Ieși și intră din nou în cont cu codul din Authenticator.',
+  bad_request: 'Verifică ce ai scris.',
+  no_user: 'Nu ești conectat.',
+}
+/** +40 format from what people usually type (07xx…, 0040…, +40…). */
+export function normPhone(s: string): string | null {
+  let p = s.replace(/[\s.\-()]/g, '')
+  if (!p) return null
+  if (p.startsWith('00')) p = '+' + p.slice(2)
+  else if (p.startsWith('0')) p = '+40' + p.slice(1)
+  return /^\+\d{8,15}$/.test(p) ? p : 'invalid'
+}
+
+function VerifySheet({ what, email, onVerified, onClose }: { what: What; email: string; onVerified: (code: string, sms: string | null) => Promise<string | null>; onClose: () => void }) {
+  const [code, setCode] = useState('')
+  const [sms, setSms] = useState('')
+  const [smsState, setSmsState] = useState<'checking' | 'off' | 'sent' | 'error'>('checking')
+  const [sent, setSent] = useState<'sending' | 'sent' | string>('sending')
+  const [err, setErr] = useState('')
+  const [busy, setBusy] = useState(false)
+  const started = useRef(false)
+
+  const sendEmail = useCallback(async () => {
+    if (!supabase) return
+    setSent('sending')
+    const { error } = await supabase.auth.reauthenticate()
+    if (error) setSent(/rate|limit|seconds/i.test(error.message) ? 'Ai cerut deja un cod de curând. Așteaptă puțin și apasă „Retrimite”.' : error.message)
+    else { setSent('sent'); supabase.rpc('secure_asked', { p_what: what, p_device: device() }) }
+  }, [what])
+  const sendSms = useCallback(async () => {
+    if (!supabase) return
+    const { error } = await supabase.functions.invoke('sms-code', { body: {} })
+    if (!error) { setSmsState('sent'); return }
+    const status = (error as any)?.context?.status
+    setSmsState(status === 503 || status === 400 ? 'off' : 'error')
+  }, [])
+
+  useEffect(() => {
+    if (started.current) return
+    started.current = true
+    sendEmail(); sendSms()
+  }, [sendEmail, sendSms])
+
+  async function go(e: React.FormEvent) {
+    e.preventDefault()
+    if (code.length < 6) return setErr('Scrie codul primit pe email.')
+    if (smsState === 'sent' && sms.length !== 6) return setErr('Scrie și codul din SMS.')
+    setBusy(true); setErr('')
+    try {
+      const fail = await onVerified(code, smsState === 'sent' ? sms : null)
+      if (fail) { setErr(fail); setCode('') }
+    } finally { setBusy(false) }
+  }
+
+  return (
+    <div className="scrim-wrap">
+      <div className="scrim" onClick={onClose} />
+      <form className="sheet" role="dialog" aria-modal="true" aria-label="Confirmă schimbarea" onSubmit={go} noValidate>
+        <div className="sheet-in">
+          <div className="sheet-head"><h2>Confirmă că ești tu</h2><button type="button" className="ghost-btn" onClick={onClose}>Renunță</button></div>
+          <p className="muted">Ca să schimbi {WHAT_LABEL[what]}, scrie codul trimis pe <b>{maskEmail(email)}</b>{smsState === 'sent' ? ' și pe cel din SMS' : ''}.</p>
+          {sent === 'sending' ? <p className="muted small">Trimit codul pe email…</p>
+            : sent === 'sent' ? <p className="ok small">Cod trimis. Verifică și folderul Spam.</p>
+            : <p className="err small">{sent}</p>}
+          <label className="field">Codul de pe email
+            <input className="code-input" inputMode="numeric" autoComplete="one-time-code" maxLength={10} value={code} onChange={e => setCode(e.target.value.replace(/\D/g, '').slice(0, 10))} />
+          </label>
+          {smsState === 'sent' && <label className="field">Codul din SMS
+            <input className="code-input" inputMode="numeric" maxLength={6} value={sms} onChange={e => setSms(e.target.value.replace(/\D/g, '').slice(0, 6))} />
+          </label>}
+          {smsState === 'error' && <p className="err small">SMS-ul nu a plecat. Mai încearcă peste un minut.</p>}
+          {err && <p className="err">{err}</p>}
+          <button type="submit" className="primary" disabled={busy}>{busy ? 'Verific…' : 'Confirmă'}</button>
+          <button type="button" className="inline-link" onClick={sendEmail}>Retrimite codul pe email</button>
+        </div>
+      </form>
+    </div>
+  )
+}
+
+export function AccountSettingsSecure({ uid, email, myName, reload, renameDemo, notify }: { uid: string; email: string; myName: string; reload: () => Promise<void>; renameDemo: (n: string) => Promise<void>; notify: (m: string) => void }) {
+  const [name, setName] = useState(myName)
+  const [phone, setPhone] = useState('')
+  const [phoneSaved, setPhoneSaved] = useState<{ phone: string | null; verified: boolean } | null>(null)
+  const [pw, setPw] = useState('')
+  const [pw2, setPw2] = useState('')
+  const [err, setErr] = useState('')
+  const [ask, setAsk] = useState<What | null>(null)
+
+  useEffect(() => {
+    if (!supabase || DEMO) return
+    supabase.from('account_security').select('phone, phone_verified').eq('user_id', uid).maybeSingle().then(({ data }) => {
+      setPhoneSaved({ phone: data?.phone ?? null, verified: !!data?.phone_verified })
+      setPhone(data?.phone ?? '')
+    })
+  }, [uid])
+
+  function start(what: What) {
+    setErr('')
+    if (what === 'nume' && !name.trim()) return setErr('Scrie un nume.')
+    if (what === 'telefon' && normPhone(phone) === 'invalid') return setErr('Numărul nu pare corect. Exemplu: 0712 345 678 sau +40712345678.')
+    if (what === 'parola') {
+      if (pw.length < 10) return setErr('Parola nouă trebuie să aibă cel puțin 10 caractere.')
+      if (pw !== pw2) return setErr('Parolele nu se potrivesc.')
+    }
+    if (DEMO || !supabase) {
+      if (what === 'nume') renameDemo(name.trim()).then(() => notify('Nume salvat'))
+      else notify('În previzualizare nu se schimbă nimic.')
+      return
+    }
+    setAsk(what)
+  }
+
+  async function verified(what: What, code: string, sms: string | null): Promise<string | null> {
+    const base = { p_code: code, p_sms: sms, p_device: device() }
+    if (what === 'nume') {
+      const { data, error } = await supabase!.rpc('secure_change', { ...base, p_what: 'nume', p_name: name.trim() })
+      if (error) return error.message
+      if (data !== 'ok') return SC_ERR[data] || data
+      await reload(); setAsk(null); notify('Nume schimbat'); return null
+    }
+    if (what === 'telefon') {
+      const p = normPhone(phone)
+      const { data, error } = await supabase!.rpc('secure_change', { ...base, p_what: 'telefon', p_phone: p })
+      if (error) return error.message
+      if (data !== 'ok') return SC_ERR[data] || data
+      setPhoneSaved({ phone: p, verified: false }); setAsk(null); notify(p ? 'Număr salvat' : 'Număr șters'); return null
+    }
+    const { data, error } = await supabase!.rpc('secure_change', { ...base, p_what: 'parola' })
+    if (error) return error.message
+    if (data !== 'ok') return SC_ERR[data] || data
+    const { error: e2 } = await supabase!.auth.updateUser({ password: pw, nonce: code })
+    if (e2) return /weak|pwned|leaked/i.test(e2.message) ? 'Parola e prea slabă sau a apărut în scurgeri de date. Alege alta.' : e2.message
+    await supabase!.rpc('secure_done', { p_what: 'parola', p_device: device() })
+    setPw(''); setPw2(''); setAsk(null); notify('Parola a fost schimbată'); return null
+  }
+
+  return (
+    <div className="screen">
+      <p className="note sec-note"><ShieldCheck size={16} /> Orice schimbare de aici cere un cod trimis pe email{phoneSaved?.verified ? ' și unul prin SMS' : ''}. Încercările greșite îți vin ca notificare pe telefon.</p>
+      <section className="card form">
+        <h2>Nume</h2>
+        <label className="field">Cum să-ți spunem<input id="acc-name" value={name} maxLength={40} onChange={e => setName(e.target.value)} /></label>
+        <button type="button" className="primary" onClick={() => start('nume')}>Schimbă numele</button>
+      </section>
+      <section className="card form">
+        <h2>Număr de telefon</h2>
+        <label className="field">Telefon<input id="acc-phone" type="tel" inputMode="tel" autoComplete="tel" placeholder="07xx xxx xxx" value={phone} onChange={e => setPhone(e.target.value)} /></label>
+        <p className="muted small">{phoneSaved?.phone ? (phoneSaved.verified ? 'Confirmat prin SMS.' : 'Salvat. Codul prin SMS se activează când pornim SMS-urile (pasul cu plată).') : 'Îl folosim pentru codul prin SMS, când îl pornim.'}</p>
+        <button type="button" className="primary" onClick={() => start('telefon')}>Salvează numărul</button>
+      </section>
+      <section className="card form">
+        <h2>Email</h2>
+        <p className="num">{email}</p>
+        <p className="muted small">Emailul e cheia contului: aici vin codurile și linkul de parolă nouă. Ține-l protejat cu verificare în doi pași la Yahoo.</p>
+      </section>
+      <section className="card form">
+        <h2>Parolă nouă</h2>
+        <label className="field">Parolă nouă<input id="acc-pw" type="password" autoComplete="new-password" value={pw} onChange={e => setPw(e.target.value)} /></label>
+        <label className="field">Încă o dată<input id="acc-pw2" type="password" autoComplete="new-password" value={pw2} onChange={e => setPw2(e.target.value)} /></label>
+        <button type="button" className="primary" onClick={() => start('parola')}>Schimbă parola</button>
+      </section>
+      {err && <p className="err">{err}</p>}
+      {ask && <VerifySheet what={ask} email={email} onClose={() => setAsk(null)} onVerified={(c, s) => verified(ask, c, s)} />}
+    </div>
+  )
+}
+
+/* ================= Jurnal de securitate ================= */
+
+const EVENT_LABEL: Record<string, string> = { cod_gresit: 'Încercare eșuată', schimbare: 'Schimbare', cod_cerut: 'Cod cerut' }
+export function SecurityLog() {
+  const [rows, setRows] = useState<{ id: number; at: string; event: string; detail: string; device: string | null }[] | null>(null)
+  useEffect(() => {
+    if (!supabase || DEMO) { setRows([]); return }
+    supabase.from('security_log').select('id, at, event, detail, device').order('id', { ascending: false }).limit(30).then(({ data }) => setRows((data as any) ?? []))
+  }, [])
+  return (
+    <section className="card">
+      <h2>Jurnal de securitate</h2>
+      {rows === null ? <p className="muted small">Se încarcă…</p>
+        : !rows.length ? <p className="muted small">Nicio încercare de schimbare până acum.</p>
+        : <ul className="sec-log">{rows.map(r => (
+            <li key={r.id} className={r.event === 'cod_gresit' ? 'bad' : ''}>
+              <b>{EVENT_LABEL[r.event] || r.event}</b> · {new Date(r.at).toLocaleString('ro-RO', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+              <span>{r.detail}{r.device ? ` · ${r.device}` : ''}</span>
+            </li>))}</ul>}
+    </section>
   )
 }

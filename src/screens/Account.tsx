@@ -237,44 +237,6 @@ export function AspectScreen({ theme, setTheme }: { theme: 'system' | 'light' | 
 
 /* ---------------- Setări cont ---------------- */
 
-export function AccountSettingsScreen({ notify }: { notify: (m: string) => void }) {
-  const st = useStore()
-  const me = st.members.find(m => m.user_id === st.user.id)
-  const [name, setName] = useState(me?.display_name || '')
-  const [pw, setPw] = useState('')
-  const [err, setErr] = useState('')
-  async function saveName() {
-    if (!name.trim()) return setErr('Scrie un nume.')
-    try { await st.renameMe(name.trim()); if (supabase) await supabase.auth.updateUser({ data: { name: name.trim() } }); notify('Nume salvat'); setErr('') } catch (e: any) { setErr(e?.message || 'Nu s-a putut salva.') }
-  }
-  async function savePw() {
-    if (pw.length < 8) return setErr('Parola trebuie să aibă cel puțin 8 caractere.')
-    if (!supabase) return setErr(DEMO ? 'În modul demo nu se poate.' : 'Nu ești conectat.')
-    const { error } = await supabase.auth.updateUser({ password: pw })
-    if (error) return setErr(error.message)
-    setPw(''); setErr(''); notify('Parola a fost schimbată')
-  }
-  return (
-    <div className="screen">
-      <section className="card form">
-        <h2>Nume</h2>
-        <label className="field">Cum să-ți spunem<input id="acc-name" value={name} maxLength={40} onChange={e => setName(e.target.value)} /></label>
-        <button type="button" className="primary" onClick={saveName}>Salvează numele</button>
-      </section>
-      <section className="card form">
-        <h2>Email</h2>
-        <p className="num">{st.user.email}</p>
-      </section>
-      <section className="card form">
-        <h2>Parolă nouă</h2>
-        <label className="field">Parolă nouă<input id="acc-pw" type="password" autoComplete="new-password" value={pw} onChange={e => setPw(e.target.value)} /></label>
-        <button type="button" className="primary" onClick={savePw}>Schimbă parola</button>
-      </section>
-      {err && <p className="err">{err}</p>}
-    </div>
-  )
-}
-
 export function AboutScreen() {
   return (
     <div className="screen">
