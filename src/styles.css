@@ -830,3 +830,41 @@ a.primary { text-decoration: none; }
 .yh-body p { margin: 0; line-height: 1.45; }
 .small-coins .coin-ic { font-size: 12px; font-weight: 700; color: var(--muted); }
 .ok-note { color: var(--good); font-weight: 600; }
+
+/* Crypto radar */
+.radar-head { gap: 6px; }
+.radar-top { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.radar-top > div { display: flex; flex-direction: column; gap: 2px; }
+.radar-search { flex-direction: row; align-items: center; gap: 8px; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 0 12px; }
+.radar-search input { border: 0; background: none; flex: 1; padding: 12px 0; }
+.radar-zones { flex-wrap: wrap; }
+.chip.z-buy[aria-pressed="true"], .zone-badge.z-buy { background: color-mix(in srgb, var(--good) 22%, transparent); color: var(--good); border-color: var(--good); }
+.chip.z-wait[aria-pressed="true"], .zone-badge.z-wait { background: color-mix(in srgb, var(--warn) 22%, transparent); color: var(--warn); border-color: var(--warn); }
+.chip.z-watch[aria-pressed="true"], .zone-badge.z-watch { background: var(--track); color: var(--ink); }
+.chip.z-avoid[aria-pressed="true"], .zone-badge.z-avoid { background: color-mix(in srgb, var(--bad) 20%, transparent); color: var(--bad); border-color: var(--bad); }
+.zone-badge { font-size: 11.5px; font-weight: 700; padding: 3px 8px; border-radius: 999px; border: 1px solid transparent; white-space: nowrap; }
+.radar-row .row-main { gap: 3px; }
+.radar-row .row-side { align-items: flex-end; gap: 4px; }
+.mine-tag { margin-left: 6px; font-size: 10.5px; padding: 1px 6px; border-radius: 6px; background: var(--track); color: var(--muted); font-weight: 600; }
+.tf-strip { display: flex; gap: 3px; margin-top: 2px; }
+.tf { width: 16px; height: 16px; border-radius: 4px; display: grid; place-items: center; font-style: normal; background: var(--track); color: var(--muted); }
+.tf.up { background: color-mix(in srgb, var(--good) 25%, transparent); color: var(--good); }
+.tf.down { background: color-mix(in srgb, var(--bad) 22%, transparent); color: var(--bad); }
+.brk h2 { display: flex; align-items: center; gap: 6px; margin: 0; }
+.brk-list { display: flex; flex-wrap: wrap; gap: 6px; }
+.verdict { display: flex; flex-direction: column; gap: 4px; padding: 12px 14px; border-radius: 14px; border: 1px solid var(--line); }
+.verdict b { font-size: 17px; }
+.verdict.z-buy { border-color: var(--good); background: color-mix(in srgb, var(--good) 12%, transparent); }
+.verdict.z-wait { border-color: var(--warn); background: color-mix(in srgb, var(--warn) 10%, transparent); }
+.verdict.z-avoid { border-color: var(--bad); background: color-mix(in srgb, var(--bad) 10%, transparent); }
+.tf-group { display: flex; flex-direction: column; gap: 6px; }
+.tf-row { display: grid; grid-template-columns: repeat(auto-fit, minmax(92px, 1fr)); gap: 6px; }
+.tf-cell { border: 1px solid var(--line); border-radius: 10px; padding: 8px; display: flex; flex-direction: column; gap: 2px; font-size: 12px; }
+.tf-cell b { display: inline-flex; align-items: center; gap: 4px; font-size: 13px; }
+.tf-cell span { color: var(--muted); }
+.tf-cell.up b { color: var(--good); } .tf-cell.down b { color: var(--bad); }
+.rules { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.rules li { display: flex; gap: 8px; align-items: flex-start; font-size: 13.5px; }
+.rules li > span { display: flex; flex-direction: column; gap: 1px; }
+.rules li.ok svg { color: var(--good); flex: none; margin-top: 2px; } .rules li.no svg { color: var(--bad); flex: none; margin-top: 2px; }
+.steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 8px; font-size: 14px; line-height: 1.45; }

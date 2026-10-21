@@ -58,7 +58,7 @@ function Spark({ values, w = 72, h = 26, stroke }: { values?: number[]; w?: numb
 const num = (v: unknown) => (v == null ? null : Number(v))
 const normTx = (r: any): CryptoTx => ({ ...r, qty: Number(r.qty), price: num(r.price), fee: Number(r.fee ?? 0), fx: num(r.fx) })
 
-export function CryptoScreen({ assetId, notify, openAsset }: { assetId: string; notify: (m: string) => void; openAsset: (a: Asset) => void }) {
+export function CryptoScreen({ assetId, notify, openAsset, openRadar }: { assetId: string; notify: (m: string) => void; openAsset: (a: Asset) => void; openRadar?: () => void }) {
   const st = useStore()
   const asset = st.assets.find(a => a.id === assetId)
   const [txs, setTxs] = useState<CryptoTx[] | null>(null)
@@ -120,6 +120,8 @@ export function CryptoScreen({ assetId, notify, openAsset }: { assetId: string; 
           <button type="button" className="icon-btn" aria-label="Nume și platformă" onClick={() => openAsset(asset)}><Pencil size={15} /></button>
         </div>
       </section>
+
+      {src === 'Binance' && openRadar && <button type="button" className="card nw-line" onClick={openRadar}><span className="muted">📡 Radar crypto</span><span className="small">Ce e de cumpărat acum, cu stop-loss și țintă</span></button>}
 
       {txs === null ? <p className="muted">Se încarcă…</p> : held.length === 0 ? (
         <EmptyArt icon="bitcoin" title="Adaugă prima monedă" text={`Scrie ce ai cumpărat: moneda, câte bucăți și cât ai plătit. Prețul se ia singur de la ${src}.${asset.value ? ` Până atunci rămâne valoarea scrisă de mână (${lei(asset.value / 100)}).` : ''}`}>

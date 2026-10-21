@@ -6,6 +6,7 @@ import { BrokerImportScreen } from './screens/BrokerImport.tsx'
 import { DreamsScreen } from './screens/Dreams.tsx'
 import { CryptoScreen } from './screens/Crypto.tsx'
 import { ReportsScreen } from './screens/Reports.tsx'
+import { CryptoRadarScreen } from './screens/CryptoRadar.tsx'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Home, PieChart, ReceiptText, Gem, User, ChevronLeft, Download, X, RefreshCw } from 'lucide-react'
 import { supabase, supabaseRepo, demoRepo, DEMO, type Repo } from './db.ts'
@@ -33,7 +34,7 @@ type Theme = 'system' | 'light' | 'dark'
 
 const SUB_TITLES: Record<string, string> = {
   history: 'Istoric', categories: 'Pe categorii', finante: 'Finanțe', familie: 'Familia mea',
-  aspect: 'Aspect', setari: 'Setări cont', despre: 'Despre aplicație', recurente: 'Plăți recurente', import: 'Import extras BT', notificari: 'Notificări și citate', visuri: 'Visurile mele', 'import-broker': 'Import Tradeville', radar: 'Radar BVB', jurnal: 'Jurnal de investiții', plan: 'Planul lunii', asistent: 'Asistent investiții', crypto: 'Crypto', rapoarte: 'Rapoarte și taxe', securitate: 'Securitate',
+  aspect: 'Aspect', setari: 'Setări cont', despre: 'Despre aplicație', recurente: 'Plăți recurente', import: 'Import extras BT', notificari: 'Notificări și citate', visuri: 'Visurile mele', 'import-broker': 'Import Tradeville', radar: 'Radar BVB', jurnal: 'Jurnal de investiții', plan: 'Planul lunii', asistent: 'Asistent investiții', crypto: 'Crypto', 'radar-crypto': 'Radar crypto', rapoarte: 'Rapoarte și taxe', securitate: 'Securitate',
 }
 
 function readTheme(): Theme {
@@ -198,7 +199,8 @@ function Shell({ theme, setTheme }: { theme: Theme; setTheme: (t: Theme) => void
       case 'radar': inner = <RadarScreen nav={nav} notify={notify} />; break
       case 'asistent': inner = <AssistantScreen initial={sub.params?.q} />; break
       case 'import-broker': inner = <BrokerImportScreen nav={nav} notify={notify} />; break
-      case 'crypto': inner = <CryptoScreen key={sub.params?.id} assetId={sub.params?.id ?? ''} notify={notify} openAsset={a => openAsset(a)} />; break
+      case 'radar-crypto': inner = <CryptoRadarScreen notify={notify} />; break
+      case 'crypto': inner = <CryptoScreen key={sub.params?.id} assetId={sub.params?.id ?? ''} notify={notify} openAsset={a => openAsset(a)} openRadar={() => nav('radar-crypto')} />; break
       case 'rapoarte': inner = <ReportsScreen notify={notify} initial={sub.params?.tab} />; break
       case 'securitate': inner = <SecurityScreen uid={st.user.id} email={st.user.email} notify={notify} />; break
       case 'visuri': inner = <DreamsScreen openGoal={openGoal} notify={notify} celebrate={celebrate} />; break

@@ -517,3 +517,13 @@ test('BNR rate of the transaction day (last published before weekends)', () => {
   const [x] = withBnr([{ coin: 'DOT', kind: 'buy', qty: 1, price: 7, currency: 'EUR', fee: 1, fx: 5, at: '2024-01-06T23:30:00Z', note: '' }], t) // 01:30 on the 7th in Bucharest
   assert.equal(x.fx, 4.97)
 })
+
+import { analyze, type Candle } from './cryptoRadar.ts'
+test('crypto radar: steady uptrend is not "avoid", downtrend is', () => {
+  const mk = (f: (i: number) => number): Candle[] => Array.from({ length: 400 }, (_, i) => { const c = f(i); return { t: i, o: c * 0.995, h: c * 1.01, l: c * 0.99, c, v: 1 } })
+  const up = analyze('UP', mk(i => 100 + i * 0.5 + Math.sin(i / 3) * 2))
+  assert.notEqual(up.zone, 'avoid')
+  assert.ok(up.stop < up.entryLo && up.target > up.entryHi)
+  const dn = analyze('DN', mk(i => 400 - i * 0.6 + Math.sin(i / 3) * 2))
+  assert.equal(dn.zone, 'avoid')
+})
