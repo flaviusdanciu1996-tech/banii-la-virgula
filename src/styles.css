@@ -739,3 +739,27 @@ textarea { width: 100%; background: var(--surface); color: var(--ink); border: 1
 .inc-month { margin-top: 10px; }
 .inc-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; padding: 6px 0; border-bottom: 1px solid var(--line); }
 .rep-line em { font-style: normal; }
+
+/* ---- Security: 2FA + app lock ---- */
+.sec-ic { width: 58px; height: 58px; border-radius: 18px; display: grid; place-items: center; background: color-mix(in srgb, var(--accent) 16%, transparent); color: var(--accent); align-self: center; }
+.auth h1, .lock-in h1 { text-align: center; }
+.sec-steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; }
+.sec-key { display: flex; flex-direction: column; gap: 8px; align-items: stretch; }
+.sec-key code { font-family: 'IBM Plex Mono', monospace; font-size: 15px; letter-spacing: .04em; background: var(--track); padding: 10px 12px; border-radius: 10px; word-break: break-all; text-align: center; user-select: all; }
+.sec-qr summary { cursor: pointer; color: var(--muted); font-size: 13.5px; }
+.sec-qr img { display: block; margin: 10px auto 0; background: #fff; padding: 8px; border-radius: 10px; }
+a.primary { text-decoration: none; }
+.code-input { font-family: 'IBM Plex Mono', monospace; font-size: 26px !important; letter-spacing: .4em; text-align: center; }
+.lock-screen { position: fixed; inset: 0; z-index: 100; background: var(--bg); display: grid; place-items: center; padding: max(24px, env(safe-area-inset-top, 0px)) 16px max(24px, env(safe-area-inset-bottom, 0px)); overflow-y: auto; }
+.lock-in { width: 100%; max-width: 340px; display: flex; flex-direction: column; align-items: center; gap: 14px; text-align: center; }
+.lock-in img { border-radius: 14px; }
+.lock-in h1 { margin: 0; font-size: 20px; }
+.lock-in .ghost-btn, .lock-in .primary { width: 100%; flex: none; }
+.pin { display: flex; flex-direction: column; align-items: center; gap: 22px; width: 100%; }
+.pin-dots { display: flex; gap: 14px; height: 16px; }
+.pin-dots span { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--muted); transition: background .12s, border-color .12s; }
+.pin-dots span.on { background: var(--accent); border-color: var(--accent); }
+.pin-pad { display: grid; grid-template-columns: repeat(3, 72px); gap: 14px 22px; justify-content: center; }
+.pin-pad button { width: 72px; height: 72px; border-radius: 50%; border: 1px solid var(--line); background: var(--surface); font-size: 26px; font-weight: 500; display: grid; place-items: center; color: var(--ink); }
+.pin-pad button:active { background: var(--track); }
+.pin-len { display: flex; gap: 8px; }

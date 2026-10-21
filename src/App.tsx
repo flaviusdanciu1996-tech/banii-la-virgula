@@ -19,6 +19,7 @@ import { StatsScreen } from './screens/Stats.tsx'
 import { AvereScreen } from './screens/Avere.tsx'
 import { AccountScreen, FinanteScreen, FamilyScreen, AspectScreen, AccountSettingsScreen, AboutScreen } from './screens/Account.tsx'
 import { AuthScreen, NewPasswordScreen } from './screens/Auth.tsx'
+import { MfaGate, AppLock, SecurityScreen } from './screens/Security.tsx'
 import { RecurringScreen, RecurringSheet, GoalSheet } from './screens/Plans.tsx'
 import { ReminderScreen } from './screens/Reminder.tsx'
 import { ImportScreen } from './screens/Import.tsx'
@@ -32,7 +33,7 @@ type Theme = 'system' | 'light' | 'dark'
 
 const SUB_TITLES: Record<string, string> = {
   history: 'Istoric', categories: 'Pe categorii', finante: 'Finanțe', familie: 'Familia mea',
-  aspect: 'Aspect', setari: 'Setări cont', despre: 'Despre aplicație', recurente: 'Plăți recurente', import: 'Import extras BT', notificari: 'Notificări și citate', visuri: 'Visurile mele', 'import-broker': 'Import Tradeville', radar: 'Radar BVB', jurnal: 'Jurnal de investiții', plan: 'Planul lunii', asistent: 'Asistent investiții', crypto: 'Crypto', rapoarte: 'Rapoarte și taxe',
+  aspect: 'Aspect', setari: 'Setări cont', despre: 'Despre aplicație', recurente: 'Plăți recurente', import: 'Import extras BT', notificari: 'Notificări și citate', visuri: 'Visurile mele', 'import-broker': 'Import Tradeville', radar: 'Radar BVB', jurnal: 'Jurnal de investiții', plan: 'Planul lunii', asistent: 'Asistent investiții', crypto: 'Crypto', rapoarte: 'Rapoarte și taxe', securitate: 'Securitate',
 }
 
 function readTheme(): Theme {
@@ -66,13 +67,19 @@ export default function App() {
 
   if (!repo) return <div className="center-screen"><div className="card form"><h1>Lipsește configurarea</h1><p>Aplicația nu are încă adresa bazei de date. Deschide <b>?demo</b> pentru o previzualizare.</p></div></div>
   if (checking) return <div className="center-screen"><div className="spinner" aria-label="Se încarcă" /></div>
-  if (recovery) return <NewPasswordScreen onDone={() => setRecovery(false)} />
   if (!user) return <AuthScreen />
 
+  // Password → 6-digit authenticator code → PIN/fingerprint → data.
   return (
-    <StoreProvider key={user.id} repo={repo} user={user}>
-      <Shell theme={theme} setTheme={setThemeState} />
-    </StoreProvider>
+    <MfaGate key={user.id}>
+      {recovery ? <NewPasswordScreen onDone={() => setRecovery(false)} /> : (
+        <AppLock uid={user.id} email={user.email}>
+          <StoreProvider key={user.id} repo={repo} user={user}>
+            <Shell theme={theme} setTheme={setThemeState} />
+          </StoreProvider>
+        </AppLock>
+      )}
+    </MfaGate>
   )
 }
 
@@ -193,6 +200,7 @@ function Shell({ theme, setTheme }: { theme: Theme; setTheme: (t: Theme) => void
       case 'import-broker': inner = <BrokerImportScreen nav={nav} notify={notify} />; break
       case 'crypto': inner = <CryptoScreen key={sub.params?.id} assetId={sub.params?.id ?? ''} notify={notify} openAsset={a => openAsset(a)} />; break
       case 'rapoarte': inner = <ReportsScreen notify={notify} initial={sub.params?.tab} />; break
+      case 'securitate': inner = <SecurityScreen uid={st.user.id} email={st.user.email} notify={notify} />; break
       case 'visuri': inner = <DreamsScreen openGoal={openGoal} notify={notify} celebrate={celebrate} />; break
       default: inner = <AboutScreen />
     }

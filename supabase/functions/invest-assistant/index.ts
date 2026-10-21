@@ -1,5 +1,5 @@
 // Investment assistant: Gemini explains the user's own numbers (portfolio, BVB Radar, rules, FI goal) that the app sends.
-// It is told to use only those numbers. Signed-in users only (verify_jwt). GEMINI_API_KEY stays on the server.
+// It is told to use only those numbers. Signed-in users only (checked against Supabase Auth, not just the public key). GEMINI_API_KEY stays on the server.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 
 const cors = {
@@ -36,8 +36,21 @@ Reguli:
 - Scrie în română, scurt și clar pentru telefon: titluri mici, liste scurte, cifre concrete. Maxim ~250 de cuvinte dacă nu cere detalii.
 - Încheie cu o secțiune „Ce aș urmări” (2–3 puncte) și o singură linie: „Analiză pe datele din aplicație, nu recomandare. Decizia e a ta.”`;
 
+/** Only a real signed-in user (the public anon key alone is not enough). */
+async function signedIn(req: Request): Promise<boolean> {
+  const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer /, "");
+  if (!token) return false;
+  try {
+    const r = await fetch(`${Deno.env.get("SUPABASE_URL")}/auth/v1/user`, { headers: { Authorization: `Bearer ${token}`, apikey: Deno.env.get("SUPABASE_ANON_KEY") ?? "" } });
+    if (!r.ok) return false;
+    const u = await r.json();
+    return typeof u?.id === "string" && !!u.id;
+  } catch { return false; }
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
+  if (!(await signedIn(req))) return json({ error: "unauthorized" }, 401);
   if (!KEY) return json({ error: "missing_key" }, 503);
   let body: { messages?: { role: string; text: string }[]; context?: unknown };
   try { body = await req.json(); } catch { return json({ error: "bad_request" }, 400); }
