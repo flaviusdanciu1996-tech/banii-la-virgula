@@ -8,7 +8,7 @@ import { kindOf } from '../lib/types.ts'
 import { monthsToTarget, safeMonthly, potForSpending, addMonthsLabel } from '../lib/fi.ts'
 
 const RETURNS = [5, 7, 10]
-const STEPS = [250, 500, 1000, 1500, 2000, 3000]
+const STEPS = [10, 50, 100, 200, 500]
 
 /** Avere: the financial-independence goal — target, what you have, what's left, and when you get there. */
 export function FiCard() {
@@ -35,7 +35,7 @@ export function FiCard() {
 
   const [monthly, setMonthly] = useState<number | null>(null)
   const [ret, setRet] = useState<number | null>(null)
-  const m = monthly ?? s.fi_monthly ?? 100000
+  const m = monthly ?? s.fi_monthly ?? 10000
   const r = ret ?? s.fi_return ?? 7
 
   if (!s.fi_target) {
