@@ -199,7 +199,7 @@ export function fiscalReport(year: number, broker: BrokerRow[], crypto: CryptoTx
   const cas = stepFor(casBase, R.casSteps, R.minWage, R.casRate)
   const taxToPay = lines.reduce((a, l) => a + l.toPay, 0)
   const withheld = lines.reduce((a, l) => a + l.withheld, 0)
-  if (R.estimated) notes.push(`Regulile pentru ${year} nu sunt încă finale: am folosit ce se știe acum (salariul minim ${Math.round(R.minWage / 100)} lei).`)
+  if (R.estimated) notes.push(`Regulile pentru ${year} nu sunt încă finale: am folosit ce se știe acum (salariul minim ${Math.round(R.minWage / 100)} lei; contează cel în vigoare la 1 ianuarie ${year}, deci se schimbă dacă Guvernul îl mărește din ianuarie).`)
   const pm = new Map<string, { name: string; income: number; withheld: number; toPay: number }>()
   const addP = (name: string, income: number, withheld: number, toPay: number) => { const x = pm.get(name) ?? { name, income: 0, withheld: 0, toPay: 0 }; x.income += income; x.withheld += withheld; x.toPay += toPay; pm.set(name, x) }
   for (const l of lines) {

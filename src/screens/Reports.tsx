@@ -242,7 +242,7 @@ function FiscalTab({ data, reload, notify }: { data: ReturnType<typeof useInvest
 
       <section className="card">
         <h2><HeartPulse size={18} /> CASS (sănătate) · {fmt(r.cassDue)}</h2>
-        <p className="hint">Se adună veniturile din investiții și dividende: <b className="num">{fmt(r.cassBase)}</b>. CASS e 10% dintr-o sumă fixă, după treaptă (salariul minim {fmtNum(mw).replace(',00', '')} lei).</p>
+        <p className="hint">Se adună veniturile din investiții și dividende: <b className="num">{fmt(r.cassBase)}</b>. CASS e 10% dintr-o sumă fixă, după treaptă (salariul minim de la 1 ianuarie {y}: {fmtNum(mw).replace(',00', '')} lei; creșterile din timpul anului nu schimbă pragurile, art. 135¹ alin. (3) Cod fiscal).</p>
         <div className="cass-scale">
           <div className="cass-track"><i style={{ width: pos(r.cassBase) }} /></div>
           {R.cassSteps.map(m => <span key={m} className={'cass-mark' + (r.cassBase >= m * mw ? ' on' : '')} style={{ left: pos(m * mw) }}><em>{m}</em></span>)}
