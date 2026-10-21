@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useStore } from './store.tsx'
-import { Sheet, Seg, MoneyField, ConfirmButton } from './ui.tsx'
+import { Sheet, Seg, MoneyField, ConfirmButton, CatIcon } from './ui.tsx'
 import { Icon } from './icons.tsx'
 import { parseMoney, fmt, fmtNum, CUR_LABEL, type Currency } from './lib/money.ts'
 import { Repeat, Plus, Trash2, ChevronDown } from 'lucide-react'
@@ -318,7 +318,7 @@ export function AssetSheet({ asset, section = 'liquid', quick, onClose, notify }
         <div className="chips">{PLATFORMS.map(p => <button key={p} type="button" className="chip" aria-pressed={p === platform} onClick={() => setPlatform(p)}>{p}</button>)}</div>
       </>}
       {!coinWallet && <Seg label="Moneda" value={currency} onChange={setCurrency} options={[{ id: 'RON', label: 'Lei' }, { id: 'EUR', label: 'Euro' }, { id: 'USD', label: 'Dolari' }]} />}
-      {coinWallet ? <p className="hint">Valoarea se calculează singură din monedele tale și prețurile Revolut X. Le modifici din ecranul portofelului.</p> : asset?.holdings?.length ? <InvestPanel asset={st.assets.find(x => x.id === asset.id) ?? asset} notify={notify} /> : parts.length ? <PartsEditor parts={parts} setParts={setParts} currency={currency} /> : <>
+      {coinWallet ? <p className="hint">Valoarea se calculează singură din monedele tale și prețurile Revolut X. Le modifici din ecranul portofelului.</p> : asset?.holdings?.length ? <InvestPanel asset={st.assets.find(x => x.id === asset.id) ?? asset} notify={notify} /> : parts.length ? <PartsEditor parts={parts} setParts={setParts} currency={currency} icon={kindOf(kind).icon} color={SECTIONS.find(x => x.id === sec)!.color} /> : <>
       <label className="field">{sec === 'debt' ? 'Cât mai ai de dat' : 'Valoare actuală'}</label>
       <MoneyField id="asset-value" big value={value} onChange={setValue} suffix={CUR_LABEL[currency]} />
       {sec === 'goods' && !depKind && <p className="hint">Pune cât ai lua pe el dacă l-ai vinde azi (caută anunțuri cu ceva asemănător). Actualizează-l o dată la câteva luni.</p>}
@@ -357,7 +357,7 @@ function parseParts(ps: PartDraft[]): AssetPart[] | string {
   return out
 }
 
-function PartsEditor({ parts, setParts, currency }: { parts: PartDraft[]; setParts: (f: (p: PartDraft[]) => PartDraft[]) => void; currency: Currency }) {
+function PartsEditor({ parts, setParts, currency, icon, color }: { parts: PartDraft[]; setParts: (f: (p: PartDraft[]) => PartDraft[]) => void; currency: Currency; icon: string; color: string }) {
   const [open, setOpen] = useState<number | null>(() => (parts.some(p => !p.name) ? parts.findIndex(p => !p.name) : null))
   const set = (i: number, patch: Partial<PartDraft>) => setParts(ps => ps.map((p, j) => (j === i ? { ...p, ...patch } : p)))
   const vals = parts.map(p => ({ v: parseMoney(p.value) ?? 0, inv: parseMoney(p.invested) ?? 0 }))
@@ -369,8 +369,9 @@ function PartsEditor({ parts, setParts, currency }: { parts: PartDraft[]; setPar
       {parts.map((p, i) => (
         <div key={i} className={'part' + (open === i ? ' open' : '')}>
           <button type="button" className="part-head" onClick={() => setOpen(open === i ? null : i)} aria-expanded={open === i}>
-            <span className="row-main"><b>{p.name || 'Rând nou'}</b>{p.note && <span className="muted small">{p.note}</span>}</span>
-            <span className="row-side"><b className="num">{fmtNum(vals[i].v)} {CUR_LABEL[currency]}</b>{vals[i].inv ? <span className="muted small num">investit {fmtNum(vals[i].inv)}</span> : null}<P p={pct(vals[i].v, vals[i].inv)} /></span>
+            <CatIcon icon={icon} color={color} />
+            <span className="row-main"><b>{p.name || 'Rând nou'}</b>{p.note && <span className="muted small">{p.note}</span>}{vals[i].inv ? <span className="muted small">investit {fmtNum(vals[i].inv)} {CUR_LABEL[currency]}</span> : null}</span>
+            <span className="row-side"><b className="num">{fmtNum(vals[i].v)} {CUR_LABEL[currency]}</b><P p={pct(vals[i].v, vals[i].inv)} /></span>
             <ChevronDown size={16} className="chev" />
           </button>
           {open === i && <div className="part-edit">
