@@ -784,3 +784,6 @@ a.primary { text-decoration: none; }
 .part-head { padding: 14px 12px; gap: 12px; }
 .part-head .row-main b { font-size: 16px; }
 .part-head .row-side b { font-size: 16px; }
+.part-row { display: flex; align-items: center; }
+.part-row .part-head { flex: 1; min-width: 0; }
+.part-row .icon-btn.refresh { margin: auto 10px auto 0; flex: none; }

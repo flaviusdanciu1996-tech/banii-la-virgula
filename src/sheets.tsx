@@ -3,7 +3,7 @@ import { useStore } from './store.tsx'
 import { Sheet, Seg, MoneyField, ConfirmButton, CatIcon } from './ui.tsx'
 import { Icon } from './icons.tsx'
 import { parseMoney, fmt, fmtNum, CUR_LABEL, type Currency } from './lib/money.ts'
-import { Repeat, Plus, Trash2, ChevronDown } from 'lucide-react'
+import { Repeat, Plus, Trash2, ChevronDown, RefreshCw } from 'lucide-react'
 import { ReceiptPhoto } from './screens/Receipt.tsx'
 import { DepreciationFields, AssetValuePanel } from './screens/AssetValue.tsx'
 import { InvestPanel } from './screens/BrokerImport.tsx'
@@ -226,21 +226,30 @@ export function AssetSheet({ asset, section = 'liquid', quick, onClose, notify }
       catch (e: any) { setErr(e?.message || 'Nu s-a putut salva.') }
       return
     }
-    if (parts.length) {
-      const parsed = parseParts(parts)
-      if (typeof parsed === 'string') return setErr(parsed)
-      if (!quick && !name.trim()) return setErr('Scrie un nume, de ex. „BT Pay”.')
+    if (parts.length) return saveParts(parts)
+    await saveRest()
+  }
+
+  async function saveParts(drafts: PartDraft[], rowOnly = false) {
+    {
+      const parsed = parseParts(drafts)
+      if (typeof parsed === 'string') { setErr(parsed); return false }
+      if (!quick && !rowOnly && !name.trim()) { setErr('Scrie un nume, de ex. „BT Pay”.'); return false }
       const v = parsed.reduce((t, p) => t + p.value, 0), inv = parsed.reduce((t, p) => t + p.invested, 0)
       const changed = !asset || asset.value !== v
       try {
-        await st.saveAsset(quick && asset
+        await st.saveAsset((quick || rowOnly) && asset
           ? { id: asset.id, parts: parsed, value: v, invested: inv, updated_on: todayIso(), value_source: 'manual' }
           : { id: asset?.id, name: name.trim(), kind, platform: platform.trim(), currency, value: v, invested: inv, parts: parsed, note: note.trim(), archived: false,
               ...(changed ? { updated_on: todayIso(), value_source: 'manual' as const } : {}) })
+        if (rowOnly) { setParts(parsed.map(toDraft)); notify('Valoare actualizată'); return true }
         notify('Salvat'); onClose()
       } catch (e: any) { setErr(e?.message || 'Nu s-a putut salva.') }
-      return
+      return false
     }
+  }
+
+  async function saveRest() {
     let v = parseMoney(value)
     if (!value.trim() && !quick && depKind) {
       // No current value typed: use the estimate from the purchase price.
@@ -318,7 +327,7 @@ export function AssetSheet({ asset, section = 'liquid', quick, onClose, notify }
         <div className="chips">{PLATFORMS.map(p => <button key={p} type="button" className="chip" aria-pressed={p === platform} onClick={() => setPlatform(p)}>{p}</button>)}</div>
       </>}
       {!coinWallet && <Seg label="Moneda" value={currency} onChange={setCurrency} options={[{ id: 'RON', label: 'Lei' }, { id: 'EUR', label: 'Euro' }, { id: 'USD', label: 'Dolari' }]} />}
-      {coinWallet ? <p className="hint">Valoarea se calculează singură din monedele tale și prețurile Revolut X. Le modifici din ecranul portofelului.</p> : asset?.holdings?.length ? <InvestPanel asset={st.assets.find(x => x.id === asset.id) ?? asset} notify={notify} /> : parts.length ? <PartsEditor parts={parts} setParts={setParts} currency={currency} icon={kindOf(kind).icon} color={SECTIONS.find(x => x.id === sec)!.color} /> : <>
+      {coinWallet ? <p className="hint">Valoarea se calculează singură din monedele tale și prețurile Revolut X. Le modifici din ecranul portofelului.</p> : asset?.holdings?.length ? <InvestPanel asset={st.assets.find(x => x.id === asset.id) ?? asset} notify={notify} /> : parts.length ? <PartsEditor parts={parts} setParts={setParts} onQuickSave={asset ? (d => saveParts(d, true)) : undefined} currency={currency} icon={kindOf(kind).icon} color={SECTIONS.find(x => x.id === sec)!.color} /> : <>
       <label className="field">{sec === 'debt' ? 'Cât mai ai de dat' : 'Valoare actuală'}</label>
       <MoneyField id="asset-value" big value={value} onChange={setValue} suffix={CUR_LABEL[currency]} />
       {sec === 'goods' && !depKind && <p className="hint">Pune cât ai lua pe el dacă l-ai vinde azi (caută anunțuri cu ceva asemănător). Actualizează-l o dată la câteva luni.</p>}
@@ -357,7 +366,9 @@ function parseParts(ps: PartDraft[]): AssetPart[] | string {
   return out
 }
 
-function PartsEditor({ parts, setParts, currency, icon, color }: { parts: PartDraft[]; setParts: (f: (p: PartDraft[]) => PartDraft[]) => void; currency: Currency; icon: string; color: string }) {
+function PartsEditor({ parts, setParts, onQuickSave, currency, icon, color }: { parts: PartDraft[]; setParts: (f: (p: PartDraft[]) => PartDraft[]) => void; onQuickSave?: (d: PartDraft[]) => Promise<boolean | undefined>; currency: Currency; icon: string; color: string }) {
+  const [quick, setQuick] = useState<{ i: number; value: string; invested: string } | null>(null)
+  const [busy, setBusy] = useState(false)
   const [open, setOpen] = useState<number | null>(() => (parts.some(p => !p.name) ? parts.findIndex(p => !p.name) : null))
   const set = (i: number, patch: Partial<PartDraft>) => setParts(ps => ps.map((p, j) => (j === i ? { ...p, ...patch } : p)))
   const vals = parts.map(p => ({ v: parseMoney(p.value) ?? 0, inv: parseMoney(p.invested) ?? 0 }))
@@ -368,12 +379,29 @@ function PartsEditor({ parts, setParts, currency, icon, color }: { parts: PartDr
     <div className="parts">
       {parts.map((p, i) => (
         <div key={i} className={'part' + (open === i ? ' open' : '')}>
-          <button type="button" className="part-head" onClick={() => setOpen(open === i ? null : i)} aria-expanded={open === i}>
+          <div className="part-row">
+          <button type="button" className="part-head" onClick={() => { setQuick(null); setOpen(open === i ? null : i) }} aria-expanded={open === i}>
             <CatIcon icon={icon} color={color} />
             <span className="row-main"><b>{p.name || 'Rând nou'}</b>{p.note && <span className="muted small">{p.note}</span>}{vals[i].inv ? <span className="muted small">investit {fmtNum(vals[i].inv)} {CUR_LABEL[currency]}</span> : null}</span>
             <span className="row-side"><b className="num">{fmtNum(vals[i].v)} {CUR_LABEL[currency]}</b><P p={pct(vals[i].v, vals[i].inv)} /></span>
-            <ChevronDown size={16} className="chev" />
+            {!onQuickSave && <ChevronDown size={16} className="chev" />}
           </button>
+          {onQuickSave && <button type="button" className="icon-btn refresh" aria-label={`Actualizează valoarea pentru ${p.name}`}
+            onClick={() => { setOpen(null); setQuick(quick?.i === i ? null : { i, value: p.value, invested: p.invested }) }}><RefreshCw size={16} /></button>}
+          </div>
+          {quick?.i === i && onQuickSave && <div className="part-edit">
+            <label className="field">Cât valorează azi</label>
+            <MoneyField id={'part-qv-' + i} big value={quick.value} onChange={x => setQuick({ ...quick, value: x })} suffix={CUR_LABEL[currency]} autoFocus />
+            <label className="field">Cât ai băgat în total</label>
+            <MoneyField id={'part-qi-' + i} value={quick.invested} onChange={x => setQuick({ ...quick, invested: x })} suffix={CUR_LABEL[currency]} />
+            <button type="button" className="primary" disabled={busy} onClick={async () => {
+              setBusy(true)
+              const next = parts.map((q, j) => (j === i ? { ...q, value: quick.value, invested: quick.invested } : q))
+              const ok = await onQuickSave(next)
+              setBusy(false)
+              if (ok) setQuick(null)
+            }}>{busy ? 'Salvez…' : 'Actualizează'}</button>
+          </div>}
           {open === i && <div className="part-edit">
             <label className="field">Nume<input maxLength={50} value={p.name} placeholder="ex. BT Index ROTX" onChange={e => set(i, { name: e.target.value })} /></label>
             <label className="field">Valoare actuală</label>
