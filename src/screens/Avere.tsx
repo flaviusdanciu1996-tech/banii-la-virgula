@@ -12,6 +12,7 @@ import { GoalsSection } from './Plans.tsx'
 import { BrokerSummaryCard } from './BrokerImport.tsx'
 import { FiCard } from './Fi.tsx'
 import { cryptoSummary } from './Crypto.tsx'
+import { CassCard } from './Reports.tsx'
 import { CountUp, EmptyArt } from '../ui.tsx'
 
 export function AvereScreen({ scope, openAsset, openGoal, nav }: { scope: 'all' | 'me'; openAsset: (a?: Asset, section?: AssetSection, quick?: boolean) => void; openGoal: (g?: Goal, add?: boolean) => void; nav: Nav }) {
@@ -61,6 +62,8 @@ export function AvereScreen({ scope, openAsset, openGoal, nav }: { scope: 'all' 
           <h2>Evoluția averii</h2>
           <LineChart points={series} />
         </section>
+
+        <CassCard onOpen={() => nav('rapoarte', { tab: 'fiscal' })} />
 
         {SECTIONS.map(s => {
           const items = assets.filter(a => kindOf(a.kind).section === s.id)

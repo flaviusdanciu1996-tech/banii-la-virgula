@@ -5,7 +5,6 @@ import { Ring, Bar, Seg, CountUp, EmptyArt } from '../ui.tsx'
 import { TxRow, catColor } from '../helpers.tsx'
 import { upcomingList, UpcomingRows } from './Plans.tsx'
 import { DreamStrip } from './Dreams.tsx'
-import { CassCard } from './Reports.tsx'
 import { useMyQuotes, asQuotes } from './Reminder.tsx'
 import { ReceiptButton } from './Receipt.tsx'
 import { quoteFor } from '../lib/quotes.ts'
@@ -126,8 +125,6 @@ export function HomeScreen({ nav, period, setPeriod, scope, setScope, openTx, op
         {monthAgo && <span className={'num small ' + (nw.net - monthAgo.net >= 0 ? 'in' : 'bad')}>{fmtSigned(nw.net - monthAgo.net)} față de acum o lună</span>}
         <ChevronRight size={16} className="chev" />
       </button>
-
-      <CassCard onOpen={() => nav('rapoarte', { tab: 'fiscal' })} />
 
       {st.assets.some(a => a.holdings?.length) && (
         <button type="button" className="card nw-line plan-home" onClick={() => nav('plan')}>
