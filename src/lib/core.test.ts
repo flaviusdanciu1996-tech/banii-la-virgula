@@ -481,3 +481,39 @@ test('fiscal: CASS steps, broker holding period, crypto exemption, SRL dividends
   assert.equal(r.deadline, '2027-05-25')
   assert.deepEqual(monthlyReserve(243000, '2026-10-21', '2027-05-25'), { months: 7, perMonth: 34800 })
 })
+
+test('crypto: swaps and transfers carry the cost, gains pooled across platforms', () => {
+  const tx = (o: any) => ({ currency: 'RON', fee: 0, fx: null, note: '', price: null, ...o })
+  const txs = [
+    tx({ asset_id: 'rev', coin: 'BTC', kind: 'buy', qty: 1, price: 1000, at: '2026-01-01T10:00:00Z' }),
+    // transfer 1 BTC Revolut → Binance
+    tx({ asset_id: 'rev', coin: 'BTC', kind: 'move_out', qty: 1, at: '2026-02-01T10:00:00Z', link: 't1' }),
+    tx({ asset_id: 'bin', coin: 'BTC', kind: 'move_in', qty: 1, at: '2026-02-01T10:00:00Z', link: 't1' }),
+    // swap on Binance: 1 BTC → 10 ETH (permissive: no gain, cost moves)
+    tx({ asset_id: 'bin', coin: 'BTC', kind: 'move_out', qty: 1, at: '2026-03-01T10:00:00Z', link: 's1' }),
+    tx({ asset_id: 'bin', coin: 'ETH', kind: 'move_in', qty: 10, at: '2026-03-01T10:00:00Z', link: 's1' }),
+    tx({ asset_id: 'bin', coin: 'ETH', kind: 'sell', qty: 5, price: 300, at: '2026-04-01T10:00:00Z' }), // 1500 − 500 = +1000
+    tx({ asset_id: 'rev', coin: 'DOT', kind: 'buy', qty: 10, price: 10, at: '2026-01-01T10:00:00Z' }),
+    tx({ asset_id: 'rev', coin: 'DOT', kind: 'sell', qty: 10, price: 5, at: '2026-05-01T10:00:00Z' }), // −50
+  ]
+  const bin = positions(txs, [], 'bin'), rev = positions(txs, [], 'rev')
+  assert.equal(bin.find(p => p.coin === 'ETH')!.cost, 500)
+  assert.equal(bin.find(p => p.coin === 'BTC')!.qty, 0)
+  assert.equal(rev.find(p => p.coin === 'BTC')!.qty, 0)
+  const r = fiscalReport(2026, [], txs as any, [], id => (id === 'bin' ? 'Binance' : 'Revolut'))
+  const cr = r.lines.find(l => l.key === 'crypto')!
+  assert.equal(cr.gross, 95000) // +1000 − 50 lei, together
+  assert.equal(cr.toPay, Math.round(95000 * 0.16))
+  assert.deepEqual(cr.split, [{ platform: 'Binance', amount: 100000 }, { platform: 'Revolut', amount: -5000 }])
+  assert.equal(r.platforms.find(p => p.name === 'Binance')!.toPay, cr.toPay)
+})
+
+import { fxOn, withBnr, fxTableFrom } from './crypto.ts'
+test('BNR rate of the transaction day (last published before weekends)', () => {
+  const t = fxTableFrom([{ day: '2024-01-05', cur: 'EUR', rate: '4.9700' }, { day: '2024-01-08', cur: 'EUR', rate: 4.9750 }])
+  assert.equal(fxOn(t, 'EUR', '2024-01-07'), 4.97)
+  assert.equal(fxOn(t, 'EUR', '2024-01-08'), 4.975)
+  assert.equal(fxOn(t, 'EUR', '2024-01-01'), null)
+  const [x] = withBnr([{ coin: 'DOT', kind: 'buy', qty: 1, price: 7, currency: 'EUR', fee: 1, fx: 5, at: '2024-01-06T23:30:00Z', note: '' }], t) // 01:30 on the 7th in Bucharest
+  assert.equal(x.fx, 4.97)
+})

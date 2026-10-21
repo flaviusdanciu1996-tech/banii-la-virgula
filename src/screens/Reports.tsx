@@ -7,7 +7,8 @@ import { todayIso, periodFor, shiftPeriod, periodLabel, MONTHS, MONTHS_SHORT, is
 import { summarize, savingsRate, snapshotAt } from '../lib/calc.ts'
 import { fiscalReport, monthlyReserve, MANUAL_LABEL, RULES_CHECKED, type BrokerRow, type ManualIncome, type ManualKind, type FiscalReport } from '../lib/fiscal.ts'
 import type { CryptoTx } from '../lib/crypto.ts'
-import { toLei } from '../lib/crypto.ts'
+import { toLei, withBnr } from '../lib/crypto.ts'
+import { loadBnr } from '../bnr.ts'
 
 type Tab = 'luna' | 'an' | 'fiscal'
 const n = (v: unknown) => (v == null ? null : Number(v))
@@ -22,15 +23,16 @@ function useInvestData() {
   useEffect(() => {
     let alive = true
     ;(async () => {
-      const [b, c, m] = await Promise.all([
+      const [b, c, m, bnr] = await Promise.all([
         st.repo.list<any>('invest_tx', st.householdId).catch(() => []),
         st.repo.list<any>('crypto_tx', st.householdId).catch(() => []),
         st.repo.list<any>('fiscal_income', st.householdId).catch(() => []),
+        loadBnr().catch(() => null),
       ])
       if (!alive) return
       setD({
         broker: b.map(r => ({ at: String(r.at), op: r.op, symbol: r.symbol, qty: Number(r.qty), price: n(r.price), commission: Number(r.commission ?? 0), net: Number(r.net ?? 0), profit: n(r.profit), note: r.note ?? '' })),
-        crypto: c.map(r => ({ ...r, qty: Number(r.qty), price: n(r.price), fee: Number(r.fee ?? 0), fx: n(r.fx) })),
+        crypto: withBnr(c.map(r => ({ ...r, qty: Number(r.qty), price: n(r.price), fee: Number(r.fee ?? 0), fx: n(r.fx) })), bnr),
         manual: m.map(r => ({ ...r, amount: Number(r.amount), tax_withheld: Number(r.tax_withheld ?? 0) })),
       })
     })()
@@ -217,7 +219,9 @@ function FiscalTab({ data, reload, notify }: { data: ReturnType<typeof useInvest
   const [y, setY] = useState(today <= `${thisYear}-05-25` ? thisYear - 1 : thisYear)
   const [sheet, setSheet] = useState<{ m?: ManualIncome } | null>(null)
   const [open, setOpen] = useState<string | null>(null)
-  const r: FiscalReport | null = useMemo(() => (data ? fiscalReport(y, data.broker, data.crypto, data.manual) : null), [data, y])
+  const st = useStore()
+  const platformOf = useMemo(() => { const m = new Map(st.assets.map(a => [a.id, a.platform || a.name])); return (id?: string) => (id ? m.get(id) ?? '' : '') }, [st.assets])
+  const r: FiscalReport | null = useMemo(() => (data ? fiscalReport(y, data.broker, data.crypto, data.manual, platformOf) : null), [data, y, platformOf])
   if (!r) return <p className="muted">Se încarcă…</p>
   const R = r.rules, mw = R.minWage
   const done = today > r.deadline
@@ -281,6 +285,19 @@ function FiscalTab({ data, reload, notify }: { data: ReturnType<typeof useInvest
         {r.lines.some(l => l.estimated) && <p className="hint">* estimat din datele importate; cifra exactă e în fișa anuală de la broker.</p>}
       </section>
 
+      {r.platforms.length > 1 && (
+        <section className="card">
+          <h2>Pe platforme</h2>
+          <p className="hint">Fiecare platformă are regulile ei. Crypto de pe toate platformele se adună (scutirea 200/600 lei și impozitul se calculează pe total).</p>
+          {r.platforms.map(p => (
+            <div key={p.name} className="rep-line">
+              <span><b>{p.name}</b> · venit {fmt(p.income)}{p.withheld ? ` · reținut ${fmt(p.withheld)}` : ''}</span>
+              <b className={'num ' + (p.toPay ? 'bad' : 'in')}>{p.toPay ? `de plătit ${fmt(p.toPay)}` : 'nimic de plătit'}</b>
+            </div>
+          ))}
+        </section>
+      )}
+
       <section className="card">
         <h2>CAS (pensie) · {fmt(r.casDue)}</h2>
         {r.casBase > 0
@@ -315,6 +332,7 @@ function ManualSheet({ m, year, divRate, notify, onClose, onSaved }: { m?: Manua
   const [touched, setTouched] = useState(!!m)
   const [day, setDay] = useState(m?.day ?? (String(year) === todayIso().slice(0, 4) ? todayIso() : `${year}-12-31`))
   const [note, setNote] = useState(m?.note ?? '')
+  const [platform, setPlatform] = useState(m?.platform ?? '')
   const [err, setErr] = useState('')
   const autoRate = kind === 'srl_div' ? divRate : kind === 'interest' ? 0.1 : 0
   const a = parseMoney(amount)
@@ -323,7 +341,7 @@ function ManualSheet({ m, year, divRate, notify, onClose, onSaved }: { m?: Manua
     if (!a || a <= 0) return setErr('Scrie suma brută (înainte de impozit).')
     const w = withheld.trim() ? parseMoney(withheld) : 0
     if (w === null || w < 0) return setErr('Impozitul reținut nu e valid.')
-    const row = { household_id: st.householdId, member_id: st.user.id, kind, amount: a, tax_withheld: w, day, note: note.trim() }
+    const row = { household_id: st.householdId, member_id: st.user.id, kind, amount: a, tax_withheld: w, day, note: note.trim(), platform: platform.trim() }
     try {
       if (m?.id) await st.repo.update('fiscal_income' as any, { id: m.id }, row as any)
       else await st.repo.insert('fiscal_income' as any, row as any)
@@ -342,6 +360,8 @@ function ManualSheet({ m, year, divRate, notify, onClose, onSaved }: { m?: Manua
       <label className="field">Impozit reținut deja</label>
       <MoneyField id="fi-tax" value={withheld} onChange={v => { setTouched(true); setWithheld(v) }} suffix="lei" />
       {kind === 'srl_div' && <p className="hint">La dividendele de la firmă, firma reține {Math.round(divRate * 100)}% și îl plătește (D100). Tu le treci în declarație doar pentru CASS.</p>}
+      <label className="field">De unde (platformă / bancă / firmă)<input maxLength={40} placeholder="ex. Revolut, BT, firma mea" value={platform} onChange={e => setPlatform(e.target.value)} /></label>
+      <div className="chips">{['Revolut', 'Binance', 'Tradeville', 'Banca Transilvania', 'Firma mea'].map(x => <button key={x} type="button" className="chip" aria-pressed={platform === x} onClick={() => setPlatform(x)}>{x}</button>)}</div>
       <label className="field">Data încasării<input type="date" value={day} onChange={e => setDay(e.target.value)} /></label>
       <label className="field">Notă<input maxLength={80} placeholder="opțional" value={note} onChange={e => setNote(e.target.value)} /></label>
       {err && <p className="err">{err}</p>}

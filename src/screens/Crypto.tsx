@@ -3,8 +3,9 @@ import { Plus, RefreshCw, Pencil } from 'lucide-react'
 import { useStore } from '../store.tsx'
 import { Sheet, Seg, ConfirmButton, EmptyArt } from '../ui.tsx'
 import { todayIso } from '../lib/period.ts'
-import { positions, portfolio, KIND_LABEL, toLei, type CryptoTx, type CryptoKind, type Position, type CoinQuote } from '../lib/crypto.ts'
+import { positions, portfolio, KIND_LABEL, toLei, feeHint, withBnr, type CryptoTx, type CryptoKind, type Position, type CoinQuote } from '../lib/crypto.ts'
 import type { Asset } from '../lib/types.ts'
+import { loadBnr } from '../bnr.ts'
 
 // Names and colors for the coins people use most; anything else shows its symbol.
 const NAMES: Record<string, string> = {
@@ -62,7 +63,8 @@ export function CryptoScreen({ assetId, notify, openAsset }: { assetId: string; 
 
   const load = useCallback(async () => {
     const all = await st.repo.list<any>('crypto_tx', st.householdId).catch(() => [])
-    setTxs(all.filter(r => r.asset_id === assetId).map(normTx))
+    const bnr = await loadBnr().catch(() => null)
+    setTxs(withBnr(all.map(normTx), bnr)) // every wallet (costs follow coins between wallets), BNR rate of each day
   }, [st.repo, st.householdId, assetId])
   useEffect(() => { load() }, [load])
 
@@ -82,7 +84,8 @@ export function CryptoScreen({ assetId, notify, openAsset }: { assetId: string; 
   }, [assetId])
 
   const quotes: CoinQuote[] = asset?.coins ?? []
-  const pos = useMemo(() => positions(txs ?? [], quotes), [txs, quotes])
+  const pos = useMemo(() => positions(txs ?? [], quotes, assetId), [txs, quotes, assetId])
+  const mine = useMemo(() => (txs ?? []).filter(t => t.asset_id === assetId), [txs, assetId])
   const held = pos.filter(p => p.qty > 0)
   const pf = portfolio(pos)
 
@@ -126,7 +129,7 @@ export function CryptoScreen({ assetId, notify, openAsset }: { assetId: string; 
               <Spark values={quotes.find(q => q.coin === p.coin)?.spark} w={52} h={24} />
               <span className="row-side">
                 <b className="num">{lei(p.value)}</b>
-                {p.pnlPct != null && <span className={'num small ' + (p.pnl >= 0 ? 'in' : 'bad')}>{pct(p.pnlPct)}</span>}
+                {p.pnlPct != null && p.price != null && <span className={'num small ' + (p.pnl >= 0 ? 'in' : 'bad')}>{pct(p.pnlPct)}</span>}
               </span>
             </button>
           ))}
@@ -135,10 +138,10 @@ export function CryptoScreen({ assetId, notify, openAsset }: { assetId: string; 
         {pos.some(p => p.qty === 0) && <p className="hint">Vândute de tot: {pos.filter(p => p.qty === 0).map(p => p.coin).join(', ')} — le găsești în istoric dacă le adaugi din nou.</p>}
       </>}
 
-      {coinOpen && txs && <CoinSheet coin={coinOpen} pos={pos.find(p => p.coin === coinOpen)} quote={quotes.find(q => q.coin === coinOpen)} txs={txs.filter(t => t.coin === coinOpen)}
+      {coinOpen && txs && <CoinSheet coin={coinOpen} pos={pos.find(p => p.coin === coinOpen)} quote={quotes.find(q => q.coin === coinOpen)} txs={mine.filter(t => t.coin === coinOpen)}
         onClose={() => setCoinOpen(null)} onAdd={() => setForm({ coin: coinOpen })} onEdit={t => setForm({ tx: t })} />}
       {form && <TxForm asset={asset} tx={form.tx} coin={form.coin} coins={pos.map(p => p.coin)} notify={notify} onClose={() => setForm(null)}
-        onSaved={async coin => { setForm(null); if (coin && held.some(p => p.coin === coin)) setCoinOpen(coin); await afterChange() }} />}
+        all={txs ?? []} onSaved={async coin => { setForm(null); if (coin && held.some(p => p.coin === coin)) setCoinOpen(coin); await afterChange() }} />}
     </div>
   )
 }
@@ -176,7 +179,7 @@ function CoinSheet({ coin, pos, quote, txs, onClose, onAdd, onEdit }: { coin: st
                   <span className="muted small">{dayFmt(t.at)}{t.price != null ? ` · ${priceFmt(toLei(t, t.price))} lei/buc.` : ''}{t.fee ? ` · comision ${n2(toLei(t, t.fee))} lei` : ''}</span>
                 </span>
                 <span className="row-side">
-                  <b className={'num ' + (t.kind === 'sell' || t.qty < 0 ? 'bad' : 'in')}>{t.kind === 'sell' || t.qty < 0 ? '−' : '+'}{qtyFmt(Math.abs(t.qty))} {coin}</b>
+                  <b className={'num ' + (t.kind === 'sell' || t.kind === 'move_out' || t.qty < 0 ? 'bad' : 'in')}>{t.kind === 'sell' || t.kind === 'move_out' || t.qty < 0 ? '−' : '+'}{qtyFmt(Math.abs(t.qty))} {coin}</b>
                   {total != null && <span className="num small muted">{lei(total)}</span>}
                 </span>
               </button>
@@ -189,21 +192,41 @@ function CoinSheet({ coin, pos, quote, txs, onClose, onAdd, onEdit }: { coin: st
   )
 }
 
-function TxForm({ asset, tx, coin, coins, notify, onClose, onSaved }: { asset: Asset; tx?: CryptoTx; coin?: string; coins: string[]; notify: (m: string) => void; onClose: () => void; onSaved: (coin?: string) => void }) {
+type FormKind = CryptoKind | 'swap' | 'transfer'
+const FORM_KINDS: { id: FormKind; label: string; hint: string }[] = [
+  { id: 'buy', label: 'Cumpăr', hint: 'Ai cumpărat monede cu bani.' },
+  { id: 'sell', label: 'Vând', hint: 'Ai vândut monede pe bani (lei, euro…). Aici apare câștigul impozabil.' },
+  { id: 'swap', label: 'Schimb', hint: 'Ai dat o monedă pe alta (ex. BTC → ETH). Nu e vânzare: costul trece pe moneda nouă, fără impozit acum.' },
+  { id: 'transfer', label: 'Transfer', hint: 'Ai mutat monede între platformele tale (ex. Revolut → Binance). Nu e vânzare: costul merge cu ele.' },
+  { id: 'reward', label: 'Primit', hint: 'Monede primite gratis: staking, Revolut Învață, cadou. Cresc cantitatea, nu costul.' },
+  { id: 'adjust', label: 'Corecție', hint: 'Potrivește cantitatea cu ce vezi în aplicația ta. Nu schimbă costul.' },
+]
+const uuid = () => (crypto as any).randomUUID ? crypto.randomUUID() : Math.random().toString(36).slice(2) + Date.now().toString(36)
+
+function TxForm({ asset, tx, coin, coins, all, notify, onClose, onSaved }: { asset: Asset; tx?: CryptoTx; coin?: string; coins: string[]; all: CryptoTx[]; notify: (m: string) => void; onClose: () => void; onSaved: (coin?: string) => void }) {
   const st = useStore()
-  const [kind, setKind] = useState<CryptoKind>(tx?.kind ?? 'buy')
+  const pair = tx?.link ? all.filter(t => t.link === tx.link) : []
+  const isMove = !!tx && (tx.kind === 'move_out' || tx.kind === 'move_in')
+  const [kind, setKind] = useState<FormKind>(tx ? (isMove ? (pair.some(t => t.asset_id !== tx.asset_id) ? 'transfer' : 'swap') : tx.kind) : 'buy')
   const [c, setC] = useState(tx?.coin ?? coin ?? coins[0] ?? '')
   const [other, setOther] = useState(!tx && !coin && coins.length === 0)
+  const [c2, setC2] = useState('')
   const [qty, setQty] = useState(tx ? String(Math.abs(tx.qty)).replace('.', ',') : '')
+  const [qty2, setQty2] = useState('')
   const [sign, setSign] = useState<1 | -1>(tx && tx.qty < 0 ? -1 : 1)
   const [total, setTotal] = useState(tx?.price != null ? n2(toLei(tx, tx.price * tx.qty)).replace(/\./g, '') : '')
   const [fee, setFee] = useState(tx?.fee ? n2(toLei(tx, tx.fee)).replace(/\./g, '') : '')
+  const [feeTouched, setFeeTouched] = useState(!!tx)
+  const wallets = st.assets.filter(a => a.kind === 'crypto' && !a.archived && a.id !== asset.id)
+  const [to, setTo] = useState(wallets[0]?.id ?? '')
   const [date, setDate] = useState((tx?.at ?? new Date().toISOString()).slice(0, 10))
   const [note, setNote] = useState(tx?.note ?? '')
   const [err, setErr] = useState('')
   const money = kind === 'buy' || kind === 'sell'
-  const q = parseNum(qty), tot = parseNum(total)
+  const q = parseNum(qty), tot = parseNum(total), q2 = parseNum(qty2)
   const unit = q && tot ? tot / q : null
+  const hint = feeHint(asset.platform || asset.name, kind as CryptoKind, tot ?? 0)
+  useEffect(() => { if (!feeTouched && hint && tot) setFee(n2(Math.round(hint.fee * 100) / 100).replace(/\./g, '')) }, [hint?.fee, tot, feeTouched]) // eslint-disable-line react-hooks/exhaustive-deps
 
   async function save() {
     const sym = c.trim().toUpperCase().replace(/[^A-Z0-9]/g, '')
@@ -213,14 +236,23 @@ function TxForm({ asset, tx, coin, coins, notify, onClose, onSaved }: { asset: A
     const f = fee.trim() ? parseNum(fee) : 0
     if (f === null || f < 0) return setErr('Comisionul nu e valid.')
     if (!date) return setErr('Alege data.')
-    // Keep the original time of day when editing, otherwise midday (stable order within a day).
     const at = tx && tx.at.slice(0, 10) === date ? tx.at : `${date}T12:00:00+03:00`
-    // Edited money amounts are stored in lei (old foreign-currency rows become lei rows).
-    const row = {
-      household_id: st.householdId, asset_id: asset.id, coin: sym, kind,
-      qty: kind === 'adjust' ? sign * q : q, price: money ? tot! / q : null, currency: 'RON', fee: money ? f : 0, fx: null, at, note: note.trim(),
-    }
+    const base = { household_id: st.householdId, currency: 'RON', fx: null, price: null, fee: 0, at, note: note.trim() }
     try {
+      if (kind === 'swap' || kind === 'transfer') {
+        const sym2 = kind === 'swap' ? c2.trim().toUpperCase().replace(/[^A-Z0-9]/g, '') : sym
+        if (!sym2 || sym2 === sym && kind === 'swap') return setErr('Scrie moneda pe care ai primit-o (ex. ETH).')
+        const got = kind === 'transfer' && !qty2.trim() ? q : q2
+        if (!got || got <= 0) return setErr(kind === 'swap' ? 'Scrie câte bucăți ai primit.' : 'Scrie câte au ajuns (după comisionul rețelei).')
+        if (kind === 'transfer' && !to) return setErr('Adaugă întâi celălalt portofel în Avere (ex. Binance, tip Crypto).')
+        const link = uuid(), toWallet = kind === 'transfer' ? to : asset.id
+        const label = kind === 'swap' ? `Schimb ${sym} → ${sym2}` : `Transfer ${asset.platform || asset.name} → ${st.assets.find(a => a.id === toWallet)?.platform || st.assets.find(a => a.id === toWallet)?.name}`
+        await st.repo.insert('crypto_tx' as any, { ...base, asset_id: asset.id, coin: sym, kind: 'move_out', qty: q, link, note: note.trim() || label } as any)
+        await st.repo.insert('crypto_tx' as any, { ...base, asset_id: toWallet, coin: sym2, kind: 'move_in', qty: got, link, note: note.trim() || label } as any)
+        notify(kind === 'swap' ? 'Schimb salvat' : 'Transfer salvat')
+        return onSaved(sym2)
+      }
+      const row = { ...base, asset_id: asset.id, coin: sym, kind, qty: kind === 'adjust' ? sign * q : q, price: money ? tot! / q : null, fee: money ? f : 0 }
       if (tx?.id) await st.repo.update('crypto_tx' as any, { id: tx.id }, row as any)
       else await st.repo.insert('crypto_tx' as any, row as any)
       notify(tx ? 'Tranzacție modificată' : 'Tranzacție adăugată')
@@ -228,28 +260,64 @@ function TxForm({ asset, tx, coin, coins, notify, onClose, onSaved }: { asset: A
     } catch (e: any) { setErr(e?.message || 'Nu s-a putut salva.') }
   }
 
+  async function remove() {
+    const ids = isMove && pair.length ? pair.map(t => t.id!) : [tx!.id!]
+    for (const id of ids) await st.repo.remove('crypto_tx' as any, { id })
+    notify(ids.length > 1 ? 'Șters (ambele părți)' : 'Șters'); onSaved()
+  }
+
+  if (tx && isMove) {
+    const out = pair.find(t => t.kind === 'move_out'), inn = pair.find(t => t.kind === 'move_in')
+    return (
+      <Sheet title={kind === 'swap' ? 'Schimb' : 'Transfer'} onClose={onClose}>
+        <p className="hint">{dayFmt(tx.at)} · {tx.note}</p>
+        {out && <div className="rep-line"><span>A ieșit</span><b className="num bad">−{qtyFmt(out.qty)} {out.coin}</b></div>}
+        {inn && <div className="rep-line"><span>A intrat{inn.asset_id !== out?.asset_id ? ` în ${st.assets.find(a => a.id === inn.asset_id)?.name ?? 'alt portofel'}` : ''}</span><b className="num in">+{qtyFmt(inn.qty)} {inn.coin}</b></div>}
+        <p className="hint">Nu e vânzare: costul a trecut pe {inn?.coin ?? 'moneda nouă'}, fără impozit. Ca s-o schimbi, șterge-o și adaug-o din nou.</p>
+        <div className="actions"><ConfirmButton onConfirm={remove} /></div>
+      </Sheet>
+    )
+  }
+
+  const meta = FORM_KINDS.find(k => k.id === kind)!
   return (
     <Sheet title={tx ? 'Modifică tranzacția' : 'Adăugare tranzacție'} onClose={onClose}>
-      <Seg label="Tip" value={kind} onChange={setKind} options={[{ id: 'buy', label: 'Cumpăr' }, { id: 'sell', label: 'Vând' }, { id: 'reward', label: 'Primit' }, { id: 'adjust', label: 'Corecție' }]} />
-      <p className="hint">{kind === 'buy' ? 'Ai cumpărat monede cu bani.' : kind === 'sell' ? 'Ai vândut monede pe bani.' : kind === 'reward' ? 'Monede primite gratis: staking, Revolut Învață, cadou. Cresc cantitatea, nu costul.' : 'Potrivește cantitatea cu ce vezi în aplicația ta (ex. după staking). Nu schimbă costul.'}</p>
-      <label className="field">Moneda</label>
+      <div className="chips kind-chips">
+        {FORM_KINDS.filter(k => !tx || (k.id !== 'swap' && k.id !== 'transfer')).map(k => <button key={k.id} type="button" className="chip" aria-pressed={kind === k.id} onClick={() => setKind(k.id)}>{k.label}</button>)}
+      </div>
+      <p className="hint">{meta.hint}</p>
+      <label className="field">{kind === 'swap' ? 'Ai dat' : kind === 'transfer' ? 'Ce monedă ai mutat' : 'Moneda'}</label>
       <div className="chips">
         {coins.map(x => <button key={x} type="button" className="chip" aria-pressed={!other && c === x} onClick={() => { setOther(false); setC(x) }}><CoinIcon coin={x} size={20} />{x}</button>)}
         <button type="button" className="chip" aria-pressed={other} onClick={() => { setOther(true); setC('') }}>+ Altă monedă</button>
       </div>
       {other && <label className="field">Simbolul monedei<input id="coin-sym" autoCapitalize="characters" maxLength={10} placeholder="ex. BTC, ETH, SOL" value={c} onChange={e => setC(e.target.value.toUpperCase())} /></label>}
       {kind === 'adjust' && <Seg label="Sens" value={sign === 1 ? 'plus' : 'minus'} onChange={v => setSign(v === 'plus' ? 1 : -1)} options={[{ id: 'plus', label: 'Am mai multe' }, { id: 'minus', label: 'Am mai puține' }]} />}
-      <label className="field">Câte bucăți<input id="coin-qty" inputMode="decimal" placeholder="ex. 0,5" value={qty} onChange={e => setQty(e.target.value)} /></label>
+      <label className="field">{kind === 'swap' || kind === 'transfer' ? 'Câte bucăți au ieșit' : 'Câte bucăți'}<input id="coin-qty" inputMode="decimal" placeholder="ex. 0,5" value={qty} onChange={e => setQty(e.target.value)} /></label>
+      {kind === 'swap' && <>
+        <label className="field">Ai primit (moneda)<input id="coin-sym2" autoCapitalize="characters" maxLength={10} placeholder="ex. ETH" value={c2} onChange={e => setC2(e.target.value.toUpperCase())} /></label>
+        <label className="field">Câte bucăți ai primit<input id="coin-qty2" inputMode="decimal" placeholder="ex. 3,2" value={qty2} onChange={e => setQty2(e.target.value)} /></label>
+      </>}
+      {kind === 'transfer' && <>
+        <label className="field">În ce portofel
+          <select value={to} onChange={e => setTo(e.target.value)}>
+            {wallets.length === 0 && <option value="">— adaugă întâi portofelul în Avere —</option>}
+            {wallets.map(w => <option key={w.id} value={w.id}>{w.name}{w.platform && w.platform !== w.name ? ` · ${w.platform}` : ''}</option>)}
+          </select>
+        </label>
+        <label className="field">Câte au ajuns (opțional, după comisionul rețelei)<input id="coin-qty2" inputMode="decimal" placeholder={qty || 'la fel'} value={qty2} onChange={e => setQty2(e.target.value)} /></label>
+      </>}
       {money && <>
         <label className="field">{kind === 'buy' ? 'Cât ai plătit în total (lei, fără comision)' : 'Cât ai primit în total (lei, fără comision)'}<input id="coin-total" inputMode="decimal" placeholder="ex. 500" value={total} onChange={e => setTotal(e.target.value)} /></label>
         {unit != null && <p className="hint">Preț pe bucată: <b className="num">{priceFmt(unit)} lei</b></p>}
-        <label className="field">Comision (lei)<input id="coin-fee" inputMode="decimal" placeholder="opțional" value={fee} onChange={e => setFee(e.target.value)} /></label>
+        <label className="field">Comision (lei)<input id="coin-fee" inputMode="decimal" placeholder="opțional" value={fee} onChange={e => { setFeeTouched(true); setFee(e.target.value) }} /></label>
+        {hint && <p className="hint">{hint.text}</p>}
       </>}
       <label className="field">Data<input id="coin-date" type="date" max={todayIso()} value={date} onChange={e => setDate(e.target.value)} /></label>
       <label className="field">Notă<input id="coin-note" maxLength={80} placeholder="opțional" value={note} onChange={e => setNote(e.target.value)} /></label>
       {err && <p className="err">{err}</p>}
       <div className="actions">
-        {tx?.id && <ConfirmButton onConfirm={async () => { await st.repo.remove('crypto_tx' as any, { id: tx.id }); notify('Șters'); onSaved() }} />}
+        {tx?.id && <ConfirmButton onConfirm={remove} />}
         <button type="button" className="primary" onClick={save}>Salvează</button>
       </div>
     </Sheet>

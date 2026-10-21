@@ -274,7 +274,18 @@ export function StoreProvider({ repo, user, children }: { repo: Repo; user: User
     async refreshRates(force = false) {
       const today = todayIso()
       if (!force && s.settings.rates_date === today) return
-      const urls = ['https://api.frankfurter.dev/v1/latest?base=EUR&symbols=RON,USD', 'https://api.frankfurter.app/latest?from=EUR&to=RON,USD']
+      // 1) The official BNR rate (loaded daily into fx_rates), 2) ECB as a fallback.
+      if (supabase && !DEMO) {
+        try {
+          const { data } = await supabase.from('fx_rates').select('day,cur,rate').in('cur', ['EUR', 'USD']).order('day', { ascending: false }).limit(4)
+          const eur = data?.find(r => r.cur === 'EUR'), usd = data?.find(r => r.cur === 'USD')
+          if (eur && usd && eur.day === usd.day && Date.parse(today) - Date.parse(eur.day) < 5 * 864e5) {
+            await store.saveSettings({ eur_rate: Number(eur.rate), usd_rate: Number(usd.rate), rates_date: today })
+            return
+          }
+        } catch { /* fall back */ }
+      }
+      const urls =['https://api.frankfurter.dev/v1/latest?base=EUR&symbols=RON,USD', 'https://api.frankfurter.app/latest?from=EUR&to=RON,USD']
       for (const u of urls) {
         try {
           const r = await fetch(u)

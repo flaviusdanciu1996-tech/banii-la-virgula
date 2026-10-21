@@ -8,7 +8,7 @@ import webpush from "npm:web-push@3.6.7";
 import { createClient } from "npm:@supabase/supabase-js@2";
 import { marketValue, anchorPoint, estimateOn, checkDue, olxUrl, publi24Url, parseOlx, parsePubli24, pickOffers, type Offer, type ValuePoint } from "./valuation.ts";
 import { bvbUrl, parseBvbPrice, holdingsValue, type Holding } from "./bvb.ts";
-import { positions, pickPair, quoteFromTickers, type CoinQuote, type CryptoTx } from "./crypto.ts";
+import { positions, pickPair, quoteFromTickers, withBnr, fxTableFrom, type CoinQuote, type CryptoTx } from "./crypto.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -89,12 +89,24 @@ async function rx(path: string): Promise<any | null> {
 
 async function priceCrypto(a: any) {
   const today = todayRo();
-  const { data: rows } = await db.from("crypto_tx").select("*").eq("asset_id", a.id).limit(20000);
-  if (!rows?.length) return { id: a.id, value: Number(a.value), priced: 0, positions: 0 }; // typed by hand: leave it alone
-  const txs: CryptoTx[] = rows.map((r: any) => ({ ...r, qty: Number(r.qty), price: r.price == null ? null : Number(r.price), fee: Number(r.fee), fx: r.fx == null ? null : Number(r.fx) }));
+  // All wallets of the household: a coin moved in from another wallet brings its cost along.
+  const { data: rows } = await db.from("crypto_tx").select("*").eq("household_id", a.household_id).limit(50000);
+  if (!rows?.some((r: any) => r.asset_id === a.id)) return { id: a.id, value: Number(a.value), priced: 0, positions: 0 }; // typed by hand: leave it alone
+  let txs: CryptoTx[] = rows.map((r: any) => ({ ...r, qty: Number(r.qty), price: r.price == null ? null : Number(r.price), fee: Number(r.fee), fx: r.fx == null ? null : Number(r.fx) }));
+  // Foreign-currency rows in lei at the official BNR rate of their own day.
+  const curs = [...new Set(txs.filter(t => t.currency !== "RON").map(t => t.currency))];
+  if (curs.length) {
+    const fx: any[] = [];
+    for (let from = 0; ; from += 1000) {
+      const { data } = await db.from("fx_rates").select("day,cur,rate").in("cur", curs).order("day").range(from, from + 999);
+      fx.push(...(data ?? []));
+      if (!data || data.length < 1000) break;
+    }
+    if (fx.length) txs = withBnr(txs, fxTableFrom(fx));
+  }
   const { data: set } = await db.from("settings").select("eur_rate,usd_rate").eq("household_id", a.household_id).maybeSingle();
   const rates = { EUR: Number(set?.eur_rate) || 5, USD: Number(set?.usd_rate) || 4.6 };
-  const held = positions(txs).filter(p => p.qty > 0).map(p => p.coin);
+  const held = positions(txs, [], a.id).filter(p => p.qty > 0).map(p => p.coin);
   const old = new Map<string, CoinQuote>((a.coins ?? []).map((c: CoinQuote) => [c.coin, c]));
   const quotes: CoinQuote[] = held.map(c => ({ coin: c, pair: old.get(c)?.pair ?? null, price: null, ch24: null, at: null, spark: old.get(c)?.spark, spark_on: old.get(c)?.spark_on ?? null }));
   if (quotes.some(x => !x.pair)) {
@@ -124,7 +136,7 @@ async function priceCrypto(a: any) {
     const closes = (Array.isArray(c?.data) ? c.data : []).map((k: any) => Number(k.close)).filter((v: number) => v > 0);
     if (closes.length) { const fx = x.pair!.endsWith("/EUR") ? rates.EUR : rates.USD; x.spark = closes.map((v: number) => Math.round(v * fx * 10000) / 10000); x.spark_on = today; }
   }
-  const pos = positions(txs, quotes);
+  const pos = positions(txs, quotes, a.id);
   const value = Math.round(pos.reduce((s, p) => s + p.value, 0) * 100);
   const invested = Math.round(pos.reduce((s, p) => s + p.cost, 0) * 100);
   await db.from("assets").update({ coins: quotes, value, invested, updated_on: today, prices_on: today, value_source: "market" }).eq("id", a.id);
