@@ -79,28 +79,45 @@ export function HomeScreen({ nav, period, setPeriod, scope, setScope, openTx, op
       </div>
 
       <section className="card budget">
-        <div className="eyebrow">Mai ai din buget</div>
-        {sum.totalBudget > 0 ? <>
-          <div className={'big' + (over ? ' neg' : '')}><CountUp v={sum.left} /></div>
-          <div className="muted">{over ? `Ai depășit bugetul cu ${fmt(-sum.left)}` : `din ${fmt(sum.totalBudget)}`}</div>
-          <div className="consum">
-            <div className="consum-head"><span>Consum</span><b className="num">{sum.spentPct}%</b></div>
-            <Bar value={sum.spentPct} color="var(--accent)" over={sum.spentPct > 100} />
-            <Bar value={sum.elapsedPct} color="var(--time)" />
-            <div className="legend"><span><i style={{ background: 'var(--accent)' }} />cheltuit din buget</span><span><i style={{ background: 'var(--time)' }} />zile trecute</span></div>
-            <p className="note">Ai cheltuit {sum.spentPct}% din bugetul total{sum.daysLeft > 0 ? ` și mai sunt ${sum.daysLeft} ${sum.daysLeft === 1 ? 'zi' : 'zile'} până la finalul perioadei.` : '.'}</p>
-            {fast && <p className="note bad">Cheltui mai repede decât trece luna.</p>}
-          </div>
-        </> : <>
+        {sum.totalBudget > 0 ? (() => {
+          const R1 = 62, R2 = 46, C1 = 2 * Math.PI * R1, C2 = 2 * Math.PI * R2
+          const sp = Math.min(100, Math.max(0, sum.spentPct)), el = Math.min(100, Math.max(0, sum.elapsedPct))
+          const leftLei = Math.round(Math.abs(sum.left) / 100)
+          return <>
+            <div className="ring-wrap">
+              <svg className="ring" viewBox="0 0 150 150" role="img" aria-label={`Ai cheltuit ${sum.spentPct}% din buget, a trecut ${sum.elapsedPct}% din lună`}>
+                <circle cx="75" cy="75" r={R1} className="ring-track" strokeWidth="14" />
+                <circle cx="75" cy="75" r={R1} className="ring-spent" strokeWidth="14" stroke={over ? 'var(--bad)' : 'var(--accent)'} strokeDasharray={`${(sp / 100) * C1} ${C1}`} transform="rotate(-90 75 75)" />
+                <circle cx="75" cy="75" r={R2} className="ring-track" strokeWidth="5" />
+                <circle cx="75" cy="75" r={R2} className="ring-time" strokeWidth="5" strokeDasharray={`${(el / 100) * C2} ${C2}`} transform="rotate(-90 75 75)" />
+              </svg>
+              <div className="ring-center">
+                <span>{over ? 'ai depășit' : 'mai ai'}</span>
+                <b className={'num' + (over ? ' neg' : '')}>{fmtNum(leftLei * 100).replace(',00', '')}</b>
+                <span>lei</span>
+              </div>
+            </div>
+            <div className="ring-stats">
+              <div><span>Cheltuit</span><b className="num">{fmtNum(sum.spent)}</b><small>din {fmtNum(sum.totalBudget).replace(',00', '')}</small></div>
+              <div><span>Venituri</span><b className="num in">{fmtNum(sum.income)}</b></div>
+              <div><span>Economii</span><b className="num save">{fmtNum(sum.saved)}</b></div>
+            </div>
+            <div className="ring-foot">
+              <div className="legend"><span><i style={{ background: over ? 'var(--bad)' : 'var(--accent)' }} />cheltuit {sum.spentPct}%</span><span><i style={{ background: 'var(--time)' }} />trecut din lună {sum.elapsedPct}%</span>{sum.daysLeft > 0 && <span className="muted">mai sunt {sum.daysLeft} {sum.daysLeft === 1 ? 'zi' : 'zile'}</span>}</div>
+              {fast && <p className="note bad">Cheltui mai repede decât trece luna.</p>}
+            </div>
+          </>
+        })() : <>
+          <div className="eyebrow">Mai ai din buget</div>
           <div className="big num">–</div>
           <p className="note">Pune limite pe categorii (sau un buget total) ca să vezi cât mai ai.</p>
           <button type="button" className="link" onClick={() => nav('finante')}>Setează bugetul <ChevronRight size={15} /></button>
+          <div className="trio">
+            <div><span>Venituri</span><b className="num in">{fmtNum(sum.income)}</b></div>
+            <div><span>Cheltuieli</span><b className="num">{fmtNum(sum.spent)}</b></div>
+            <div><span>Economii</span><b className="num save">{fmtNum(sum.saved)}</b></div>
+          </div>
         </>}
-        <div className="trio">
-          <div><span>Venituri</span><b className="num in">{fmtNum(sum.income)}</b></div>
-          <div><span>Cheltuieli</span><b className="num">{fmtNum(sum.spent)}</b></div>
-          <div><span>Economii</span><b className="num save">{fmtNum(sum.saved)}</b></div>
-        </div>
       </section>
 
       <button type="button" className="card nw-line" onClick={() => nav('tab:avere')}>
