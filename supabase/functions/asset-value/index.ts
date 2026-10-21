@@ -87,6 +87,15 @@ async function rx(path: string): Promise<any | null> {
   return null;
 }
 
+/** Binance public market data (no key). */
+async function bn(path: string): Promise<any> {
+  try {
+    const r = await fetch("https://data-api.binance.vision" + path, { signal: AbortSignal.timeout(15000) });
+    if (!r.ok) { console.log("binance", path, r.status); return null; }
+    return await r.json();
+  } catch (e) { console.log("binance", path, String(e)); return null; }
+}
+
 async function priceCrypto(a: any) {
   const today = todayRo();
   // All wallets of the household: a coin moved in from another wallet brings its cost along.
@@ -109,6 +118,28 @@ async function priceCrypto(a: any) {
   const held = positions(txs, [], a.id).filter(p => p.qty > 0).map(p => p.coin);
   const old = new Map<string, CoinQuote>((a.coins ?? []).map((c: CoinQuote) => [c.coin, c]));
   const quotes: CoinQuote[] = held.map(c => ({ coin: c, pair: old.get(c)?.pair ?? null, price: null, ch24: null, at: null, spark: old.get(c)?.spark, spark_on: old.get(c)?.spark_on ?? null }));
+  if (String(a.platform ?? "").toLowerCase().includes("binance")) {
+    // Binance wallet: prices straight from Binance (USDT pairs, USDT ≈ USD at the BNR rate).
+    let priced = 0;
+    for (const x of quotes) {
+      const sym = `${x.coin}USDT`;
+      const t = await bn(`/api/v3/ticker/24hr?symbol=${sym}`);
+      const last = Number(t?.lastPrice);
+      if (last > 0) { x.pair = `${x.coin}/USDT`; x.price = last * rates.USD; x.ch24 = Number(t.priceChangePercent); x.at = new Date().toISOString(); priced++; }
+      else { const o = old.get(x.coin); if (o?.price != null) { x.price = o.price; x.ch24 = o.ch24; x.at = o.at; } continue; }
+      if (x.spark_on !== today) {
+        const k = await bn(`/api/v3/klines?symbol=${sym}&interval=1d&limit=30`);
+        const closes = (Array.isArray(k) ? k : []).map((r: any) => Number(r[4])).filter((v: number) => v > 0);
+        if (closes.length) { x.spark = closes.map((v: number) => Math.round(v * rates.USD * 1e8) / 1e8); x.spark_on = today; }
+      }
+    }
+    const pos = positions(txs, quotes, a.id);
+    const value = Math.round(pos.reduce((s, p) => s + p.value, 0) * 100);
+    const invested = Math.round(pos.reduce((s, p) => s + p.cost, 0) * 100);
+    await db.from("assets").update({ coins: quotes, value, invested, updated_on: today, prices_on: today, value_source: "market" }).eq("id", a.id);
+    await db.from("asset_values").upsert({ household_id: a.household_id, asset_id: a.id, day: today, value, source: "market" }, { onConflict: "asset_id,day" });
+    return { id: a.id, value, priced, positions: held.length };
+  }
   if (quotes.some(x => !x.pair)) {
     const cfg = await rx("/configuration/pairs");
     const pairs = cfg ? Object.keys(cfg) : [];

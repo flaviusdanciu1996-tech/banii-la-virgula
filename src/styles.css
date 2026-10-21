@@ -821,3 +821,12 @@ a.primary { text-decoration: none; }
 .ring-foot .legend i { width: 9px; height: 9px; border-radius: 50%; display: inline-block; }
 .ring-foot .note.bad { margin: 0; }
 @media (max-width: 350px) { .card.budget:has(.ring-wrap) { grid-template-columns: 120px 1fr; } .ring-wrap { width: 120px; height: 120px; } .ring-center b { font-size: 21px; } }
+.year-hist { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.yh { padding: 0; gap: 0; }
+.yh-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; padding: 14px 16px; background: none; border: 0; color: var(--ink); text-align: left; width: 100%; }
+.yh-head b { font-size: 17px; }
+.yh-tag { margin-left: auto; font-size: 11.5px; font-weight: 600; padding: 3px 8px; border-radius: 999px; background: color-mix(in srgb, var(--good) 18%, transparent); color: var(--good); }
+.yh-body { padding: 0 16px 14px; display: flex; flex-direction: column; gap: 8px; }
+.yh-body p { margin: 0; line-height: 1.45; }
+.small-coins .coin-ic { font-size: 12px; font-weight: 700; color: var(--muted); }
+.ok-note { color: var(--good); font-weight: 600; }

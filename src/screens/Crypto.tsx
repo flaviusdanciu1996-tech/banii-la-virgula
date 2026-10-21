@@ -6,16 +6,21 @@ import { todayIso } from '../lib/period.ts'
 import { positions, portfolio, KIND_LABEL, toLei, feeHint, withBnr, type CryptoTx, type CryptoKind, type Position, type CoinQuote } from '../lib/crypto.ts'
 import type { Asset } from '../lib/types.ts'
 import { loadBnr } from '../bnr.ts'
+import { yearStories, type YearStory } from '../lib/cryptoYears.ts'
+import { DECLARED_UNTIL } from '../lib/fiscal.ts'
 
 // Names and colors for the coins people use most; anything else shows its symbol.
 const NAMES: Record<string, string> = {
   BTC: 'Bitcoin', ETH: 'Ethereum', SOL: 'Solana', XRP: 'XRP', DOT: 'Polkadot', EGLD: 'MultiversX', AVAX: 'Avalanche', '1INCH': 'Rețea 1inch',
   ADA: 'Cardano', DOGE: 'Dogecoin', LINK: 'Chainlink', POL: 'Polygon', MATIC: 'Polygon', USDT: 'Tether', USDC: 'USD Coin', BNB: 'BNB',
+  AMP: 'Amp', LUNA: 'Terra', LUNC: 'Terra Classic', ETHW: 'Ethereum PoW', FDUSD: 'First Digital USD', FLOKI: 'FLOKI', LRC: 'Loopring',
   LTC: 'Litecoin', TRX: 'TRON', ATOM: 'Cosmos', SHIB: 'Shiba Inu', PEPE: 'Pepe', NEAR: 'NEAR', UNI: 'Uniswap', XLM: 'Stellar', SUI: 'Sui', TON: 'Toncoin',
 }
-const COLORS: Record<string, string> = { BTC: '#F7931A', ETH: '#627EEA', SOL: '#9945FF', DOT: '#E6007A', EGLD: '#23F7DD', AVAX: '#E84142', '1INCH': '#94A6C3', XRP: '#9AA4AE', ADA: '#0033AD', DOGE: '#C2A633' }
+const COLORS: Record<string, string> = { AMP: '#E2357F', LUNA: '#F9C74F', LINK: '#2A5ADA', BTC: '#F7931A', ETH: '#627EEA', SOL: '#9945FF', DOT: '#E6007A', EGLD: '#23F7DD', AVAX: '#E84142', '1INCH': '#94A6C3', XRP: '#9AA4AE', ADA: '#0033AD', DOGE: '#C2A633' }
 const coinColor = (c: string) => COLORS[c] ?? `hsl(${[...c].reduce((h, ch) => (h * 31 + ch.charCodeAt(0)) % 360, 0)} 55% 50%)`
 const coinName = (c: string) => NAMES[c] ?? c
+/** Where a wallet's prices come from. */
+export const priceSource = (a?: { platform?: string | null }) => (String(a?.platform ?? '').toLowerCase().includes('binance') ? 'Binance' : 'Revolut X')
 
 const n2 = (x: number, d = 2) => x.toLocaleString('ro-RO', { minimumFractionDigits: d, maximumFractionDigits: d })
 const lei = (x: number) => `${n2(x)} lei`
@@ -60,6 +65,7 @@ export function CryptoScreen({ assetId, notify, openAsset }: { assetId: string; 
   const [busy, setBusy] = useState(false)
   const [coinOpen, setCoinOpen] = useState<string | null>(null)
   const [form, setForm] = useState<{ tx?: CryptoTx; coin?: string } | null>(null)
+  const [showSmall, setShowSmall] = useState(false)
 
   const load = useCallback(async () => {
     const all = await st.repo.list<any>('crypto_tx', st.householdId).catch(() => [])
@@ -88,6 +94,9 @@ export function CryptoScreen({ assetId, notify, openAsset }: { assetId: string; 
   const mine = useMemo(() => (txs ?? []).filter(t => t.asset_id === assetId), [txs, assetId])
   const held = pos.filter(p => p.qty > 0)
   const pf = portfolio(pos)
+  const big = held.filter(p => p.price == null || p.value >= 1), small = held.filter(p => p.price != null && p.value < 1)
+  const years = useMemo(() => yearStories(mine), [mine])
+  const src = priceSource(asset)
 
   if (!asset) return <div className="screen"><p className="muted">Portofelul nu mai există.</p></div>
 
@@ -106,20 +115,20 @@ export function CryptoScreen({ assetId, notify, openAsset }: { assetId: string; 
           <div><span>Comisioane plătite</span><b className="num">{lei(pf.fees)}</b></div>
         </div>
         <div className="crypto-src">
-          <span className="muted small">Prețuri Revolut X · {ago(lastAt) ?? 'încă nu'}</span>
+          <span className="muted small">Prețuri {src} · {ago(lastAt) ?? 'încă nu'}</span>
           <button type="button" className="icon-btn" aria-label="Actualizează prețurile" disabled={busy} onClick={() => refresh()}><RefreshCw size={16} className={busy ? 'spin' : ''} /></button>
           <button type="button" className="icon-btn" aria-label="Nume și platformă" onClick={() => openAsset(asset)}><Pencil size={15} /></button>
         </div>
       </section>
 
       {txs === null ? <p className="muted">Se încarcă…</p> : held.length === 0 ? (
-        <EmptyArt icon="bitcoin" title="Adaugă prima monedă" text={`Scrie ce ai cumpărat: moneda, câte bucăți și cât ai plătit. Prețul se ia singur de la Revolut X.${asset.value ? ` Până atunci rămâne valoarea scrisă de mână (${lei(asset.value / 100)}).` : ''}`}>
+        <EmptyArt icon="bitcoin" title="Adaugă prima monedă" text={`Scrie ce ai cumpărat: moneda, câte bucăți și cât ai plătit. Prețul se ia singur de la ${src}.${asset.value ? ` Până atunci rămâne valoarea scrisă de mână (${lei(asset.value / 100)}).` : ''}`}>
           <button type="button" className="primary" onClick={() => setForm({})}><Plus size={17} /> Adaugă tranzacție</button>
         </EmptyArt>
       ) : <>
         <h2 className="grp-h"><span>Monedele mele</span><span className="num">{held.length}</span></h2>
         <div className="rows">
-          {held.map(p => (
+          {[...big, ...(showSmall ? small : [])].map(p => (
             <button key={p.coin} type="button" className="row coin-row" onClick={() => setCoinOpen(p.coin)}>
               <CoinIcon coin={p.coin} />
               <span className="row-main">
@@ -133,9 +142,15 @@ export function CryptoScreen({ assetId, notify, openAsset }: { assetId: string; 
               </span>
             </button>
           ))}
+          {small.length > 0 && <button type="button" className="row coin-row small-coins" onClick={() => setShowSmall(v => !v)}>
+            <span className="coin-ic" style={{ background: 'var(--track)' }}>+{small.length}</span>
+            <span className="row-main"><b>{showSmall ? 'Ascunde monedele mici' : `Altele (${small.length} monede mici)`}</b><span className="muted small">{small.map(p => p.coin).join(', ')}</span></span>
+            <span className="row-side"><b className="num">{lei(small.reduce((a, p) => a + p.value, 0))}</b></span>
+          </button>}
           <button type="button" className="row add-line" onClick={() => setForm({})}><Plus size={16} />Adaugă tranzacție</button>
         </div>
-        {pos.some(p => p.qty === 0) && <p className="hint">Vândute de tot: {pos.filter(p => p.qty === 0).map(p => p.coin).join(', ')} — le găsești în istoric dacă le adaugi din nou.</p>}
+        {pos.some(p => p.qty === 0) && <p className="hint">Nu mai ai: {pos.filter(p => p.qty === 0).map(p => p.coin).join(', ')}. Le vezi mai jos, în istoricul pe ani.</p>}
+        {years.length > 0 && <YearHistory years={years} />}
       </>}
 
       {coinOpen && txs && <CoinSheet coin={coinOpen} pos={pos.find(p => p.coin === coinOpen)} quote={quotes.find(q => q.coin === coinOpen)} txs={mine.filter(t => t.coin === coinOpen)}
@@ -154,7 +169,7 @@ function CoinSheet({ coin, pos, quote, txs, onClose, onAdd, onEdit }: { coin: st
         <div className="coin-price">
           <div><b className="num">{priceFmt(quote.price)} lei</b>{quote.ch24 != null && <span className={'num small ' + (quote.ch24 >= 0 ? 'in' : 'bad')}> {pct(quote.ch24)} · 24 h</span>}</div>
           <Spark values={quote.spark} w={300} h={64} />
-          {quote.spark && <span className="muted small">Ultimele 30 de zile · {quote.pair} pe Revolut X</span>}
+          {quote.spark && <span className="muted small">Ultimele 30 de zile · {quote.pair} pe {quote.pair?.endsWith('/USDT') ? 'Binance' : 'Revolut X'}</span>}
         </div>
       )}
       {pos && (
@@ -327,5 +342,41 @@ function TxForm({ asset, tx, coin, coins, all, notify, onClose, onSaved }: { ass
 /** Small line for the Avere row. */
 export function cryptoSummary(a: Asset): string | null {
   const n = a.coins?.length ?? 0
-  return n ? `${n} ${n === 1 ? 'monedă' : 'monede'} · preț Revolut X` : null
+  return n ? `${n} ${n === 1 ? 'monedă' : 'monede'} · preț ${priceSource(a)}` : null
+}
+
+/* ---------- Year by year ---------- */
+
+function YearHistory({ years }: { years: YearStory[] }) {
+  const [open, setOpen] = useState<number | null>(years[0]?.year ?? null)
+  const q = (n: number) => qtyFmt(n)
+  return (
+    <section className="year-hist">
+      <h2 className="grp-h"><span>Istoric pe ani</span><span className="muted small">{years[years.length - 1].year}–{years[0].year}</span></h2>
+      {years.map(y => {
+        const isOpen = open === y.year
+        return (
+          <div key={y.year} className={'card yh' + (isOpen ? ' open' : '')}>
+            <button type="button" className="yh-head" onClick={() => setOpen(isOpen ? null : y.year)} aria-expanded={isOpen}>
+              <b>{y.year}</b>
+              <span className="muted small">{[y.buys && `${y.buys} cumpărări`, y.sells && `${y.sells} vânzări`, y.swaps.length && `${y.swaps.reduce((a, s) => a + s.n, 0)} schimburi`].filter(Boolean).join(' · ') || 'doar recompense'}</span>
+              {y.year <= DECLARED_UNTIL && (y.sells > 0) && <span className="yh-tag">declarat și plătit</span>}
+            </button>
+            {isOpen && <div className="yh-body">
+              <div className="coin-box">
+                <div><span>Bani puși (cumpărări)</span><b className="num">{lei(y.bought)}</b></div>
+                <div><span>Bani scoși (vânzări)</span><b className="num">{lei(y.sold)}</b></div>
+                {y.sells > 0 && <div className="wide"><span>Profit / pierdere din vânzări</span><b className={'num ' + (y.realized >= 0 ? 'in' : 'bad')}>{signed(y.realized)}</b></div>}
+              </div>
+              {y.swaps.length > 0 && <p className="small"><b>Schimburi:</b> {y.swaps.map(s => `${s.from} → ${s.to}${s.n > 1 ? ` (${s.n}×)` : ''}`).join(', ')}</p>}
+              {y.rewards.length > 0 && <p className="small"><b>Recompense primite:</b> {y.rewards.map(r => `${q(r.qty)} ${r.coin}`).join(', ')}</p>}
+              {y.withdrawn.length > 0 && <p className="small"><b>Retrase din platformă:</b> {y.withdrawn.map(r => `${q(r.qty)} ${r.coin}`).join(', ')}</p>}
+              <p className="small"><b>{y.year === new Date().getFullYear() ? 'Ai acum:' : 'La final de an:'}</b> {y.end.length ? y.end.map(r => `${q(r.qty)} ${r.coin}`).join(', ') : 'nimic'}</p>
+            </div>}
+          </div>
+        )
+      })}
+      <p className="hint">Schimburile dintre monede nu se impozitează, doar vânzarea pe bani. Sumele în lei folosesc cursul BNR din ziua fiecărei tranzacții.</p>
+    </section>
+  )
 }

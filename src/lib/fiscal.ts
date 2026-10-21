@@ -29,6 +29,8 @@ export const FISCAL_RULES: Record<number, FiscalRules> = {
   2026: { ...base, year: 2026, minWage: 405000, divRate: 0.16, bvbLong: 0.03, bvbShort: 0.06, cryptoRate: 0.16, foreignRate: 0.16, interestRate: 0.1 },
   2027: { ...base, year: 2027, minWage: 432500, divRate: 0.16, bvbLong: 0.03, bvbShort: 0.06, cryptoRate: 0.16, foreignRate: 0.16, interestRate: 0.1, estimated: true },
 }
+/** Years already declared and paid (Declarația unică filed): shown as settled, nothing more to pay. */
+export const DECLARED_UNTIL = 2025
 export const RULES_CHECKED = '21.10.2026'
 export function rulesFor(year: number): FiscalRules {
   if (FISCAL_RULES[year]) return FISCAL_RULES[year]

@@ -5,7 +5,7 @@ import { Seg, Bar, BarsChart, Sheet, MoneyField, ConfirmButton } from '../ui.tsx
 import { fmt, fmtNum, fmtSigned, parseMoney } from '../lib/money.ts'
 import { todayIso, periodFor, shiftPeriod, periodLabel, MONTHS, MONTHS_SHORT, iso, daysInMonth, inPeriod, type Period } from '../lib/period.ts'
 import { summarize, savingsRate, snapshotAt } from '../lib/calc.ts'
-import { fiscalReport, monthlyReserve, MANUAL_LABEL, RULES_CHECKED, SOURCE_LABEL, type BrokerRow, type ManualIncome, type ManualKind, type FiscalReport } from '../lib/fiscal.ts'
+import { fiscalReport, monthlyReserve, MANUAL_LABEL, RULES_CHECKED, SOURCE_LABEL, type BrokerRow, type ManualIncome, type ManualKind, type FiscalReport, DECLARED_UNTIL } from '../lib/fiscal.ts'
 import type { CryptoTx } from '../lib/crypto.ts'
 import { toLei, withBnr } from '../lib/crypto.ts'
 import { loadBnr } from '../bnr.ts'
@@ -233,6 +233,7 @@ function FiscalTab({ data, reload, notify }: { data: ReturnType<typeof useInvest
   return (
     <>
       <Stepper label={`Veniturile din ${y}`} onPrev={() => setY(v => v - 1)} onNext={() => setY(v => v + 1)} canNext={y < thisYear} />
+      {y <= DECLARED_UNTIL && <p className="note ok-note">✓ Anul {y} e declarat și plătit. Cifrele de mai jos sunt doar pentru evidență, nu mai ai nimic de plătit pe ele.</p>}
       <section className="card budget">
         <div className="eyebrow">Declarația unică · {done ? 'termen trecut' : `până la ${dateRo(r.deadline)}`}</div>
         <div className="big num">{fmt(r.totalToPay)}</div>
