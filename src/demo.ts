@@ -84,7 +84,7 @@ export function demoSeed(): Record<Table, any[]> {
     households: [{ id: H, name: 'Familia mea', owner_id: U }],
     members: [{ household_id: H, user_id: U, display_name: 'Flavius Danciu', role: 'owner' }, { household_id: H, user_id: U2, display_name: 'Ana Pop', role: 'member' }],
     settings: [{ household_id: H, payday: 1, total_budget: null, savings_target_pct: 20, eur_rate: 4.9768, usd_rate: 4.2851, rates_date: today, fi_target: 30000000, fi_currency: 'EUR', fi_monthly: 100000, fi_return: 7, fi_include_liquid: true }],
-    categories, transactions, assets, snapshots, invites: [], push_subs: [], import_rules: [], invest_tx: [], invest_journal: [],
+    categories, transactions, assets, snapshots, invites: [], push_subs: [], import_rules: [], invest_tx: [], invest_journal: [], fiscal_income: [],
     crypto_tx: [
       { id: 'c1', household_id: H, asset_id: 'a3', coin: 'BTC', kind: 'buy', qty: 0.004, price: 300000, currency: 'RON', fee: 6, fx: null, at: addDays(today, -400) + 'T10:00:00Z', note: '' },
       { id: 'c2', household_id: H, asset_id: 'a3', coin: 'BTC', kind: 'buy', qty: 0.002, price: 350000, currency: 'RON', fee: 6, fx: null, at: addDays(today, -120) + 'T10:00:00Z', note: '' },

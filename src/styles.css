@@ -696,3 +696,34 @@ textarea { width: 100%; background: var(--surface); color: var(--ink); border: 1
 .tx-hist .row { width: 100%; text-align: left; }
 .spin { animation: spin 1s linear infinite; }
 .coin-row .row-main .small { white-space: normal; }
+
+/* ---------- Reports ---------- */
+.rep-period { margin: 12px 0; }
+.rep-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.rep-grid div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.rep-grid span { font-size: 12px; color: var(--muted); }
+.rep-grid b { font-size: 16px; overflow-wrap: anywhere; }
+.rep-cats { display: flex; flex-direction: column; gap: 10px; }
+.rep-cat-top { display: flex; justify-content: space-between; gap: 8px; font-size: 14px; margin-bottom: 4px; }
+.rep-line { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; padding: 7px 0; border-bottom: 1px solid var(--line); font-size: 14px; width: 100%; text-align: left; background: none; color: inherit; }
+.rep-line:last-child { border-bottom: 0; }
+.rep-line span { min-width: 0; color: var(--muted); }
+.rep-line b { flex: none; }
+.note svg { vertical-align: -3px; margin-right: 4px; }
+.card h2 svg { vertical-align: -3px; margin-right: 6px; }
+.cass-scale { position: relative; margin: 14px 0 26px; }
+.cass-track { height: 10px; border-radius: 99px; background: var(--track, var(--line)); overflow: hidden; }
+.cass-track i { display: block; height: 100%; background: var(--accent); border-radius: 99px; }
+.cass-mark { position: absolute; top: -4px; width: 2px; height: 18px; background: var(--muted); transform: translateX(-1px); }
+.cass-mark.on { background: var(--accent); }
+.cass-mark em { position: absolute; top: 20px; left: 50%; transform: translateX(-50%); font-size: 11px; font-style: normal; color: var(--muted); white-space: nowrap; }
+.cass-mark em::after { content: ' sal.'; }
+.cass-steps { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
+.cass-steps div { display: flex; justify-content: space-between; padding: 6px 10px; border-radius: 10px; font-size: 13.5px; color: var(--muted); }
+.cass-steps div.on { background: var(--surface-2); color: var(--ink); border: 1px solid var(--accent); }
+.fisc-rows { gap: 0; }
+.fisc-line { border-bottom: 1px solid var(--line); }
+.fisc-head { border: 0; display: flex; gap: 10px; width: 100%; text-align: left; padding: 12px 14px; background: none; color: inherit; align-items: flex-start; }
+.fisc-head .row-main .small { white-space: normal; }
+.fisc-details { padding: 0 14px 10px; }
+.fisc-todo { padding-left: 20px; display: flex; flex-direction: column; gap: 8px; font-size: 14px; }

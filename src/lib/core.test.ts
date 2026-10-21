@@ -447,3 +447,37 @@ test('crypto: average cost, rewards, sells, live prices', () => {
   assert.equal(Math.round(q.price * 100) / 100, 5.5)
   assert.ok(q.ch24! < 0)
 })
+
+import { fiscalReport, stepFor, monthlyReserve } from './fiscal.ts'
+test('fiscal: CASS steps, broker holding period, crypto exemption, SRL dividends', () => {
+  const mw = 405000
+  assert.equal(stepFor(24299_99, [6, 12, 24], mw, 0.1).step, null)
+  assert.equal(stepFor(24300_00, [6, 12, 24], mw, 0.1).step!.due, 243000)
+  assert.equal(stepFor(60000_00, [6, 12, 24], mw, 0.1).step!.due, 486000)
+  assert.equal(stepFor(200000_00, [6, 12, 24], mw, 0.1).step!.due, 972000)
+  assert.equal(stepFor(30000_00, [6, 12, 24], mw, 0.1).next!.left, 18600_00)
+  const broker = [
+    { at: '2024-01-10T10:00:00', op: 'cump', symbol: 'TLV', qty: 100, price: 20, commission: 0, net: -200000, profit: null, note: '' },
+    { at: '2026-03-01T10:00:00', op: 'cump', symbol: 'TLV', qty: 100, price: 30, commission: 0, net: -300000, profit: null, note: '' },
+    { at: '2026-06-01T10:00:00', op: 'vanz', symbol: 'TLV', qty: 150, price: 40, commission: 0, net: 600000, profit: 250000, note: '' },
+    { at: '2026-06-30T10:00:00', op: 'div', symbol: 'RON', qty: 840, price: null, commission: 0, net: 84000, profit: null, note: 'dividend TLV' },
+  ]
+  const crypto = [
+    { coin: 'DOT', kind: 'buy', qty: 10, price: 10, currency: 'RON', fee: 0, fx: null, at: '2025-01-01T00:00:00Z', note: '' },
+    { coin: 'DOT', kind: 'sell', qty: 5, price: 30, currency: 'RON', fee: 0, fx: null, at: '2026-02-01T00:00:00Z', note: '' }, // +100 lei
+  ] as any
+  const r = fiscalReport(2026, broker, crypto, [{ kind: 'srl_div', amount: 3000000, tax_withheld: 480000, day: '2026-04-01', note: '' }])
+  const bvb = r.lines.find(l => l.key === 'bvb_gain')!
+  // 100 shares held > 1 year (3%) + 50 under (6%) → 4% of 2.500 lei
+  assert.equal(bvb.withheld, 10000)
+  const div = r.lines.find(l => l.key === 'bvb_div')!
+  assert.equal(div.gross, 100000) // 840 received at 16% → 1.000 gross
+  const cr = r.lines.find(l => l.key === 'crypto')!
+  assert.equal(cr.toPay, 0) // 100 lei: under 200 per sale and 600 per year → exempt
+  // CASS base: 2.500 + 1.000 + 30.000 = 33.500 lei → step 6 → 2.430 lei
+  assert.equal(r.cassBase, 3350000)
+  assert.equal(r.cassDue, 243000)
+  assert.equal(r.casDue, 0)
+  assert.equal(r.deadline, '2027-05-25')
+  assert.deepEqual(monthlyReserve(243000, '2026-10-21', '2027-05-25'), { months: 7, perMonth: 34800 })
+})
