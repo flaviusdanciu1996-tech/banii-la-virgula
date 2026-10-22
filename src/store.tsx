@@ -95,6 +95,16 @@ export function StoreProvider({ repo, user, children }: { repo: Repo; user: User
 
   useEffect(() => { reload() }, [reload])
 
+  // Opening (or returning to) the unlocked app stops repeating radar alarms.
+  useEffect(() => {
+    if (DEMO || !supabase) return
+    const sb = supabase
+    const seen = () => { if (document.visibilityState === 'visible') sb.from('push_alerts').update({ acked: true }).eq('acked', false).then(() => {}) }
+    seen()
+    document.addEventListener('visibilitychange', seen)
+    return () => document.removeEventListener('visibilitychange', seen)
+  }, [])
+
   const [recurringRan, setRecurringRan] = useState(false)
   const rates = useMemo(() => ({ EUR: s.settings.eur_rate || 4.97, USD: s.settings.usd_rate || 4.3 }), [s.settings])
 

@@ -9,6 +9,8 @@ self.addEventListener('push', e => {
   e.waitUntil(self.registration.showNotification(d.title || 'Banii la virgulă', {
     body: d.body || 'Ai trecut cheltuielile de azi?',
     icon: 'icon-192.png', badge: 'icon-192.png', tag: d.tag || 'daily-reminder', data: { url: d.url || './' },
+    // Urgent (radar signal): stays on screen until touched, rings and vibrates long on every repeat.
+    ...(d.urgent ? { requireInteraction: true, renotify: true, silent: false, vibrate: [800, 300, 800, 300, 800, 300, 1500] } : {}),
   }))
 })
 

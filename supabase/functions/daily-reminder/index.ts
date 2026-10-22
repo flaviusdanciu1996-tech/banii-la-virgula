@@ -55,10 +55,15 @@ Deno.serve(async () => {
   }
 
   // Radar alerts (a watched coin entered "buy"), written by a trigger on crypto_radar.
-  const { data: radar } = await db.from("push_alerts").select("id, user_id, title, body, tag").eq("pushed", false).order("id").limit(50);
+  // Urgent ones ring again every ~10 minutes (max 6 times) until the app is opened, which marks them seen.
+  const { data: radar } = await db.from("push_alerts").select("id, user_id, title, body, tag, urgent, sends, last_sent, pushed")
+    .eq("acked", false).lt("sends", 6).order("id").limit(50);
   for (const a of radar ?? []) {
-    for (const s of (subs ?? []).filter((x: any) => x.user_id === a.user_id)) await send(s, { title: a.title, body: a.body, url: "./", tag: a.tag || "alert-" + a.id });
-    await db.from("push_alerts").update({ pushed: true }).eq("id", a.id);
+    if (a.pushed && (!a.urgent || (a.last_sent && Date.now() - Date.parse(a.last_sent) < 9 * 60e3))) continue;
+    const again = a.sends > 0 ? ` (repetat ${a.sends + 1}/6 — deschide aplicația ca să se oprească)` : "";
+    for (const s of (subs ?? []).filter((x: any) => x.user_id === a.user_id))
+      await send(s, { title: a.title, body: a.body + again, url: "./", tag: a.tag || "alert-" + a.id, urgent: !!a.urgent });
+    await db.from("push_alerts").update({ pushed: true, sends: a.sends + 1, last_sent: new Date().toISOString(), acked: !a.urgent }).eq("id", a.id);
   }
 
   for (const s of subs ?? []) {
