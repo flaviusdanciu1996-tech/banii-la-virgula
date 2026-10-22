@@ -1,5 +1,5 @@
 // Crypto radar: the ~200 most traded coins on Binance, analysed on 1h … 1 year with our rules.
-// pg_cron calls it every 5 minutes at night; each call refreshes the coin list once a day and the 20 stalest coins.
+// pg_cron calls it every few minutes; each call refreshes the coin list once a day, the watched open positions and the stalest coins (20 in all).
 // The app calls it too when the radar is old. Binance public market data, no key.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
@@ -66,7 +66,11 @@ Deno.serve(async (req) => {
   const u = await universe(!!body.refresh_list);
   const { data: have } = await db.from("crypto_radar").select("coin, at").neq("coin", "__universe__");
   const seen = new Map((have ?? []).map((r: any) => [r.coin, Date.parse(r.at)]));
-  const todo = [...u.coins].sort((a, b) => (seen.get(a) ?? 0) - (seen.get(b) ?? 0)).slice(0, BATCH);
+  // Open positions we watch for stop-loss / target (e.g. TSLAB for Tesla) are refreshed on every call, before the rest.
+  const { data: pos } = await db.from("invest_journal").select("watch_symbol").eq("status", "deschis").not("watch_symbol", "is", null);
+  const watch = [...new Set((pos ?? []).map((r: any) => r.watch_symbol as string))];
+  const rest = [...u.coins].filter(c => !watch.includes(c)).sort((a, b) => (seen.get(a) ?? 0) - (seen.get(b) ?? 0));
+  const todo = [...watch, ...rest].slice(0, BATCH);
   let done = 0;
   for (let i = 0; i < todo.length; i += 5) {
     const r = await Promise.all(todo.slice(i, i + 5).map(c => one(c, u).catch(e => { console.log(c, String(e)); return null; })));

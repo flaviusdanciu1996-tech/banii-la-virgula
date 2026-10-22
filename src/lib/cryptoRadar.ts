@@ -14,7 +14,7 @@ export interface RadarRow {
   volUsd: number // 24h traded value, USDT
   zone: Zone; score: number; rules: Rule[]
   entryLo: number; entryHi: number; stop: number; target: number; riskPct: number; rewardPct: number
-  sma50: number; sma200: number; rsi: number; atr: number; high20: number; low20: number; high52: number
+  sma50: number; sma200: number; rsi: number; atr: number; high20: number; low20: number; high52: number; days?: number
   note: string; at: string
 }
 
@@ -59,7 +59,7 @@ export function indicators(cs: Candle[]) {
   const macdL = e12.map((v, i) => v - e26[i]), sig = ema(macdL, 9)
   const prior = (arr: number[], n: number, f: (...a: number[]) => number) => f(...arr.slice(last - n, last))
   return {
-    close: c[last], sma20: sma(c, 20), sma50: sma(c, 50), sma200: c.length >= 200 ? sma(c, 200) : sma(c, c.length),
+    close: c[last], sma20: sma(c, 20), sma50: sma(c, 50), sma200: c.length >= 200 ? sma(c, 200) : NaN, days: c.length,
     sma50prev: sma(c, 50, last - 5), e5: ema(c, 5)[last], e8: ema(c, 8)[last], e13: ema(c, 13)[last],
     rsi, atr: atrS[last], atr50: sma(atrS.filter(Number.isFinite), 50), adx, pdi: pdi[last], ndi: ndi[last],
     macd: macdL[last], signal: sig[last], high20: prior(h, 20, Math.max), low20: prior(l, 20, Math.min), low10: Math.min(...l.slice(last - 9)),
@@ -131,16 +131,19 @@ export function analyze(coin: string, daily: Candle[], h4: Candle[] = [], ch24: 
   const t4 = h4.length > 30 ? indicators(h4) : null
   const range20 = pct(d.high20, d.low20)
   const extended = (p - d.sma20) / d.atr // how many daily moves above the 20-day average
+  // Under 200 days of history there is no real 200-day average and no 1-year high: those rules can't pass.
+  const short = d.days < 200
+  const shortTxt = `istoric prea scurt: doar ${d.days} zile (trebuie 200)`
   const rules: Rule[] = [
-    { id: 'trend', label: 'Tendință în sus (preț > media 50 > media 200)', ok: p > d.sma50 && d.sma50 > d.sma200, detail: `media 50: ${f(d.sma50)} · media 200: ${f(d.sma200)}` },
-    { id: 'golden', label: 'Golden cross (media 50 peste 200, în creștere)', ok: d.sma50 > d.sma200 && d.sma50 >= d.sma50prev, detail: d.sma50 > d.sma200 ? 'media 50 e peste 200' : 'media 50 e sub 200' },
+    { id: 'trend', label: 'Tendință în sus (preț > media 50 > media 200)', ok: !short && p > d.sma50 && d.sma50 > d.sma200, detail: short ? shortTxt : `media 50: ${f(d.sma50)} · media 200: ${f(d.sma200)}` },
+    { id: 'golden', label: 'Golden cross (media 50 peste 200, în creștere)', ok: !short && d.sma50 > d.sma200 && d.sma50 >= d.sma50prev, detail: short ? shortTxt : d.sma50 > d.sma200 ? 'media 50 e peste 200' : 'media 50 e sub 200' },
     { id: 'adx', label: 'Forța tendinței (ADX ≥ 20, cumpărătorii conduc)', ok: d.adx >= 20 && d.pdi > d.ndi, detail: `ADX ${d.adx.toFixed(0)} · +DI ${d.pdi.toFixed(0)} / −DI ${d.ndi.toFixed(0)}` },
     { id: 'ema', label: 'Mediile scurte aliniate (5 > 8 > 13)', ok: d.e5 > d.e8 && d.e8 > d.e13, detail: `${f(d.e5)} / ${f(d.e8)} / ${f(d.e13)}` },
     { id: 'macd', label: 'MACD peste semnal', ok: d.macd > d.signal, detail: `${d.macd > d.signal ? 'peste' : 'sub'} linia de semnal` },
     { id: 'rsi', label: 'RSI sănătos (45–70)', ok: d.rsi >= 45 && d.rsi <= 70, detail: `RSI ${d.rsi.toFixed(0)}${d.rsi > 70 ? ' (prea încins)' : d.rsi < 45 ? ' (slab)' : ''}` },
     { id: 'contract', label: 'Contracție (Ciprian): prețul se strânge', ok: d.atr < d.atr50 && range20 < 20, detail: `interval 20 zile: ${range20.toFixed(0)}% · volatilitate ${d.atr < d.atr50 ? 'în scădere' : 'în creștere'}` },
     { id: 'speed', label: 'Viteză (Ciprian): iese peste maximul recent', ok: p > d.high20 || (t4 != null && t4.close > t4.high20), detail: p > d.high20 ? `peste maximul pe 20 de zile${breakout ? ', cu volum mare' : ''}` : t4 && t4.close > t4.high20 ? 'peste maximul pe 4 ore' : `maxim 20 zile: ${f(d.high20)}` },
-    { id: 'high', label: 'Minervini: la cel mult 25% sub maximul pe 1 an', ok: p >= d.high52 * 0.75, detail: `${pct(p, d.high52).toFixed(0)}% față de maximul pe 1 an (${f(d.high52)})` },
+    { id: 'high', label: 'Minervini: la cel mult 25% sub maximul pe 1 an', ok: d.days >= 250 && p >= d.high52 * 0.75, detail: d.days < 250 ? `istoric prea scurt: doar ${d.days} zile, nu știm maximul pe 1 an` : `${pct(p, d.high52).toFixed(0)}% față de maximul pe 1 an (${f(d.high52)})` },
   ]
   const score = rules.filter(r => r.ok).length
   const up = rules[0].ok
@@ -155,6 +158,7 @@ export function analyze(coin: string, daily: Candle[], h4: Candle[] = [], ch24: 
   else if (up && score >= 6 && extended <= 2 && !macroDown && !microDown) zone = 'buy'
   else if (up && score >= 4) zone = 'wait'
   if (zone === 'buy' && !macroUp && cnt(['1d', '2d', '1w'], 'up') < 2) zone = 'wait'
+  if (short && zone !== 'avoid') zone = 'watch' // too little history to judge the big trend
 
   // Plan. Buy now (green) or on a pullback to the short averages (yellow / white).
   const entryHi = zone === 'buy' ? p + 0.25 * d.atr : Math.max(d.e13, d.sma20)
@@ -165,7 +169,8 @@ export function analyze(coin: string, daily: Candle[], h4: Candle[] = [], ch24: 
   const stop = Math.min(entry - d.atr, Math.max(swingStop, entry - 2.5 * d.atr))
   const risk = entry - stop
   const target = Math.max(d.high20 > entry * 1.02 ? d.high20 : 0, entry + 2 * risk)
-  const note = zone === 'buy' ? 'Trece regulile pe zi, iar imaginea mare (luni, an) nu e în jos: se poate intra în intervalul arătat.'
+  const note = short && zone === 'watch' ? `Prea nouă pe Binance (${d.days} zile de istoric): nu avem media pe 200 de zile, deci nu putem judeca tendința mare. Doar urmărește.`
+    : zone === 'buy' ? 'Trece regulile pe zi, iar imaginea mare (luni, an) nu e în jos: se poate intra în intervalul arătat.'
     : zone === 'wait' ? (extended > 2 ? 'Tendință bună, dar a urcat prea repede: așteaptă să coboare în zona de intrare.'
       : microDown ? 'Tendință bună pe zi, dar pe ore coboară acum: așteaptă să se întoarcă în sus pe 4 ore.'
       : macroDown ? 'Pe zi arată bine, dar pe luni și pe an e în jos: e doar o revenire, riscant.'
@@ -175,7 +180,7 @@ export function analyze(coin: string, daily: Candle[], h4: Candle[] = [], ch24: 
   return {
     coin, pair: `${coin}/USDT`, price: p, ch24, frames: fr, breakout, volUsd, zone, score, rules,
     entryLo, entryHi, stop, target, riskPct: (risk / entry) * 100, rewardPct: ((target - entry) / entry) * 100,
-    sma50: d.sma50, sma200: d.sma200, rsi: d.rsi, atr: d.atr, high20: d.high20, low20: d.low20, high52: d.high52,
+    sma50: d.sma50, sma200: d.sma200, rsi: d.rsi, atr: d.atr, high20: d.high20, low20: d.low20, high52: d.high52, days: d.days,
     note, at: new Date().toISOString(),
   }
 }

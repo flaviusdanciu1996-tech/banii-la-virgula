@@ -527,3 +527,13 @@ test('crypto radar: steady uptrend is not "avoid", downtrend is', () => {
   const dn = analyze('DN', mk(i => 400 - i * 0.6 + Math.sin(i / 3) * 2))
   assert.equal(dn.zone, 'avoid')
 })
+
+test('crypto radar: under 200 days of history is never "buy" (no fake 200-day average)', () => {
+  const mk = (n: number): Candle[] => Array.from({ length: n }, (_, i) => { const c = 100 + i * 0.5 + Math.sin(i / 3) * 2; return { t: i, o: c * 0.995, h: c * 1.01, l: c * 0.99, c, v: 1 } })
+  const young = analyze('NEW', mk(134))
+  assert.equal(young.zone, 'watch')
+  assert.equal(young.rules.find(r => r.id === 'trend')!.ok, false)
+  assert.equal(young.days, 134)
+  const old = analyze('OLD', mk(400))
+  assert.equal(old.rules.find(r => r.id === 'trend')!.ok, true)
+})
