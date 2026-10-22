@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="ro">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="referrer" content="no-referrer">
+<title>Semnal radar</title>
+<!-- Shown by the Automate "Dialog web" block when the radar alarm rings.
+     The button goes to alarma-oprita.html; Automate's regular expression "oprita" closes the dialog. -->
+<style>
+  :root { --bg1: #0B1B33; --bg2: #102A4C; --ink: #FFFFFF; --soft: #B9C8E0; --go: #2EBD85; --go2: #1E9E6C; --ring: rgba(46,189,133,.35); }
+  * { box-sizing: border-box; margin: 0; }
+  html, body { height: 100%; }
+  body {
+    background: radial-gradient(120% 90% at 50% 20%, var(--bg2), var(--bg1));
+    color: var(--ink); font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    display: flex; align-items: center; justify-content: center; padding: 24px 16px; min-height: 420px;
+  }
+  .card { width: 100%; max-width: 360px; text-align: center; display: flex; flex-direction: column; align-items: center; gap: 14px; }
+  .radar { position: relative; width: 132px; height: 132px; }
+  .radar span { position: absolute; inset: 0; border-radius: 50%; border: 3px solid var(--go); opacity: 0; animation: ping 2s ease-out infinite; }
+  .radar span:nth-child(2) { animation-delay: .66s; }
+  .radar span:nth-child(3) { animation-delay: 1.33s; }
+  .radar .core {
+    position: absolute; inset: 26px; border-radius: 50%;
+    background: conic-gradient(from 0deg, var(--go), #F0A733, #4C8DFF, var(--go));
+    display: grid; place-items: center; box-shadow: 0 0 40px var(--ring);
+  }
+  .radar .core i { width: 62px; height: 62px; border-radius: 50%; background: var(--bg1); display: grid; place-items: center; font-style: normal; font-size: 30px; }
+  @keyframes ping { 0% { transform: scale(.55); opacity: .9; } 100% { transform: scale(1.25); opacity: 0; } }
+  .tag { font-size: 13px; letter-spacing: .14em; text-transform: uppercase; color: var(--soft); }
+  h1 { font-size: 28px; line-height: 1.2; font-weight: 800; }
+  h1 b { color: var(--go); white-space: nowrap; }
+  p { color: var(--soft); font-size: 16px; line-height: 1.45; }
+  .stop {
+    margin-top: 6px; width: 150px; height: 150px; border-radius: 50%; border: 0; text-decoration: none;
+    background: radial-gradient(circle at 35% 30%, #4BE0A6, var(--go) 45%, var(--go2));
+    color: #fff; font-size: 24px; font-weight: 800; letter-spacing: .04em;
+    display: grid; place-items: center; box-shadow: 0 12px 34px rgba(0,0,0,.35), 0 0 0 10px var(--ring);
+    -webkit-tap-highlight-color: transparent;
+  }
+  .stop:active { transform: scale(.96); }
+  .hint { font-size: 13px; color: var(--soft); opacity: .8; }
+  @media (prefers-reduced-motion: reduce) { .radar span { animation: none; opacity: .4; } }
+</style>
+</head>
+<body>
+  <main class="card">
+    <div class="radar" aria-hidden="true"><span></span><span></span><span></span><div class="core"><i>📡</i></div></div>
+    <div class="tag">Semnal radar</div>
+    <h1><span id="coin">BTC</span> a intrat în zona <b>„De cumpărat”</b></h1>
+    <p>Regulile noastre spun că e momentul. Deschide Radarul și scrie-i lui Claude ca să faceți testul pas cu pas.</p>
+    <a class="stop" href="alarma-oprita.html" role="button">OPREȘTE</a>
+    <div class="hint">Atinge butonul ca să oprești alarma.</div>
+  </main>
+  <script>
+    try { var c = new URLSearchParams(location.search).get('c'); if (c && /^[A-Z0-9]{2,12}$/.test(c)) document.getElementById('coin').textContent = c } catch (e) {}
+  </script>
+</body>
+</html>
