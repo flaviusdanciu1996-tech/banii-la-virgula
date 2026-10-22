@@ -1,5 +1,5 @@
-import { useMemo } from 'react'
-import { Plus, RefreshCw, FileUp, Radar as RadarIcon, Sparkles, NotebookPen, CalendarCheck, Landmark } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { Plus, RefreshCw, ChevronDown, FileUp, Radar as RadarIcon, Sparkles, NotebookPen, CalendarCheck, Landmark } from 'lucide-react'
 import type { Nav } from '../App.tsx'
 import { useStore } from '../store.tsx'
 import { Donut, LineChart, CatIcon } from '../ui.tsx'
@@ -18,6 +18,9 @@ import { CountUp, EmptyArt } from '../ui.tsx'
 export function AvereScreen({ scope, openAsset, openGoal, nav }: { scope: 'all' | 'me'; openAsset: (a?: Asset, section?: AssetSection, quick?: boolean) => void; openGoal: (g?: Goal, add?: boolean) => void; nav: Nav }) {
   const st = useStore()
   const today = todayIso()
+  // Bunuri folded into one row (tap to open); the choice is remembered on this phone.
+  const [goodsOpen, setGoodsOpen] = useState(() => { try { return localStorage.getItem('avere-goods-open') === '1' } catch { return false } })
+  const toggleGoods = () => setGoodsOpen(o => { try { localStorage.setItem('avere-goods-open', o ? '0' : '1') } catch { /* ignore */ } return !o })
   const assets = useMemo(() => st.assets.filter(a => !a.archived && (scope === 'all' || a.owner_id === st.user.id)), [st.assets, scope, st.user.id])
   const nw = netWorth(assets, st.rates)
   const monthAgo = scope === 'all' ? snapshotAt(st.snapshots, new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10)) : null
@@ -95,10 +98,21 @@ export function AvereScreen({ scope, openAsset, openGoal, nav }: { scope: 'all' 
                 )
               })()}
               <div className="rows">
-                {items.map(a => a.kind === 'crypto'
+                {s.id === 'goods' && items.length > 0 && (
+                  <button type="button" className="row goods-fold" aria-expanded={goodsOpen} onClick={toggleGoods}>
+                    <CatIcon icon="gem" color={s.color} />
+                    <span className="row-main">
+                      <b>Bunurile tale · {items.length}</b>
+                      <span className="muted small">{items.map(a => a.name).join(' · ')}</span>
+                    </span>
+                    <span className="row-side"><b className="num">{fmtNum(total)} lei</b><span className="muted small">{goodsOpen ? 'ascunde' : 'vezi tot'}</span></span>
+                    <ChevronDown size={18} className={'fold-chev' + (goodsOpen ? ' open' : '')} />
+                  </button>
+                )}
+                {(s.id !== 'goods' || goodsOpen) && items.map(a => a.kind === 'crypto'
                   ? <AssetRow key={a.id} a={a} today={today} onOpen={() => nav('crypto', { id: a.id })} onQuick={() => nav('crypto', { id: a.id })} />
                   : <AssetRow key={a.id} a={a} today={today} onOpen={() => openAsset(a)} onQuick={() => openAsset(a, undefined, !a.holdings?.length)} />)}
-                <button type="button" className="row add-line" onClick={() => openAsset(undefined, s.id)}><Plus size={16} />Adaugă la {s.name.toLowerCase()}</button>
+                {(s.id !== 'goods' || goodsOpen || !items.length) && <button type="button" className="row add-line" onClick={() => openAsset(undefined, s.id)}><Plus size={16} />Adaugă la {s.name.toLowerCase()}</button>}
                 {s.id === 'invest' && <button type="button" className="row add-line" onClick={() => nav('import-broker')}><FileUp size={16} />Import din Tradeville</button>}
                 {s.id === 'invest' && <button type="button" className="row add-line plan-line" onClick={() => nav('plan')}><CalendarCheck size={16} />Planul lunii · ce cumpăr acum</button>}
                 {s.id === 'invest' && <button type="button" className="row add-line" onClick={() => nav('radar')}><RadarIcon size={16} />Radar BVB · scoruri și analize</button>}

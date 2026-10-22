@@ -880,3 +880,12 @@ a.primary { text-decoration: none; }
 .small-chip { flex: none; padding: 5px 10px; font-size: 12.5px; }
 .chart-read { display: flex; flex-direction: column; gap: 6px; font-size: 13.5px; }
 .chart-read ul { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 4px; }
+
+/* Bunuri folded into one row on Avere */
+.goods-fold { display: flex; align-items: center; gap: 12px; width: 100%; padding: 12px 14px; background: none; border: 0; text-align: left; color: inherit; }
+.goods-fold .row-main { flex: 1; min-width: 0; }
+.goods-fold .row-main .small { display: block; white-space: normal; overflow: visible; }
+.goods-fold .row-side { display: flex; flex-direction: column; align-items: flex-end; gap: 2px; }
+.goods-fold .fold-chev { color: var(--muted); transition: transform .2s; flex: none; }
+.goods-fold .fold-chev.open { transform: rotate(180deg); }
+.goods-fold[aria-expanded="true"] { border-bottom: 1px solid var(--line); }
