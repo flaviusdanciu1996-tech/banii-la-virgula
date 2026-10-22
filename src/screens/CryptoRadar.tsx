@@ -108,10 +108,41 @@ function RadarSheet({ r, rate, onClose }: { r: RadarRow; rate: number; onClose: 
   const plan = r.zone === 'buy' || r.zone === 'wait'
   const entry = r.zone === 'buy' ? r.entryHi : (r.entryLo + r.entryHi) / 2
   const stopLimit = r.stop * 0.995
+  // In the EU, Binance no longer trades USDT: orders go on COIN/EUR when it exists, otherwise COIN/USDC (≈ 1 USD).
+  const [eu, setEu] = useState<{ quote: 'EUR' | 'USDC'; k: number } | null>(null)
+  useEffect(() => {
+    let alive = true
+    const px = async (s: string) => { const res = await fetch(`https://data-api.binance.vision/api/v3/ticker/price?symbol=${s}`); if (!res.ok) return null; return Number((await res.json()).price) || null }
+    ;(async () => {
+      try {
+        const [eurUsdc, coinEur] = await Promise.all([px('EURUSDC'), px(r.coin + 'EUR')])
+        if (alive) setEu(coinEur && eurUsdc ? { quote: 'EUR', k: 1 / eurUsdc } : { quote: 'USDC', k: 1 })
+      } catch { if (alive) setEu({ quote: 'USDC', k: 1 }) }
+    })()
+    return () => { alive = false }
+  }, [r.coin])
+  const q = eu?.quote ?? 'USDC', k = eu?.k ?? 1
+  const p = (x: number) => usd(x * k) + (q === 'EUR' ? ' €' : ' USDC')
+  const tooSmall = amount > 0 && amount * (1 - r.riskPct / 100) < 5.5
+  // Push alert when this coin enters "buy" (a database trigger watches the radar).
+  const [watch, setWatch] = useState<boolean | null>(DEMO ? false : null)
+  useEffect(() => {
+    if (DEMO || !supabase) return
+    supabase.from('radar_watch').select('coin').eq('coin', r.coin).maybeSingle().then(({ data }) => setWatch(!!data))
+  }, [r.coin])
+  const toggleWatch = async () => {
+    if (DEMO || !supabase || watch === null) return
+    const { data: u } = await supabase.auth.getUser()
+    if (!u.user) return
+    if (watch) await supabase.from('radar_watch').delete().eq('coin', r.coin).eq('user_id', u.user.id)
+    else await supabase.from('radar_watch').upsert({ user_id: u.user.id, coin: r.coin })
+    setWatch(!watch)
+  }
   const groups: [string, string[]][] = [['Pe termen scurt (intrarea)', ['1h', '4h', '8h']], ['Tendința', ['1d', '2d', '1w']], ['Imaginea mare', ['1M', '3M', '6M', '1y']]]
   return (
     <Sheet title={`${r.coin} · ${usd(r.price)} USDT`} onClose={onClose}>
       <div className={'verdict z-' + r.zone}><b>{ZONE_LABEL[r.zone]}</b><span>{r.note}</span></div>
+      {!DEMO && <button type="button" className="chip" aria-pressed={!!watch} disabled={watch === null} onClick={toggleWatch}>{watch ? '🔔 Te anunț când intră pe „De cumpărat” · oprește' : '🔕 Anunță-mă când intră pe „De cumpărat”'}</button>}
       <CryptoChart coin={r.coin} plan={r} />
       <p className="muted small">≈ {(r.price * rate).toLocaleString('ro-RO', { maximumSignificantDigits: 5 })} lei · 24 h {pctS(r.ch24)} · {r.score}/9 reguli trec{r.breakout ? ' · ⚡ sparge azi' : ''}</p>
 
@@ -141,10 +172,11 @@ function RadarSheet({ r, rate, onClose }: { r: RadarRow; rate: number; onClose: 
 
         <h3 className="sub-h">Pașii în aplicația Binance</h3>
         <ol className="steps">
-          <li><b>Ai nevoie de USDT.</b> Depune euro prin transfer bancar (SEPA, gratuit), apoi <b>Trade → Convert</b>: din EUR în USDT. Nu cumpăra cu cardul: comisionul e ~2%.</li>
-          <li><b>Cumpărarea:</b> Trade → <b>Spot</b> → caută <b>{r.coin}/USDT</b> → Cumpără → tip <b>Limită</b>. Preț: <b className="num">{usd(r.zone === 'buy' ? r.entryHi : entry)}</b>. Sumă: <b>{amount} €</b> în USDT. Apasă Cumpără {r.coin}.</li>
+          {tooSmall && <li className="bad"><b>Suma e prea mică.</b> Binance nu primește ordine sub 5 €, iar după o scădere până la stop ordinul de vânzare ar fi refuzat. Pune cel puțin 10 €.</li>}
+          <li><b>Banii în cont ({q}).</b> În UE, Binance nu mai tranzacționează USDT. {q === 'EUR' ? 'Ai nevoie de euro în Binance.' : 'Ai nevoie de USDC (Trade → Convert: din EUR sau din altă monedă în USDC).'} Cel mai ieftin: schimbi o monedă pe care o ai deja (Trade → <b>Convert</b>). Cardul costă 3,6–4,1%; transferul bancar SEPA, dacă apare la tine în Add Funds, e ~1 €.</li>
+          <li><b>Cumpărarea:</b> Trade → <b>Spot</b> → caută <b>{r.coin}/{q}</b> → Cumpără → tip <b>Limită</b>. Preț: <b className="num">{p(r.zone === 'buy' ? r.entryHi : entry)}</b>. Sumă: <b>{amount} €</b>{q === 'USDC' ? ' (în USDC)' : ''}. Apasă Cumpără {r.coin}.</li>
           <li>Dacă prețul nu ajunge în zona de intrare în 2–3 zile, <b>anulează ordinul</b> (Ordine deschise → Anulează). Nu alerga după preț.</li>
-          <li><b>Stop-loss + țintă deodată:</b> după ce s-a cumpărat, tot pe {r.coin}/USDT → Vinde → tip <b>OCO</b>. Completează: <b>Limită (ținta)</b> <span className="num">{usd(r.target)}</span> · <b>Stop (declanșare)</b> <span className="num">{usd(r.stop)}</span> · <b>Limită la stop</b> <span className="num">{usd(stopLimit)}</span> · <b>Cantitate</b>: toată moneda cumpărată. Apasă Vinde.</li>
+          <li><b>Stop-loss + țintă deodată:</b> după ce s-a cumpărat, tot pe {r.coin}/{q} → Vinde → tip <b>OCO</b>. Completează: <b>Limită (ținta)</b> <span className="num">{p(r.target)}</span> · <b>Stop (declanșare)</b> <span className="num">{p(r.stop)}</span> · <b>Limită la stop</b> <span className="num">{p(stopLimit)}</span> · <b>Cantitate</b>: toată moneda cumpărată. Apasă Vinde.</li>
           <li>Verifică în <b>Ordine deschise</b> că apar cele două ordine OCO. Când unul se execută, celălalt se anulează singur.</li>
           <li>Nu muta stop-loss-ul în jos. Îl poți urca doar în sus, după ce prețul a crescut.</li>
         </ol>

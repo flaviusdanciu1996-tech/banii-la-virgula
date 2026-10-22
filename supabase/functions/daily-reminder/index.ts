@@ -1,5 +1,5 @@
 // Daily push: the expense reminder (only if nothing was logged today) and the quote of the day.
-// Also sends security alerts (wrong codes, account changes) from security_log right away.
+// Also sends security alerts (wrong codes, account changes) from security_log and radar alerts from push_alerts right away.
 // Called every 10 minutes by pg_cron and by a trigger on security_log. Quotes come from the published app (dist/quotes.json).
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import webpush from "npm:web-push@3.6.7";
@@ -52,6 +52,13 @@ Deno.serve(async () => {
     const body = `${a.detail}. Dacă nu ai fost tu: Cont → Securitate → Deconectează celelalte dispozitive și schimbă parola.`;
     for (const s of (subs ?? []).filter((x: any) => x.user_id === a.user_id)) await send(s, { title, body, url: "./", tag: "security-" + a.id });
     await db.from("security_log").update({ pushed: true }).eq("id", a.id);
+  }
+
+  // Radar alerts (a watched coin entered "buy"), written by a trigger on crypto_radar.
+  const { data: radar } = await db.from("push_alerts").select("id, user_id, title, body, tag").eq("pushed", false).order("id").limit(50);
+  for (const a of radar ?? []) {
+    for (const s of (subs ?? []).filter((x: any) => x.user_id === a.user_id)) await send(s, { title: a.title, body: a.body, url: "./", tag: a.tag || "alert-" + a.id });
+    await db.from("push_alerts").update({ pushed: true }).eq("id", a.id);
   }
 
   for (const s of subs ?? []) {
