@@ -48,13 +48,10 @@
   <main class="card">
     <div class="radar" aria-hidden="true"><span></span><span></span><span></span><div class="core"><i>📡</i></div></div>
     <div class="tag">Semnal radar</div>
-    <h1><span id="coin">BTC</span> a intrat în zona <b>„De cumpărat”</b></h1>
-    <p>Regulile noastre spun că e momentul. Deschide Radarul și scrie-i lui Claude ca să faceți testul pas cu pas.</p>
+    <h1>Ai un <b>semnal nou</b></h1>
+    <p>Cumpărare, stop-loss sau țintă: scrie în notificare ce monedă sau acțiune și ce ai de făcut. Oprește alarma, citește notificarea și scrie-i lui Claude.</p>
     <a class="stop" href="http://localhost/ok" target="_top" role="button">OPREȘTE</a>
     <div class="hint">Atinge butonul ca să oprești alarma.</div>
   </main>
-  <script>
-    try { var c = new URLSearchParams(location.search).get('c'); if (c && /^[A-Z0-9]{2,12}$/.test(c)) document.getElementById('coin').textContent = c } catch (e) {}
-  </script>
 </body>
 </html>
