@@ -6,7 +6,7 @@
 <meta name="referrer" content="no-referrer">
 <title>Semnal radar</title>
 <!-- Shown by the Automate "Dialog web" block when the radar alarm rings.
-     The button goes to alarma-oprita.html; Automate's regular expression "oprita" closes the dialog. -->
+     Automate intercepts http://localhost/ok: the dialog closes on its YES path, which stops the sound. -->
 <style>
   :root { --bg1: #0B1B33; --bg2: #102A4C; --ink: #FFFFFF; --soft: #B9C8E0; --go: #2EBD85; --go2: #1E9E6C; --ring: rgba(46,189,133,.35); }
   * { box-sizing: border-box; margin: 0; }
@@ -50,7 +50,7 @@
     <div class="tag">Semnal radar</div>
     <h1><span id="coin">BTC</span> a intrat în zona <b>„De cumpărat”</b></h1>
     <p>Regulile noastre spun că e momentul. Deschide Radarul și scrie-i lui Claude ca să faceți testul pas cu pas.</p>
-    <a class="stop" href="alarma-oprita.html" role="button">OPREȘTE</a>
+    <a class="stop" href="http://localhost/ok" role="button">OPREȘTE</a>
     <div class="hint">Atinge butonul ca să oprești alarma.</div>
   </main>
   <script>
