@@ -136,6 +136,7 @@ export interface CiprianRead {
   setup: null | { kind: 'canal' | 'lateral'; ago: number; line: number; touches: number }
   pullback: boolean; smallCandles: boolean; calmVolume: boolean; held: boolean
   pullbackLow: number; depth: number // retragerea ca parte din impuls (trebuie < 1)
+  falseLimit: number; axis: number // falsa ruptură: max 38% din impuls sub linie; axa (mijlocul) bazei de nivel 1
   validHigh: number | null // ultimul maxim valid peste preț = ținta 1
 }
 
@@ -188,13 +189,17 @@ export function readCiprian(cs: Candle[], atr: number): CiprianRead {
     if ((bh - bl) / bl < 0.25 && c[j] > bh * 1.005 && c[j - 1] <= bh) { setup = { kind: 'lateral', ago: i - j, line: bh, touches: 0 }; j0 = j }
   }
   // Pullback after the breakout: back near the line, with small candles and quieter volume, still holding above it.
-  let pullback = false, smallCandles = false, calmVolume = false, held = false, pullbackLow = cs[i].l, depth = 1
+  let pullback = false, smallCandles = false, calmVolume = false, held = false, pullbackLow = cs[i].l, depth = 1, falseLimit = 0, axis = 0
   if (setup) {
     let pk = j0
     for (let k = j0; k <= i; k++) if (c[k] > c[pk]) pk = k
     if (pk < i) {
       pullbackLow = Math.min(...cs.slice(pk + 1).map(x => x.l))
       const base = Math.min(...cs.slice(j0 - 20, j0 + 1).map(x => x.l))
+      // "Expansiunile prețurilor": a false break may go under the line by at most 38% of the impulse above it,
+      // and the pullback must stay above the axis (middle) of the base it broke out of.
+      falseLimit = setup.line - 0.38 * Math.max(cs[pk].h - setup.line, 0)
+      axis = (setup.line + Math.min(...cs.slice(j0 - 30, j0).map(x => x.l))) / 2
       depth = (cs[pk].h - pullbackLow) / (cs[pk].h - base || 1)
       pullback = pullbackLow <= setup.line + atr && c[i] < c[pk]
       held = c[i] >= setup.line * 0.98
@@ -213,7 +218,7 @@ export function readCiprian(cs: Candle[], atr: number): CiprianRead {
   const valid = piv.filter((h, q) => q === 0 || Math.abs(h - piv[q - 1]) >= atr)
   const above = valid.filter(h => h > c[i] * 1.02)
   const validHigh = above.length ? Math.min(...above) : null
-  return { speed, rising, area, place, climaxAgo, setup, pullback, smallCandles, calmVolume, held, pullbackLow, depth, validHigh }
+  return { speed, rising, area, place, climaxAgo, setup, pullback, smallCandles, calmVolume, held, pullbackLow, depth, falseLimit, axis, validHigh }
 }
 
 /**
@@ -260,6 +265,7 @@ export function analyze(coin: string, daily: Candle[], h4: Candle[] = [], ch24: 
     { id: 'panica', label: 'Panică (Ciprian): cădere cu volum uriaș în ultimele 5 luni', ok: k.climaxAgo != null, detail: k.climaxAgo != null ? `acum ${k.climaxAgo} zile` : 'nu a fost' },
     { id: 'structura', label: 'Structura (Ciprian): canal de scădere sau lateral rupt cu volum', ok: k.setup != null, detail: k.setup ? `${k.setup.kind === 'canal' ? `canal de scădere (${k.setup.touches} atingeri)` : 'lateral'} rupt acum ${k.setup.ago} zile · linia la ${f(k.setup.line)}` : 'nicio ruptură în ultimele 25 de zile' },
     { id: 'pullback', label: 'Pullback (Ciprian): revine la linie cu lumânări mici și volum mic', ok: k.pullback && k.held && k.smallCandles && k.calmVolume, detail: !k.setup ? 'așteaptă întâi ruptura' : !k.pullback ? 'nu a revenit încă la linie' : !k.held ? 'a căzut sub linie: ruptură falsă' : !k.smallCandles ? 'lumânările retragerii sunt mari' : !k.calmVolume ? 'volumul retragerii e mare' : 'lumânări mici, volum mic, ține linia' },
+    { id: 'adancime', label: 'Falsa ruptură max 38% și deasupra axei (Ciprian)', ok: k.setup != null && k.pullback && k.pullbackLow >= k.falseLimit && k.pullbackLow >= k.axis, detail: !(k.setup && k.pullback) ? '—' : k.pullbackLow < k.falseLimit ? `a coborât la ${f(k.pullbackLow)}, sub limita de 38% (${f(k.falseLimit)}): ruptura a eșuat` : k.pullbackLow < k.axis ? `a coborât sub axa bazei (${f(k.axis)})` : `minimul ${f(k.pullbackLow)} e peste limita ${f(Math.max(k.falseLimit, k.axis))}` },
     { id: 'contractie', label: 'Contracția mai mică decât impulsul (Ciprian)', ok: k.setup != null && k.pullback && k.depth < 1, detail: k.setup && k.pullback ? `retragerea = ${Math.round(k.depth * 100)}% din urcare` : '—' },
     // The second strategy, "Trend (cărți)": already rising, squeezed, then breaks out on volume. Tested on BTC 2017–2026.
     { id: 'trend', label: 'Trend (cărți): preț > media 50 > media 200', ok: !short && p > d.sma50 && d.sma50 > d.sma200, detail: short ? shortTxt : `media 50: ${f(d.sma50)} · media 200: ${f(d.sma200)}` },
@@ -271,7 +277,7 @@ export function analyze(coin: string, daily: Candle[], h4: Candle[] = [], ch24: 
   ]
   const score = rules.filter(r => r.ok).length
   const ok = (id: string) => rules.find(r => r.id === id)!.ok
-  const ciprianOk = ok('zona') && ok('viteza') && ok('structura') && ok('pullback') && ok('contractie')
+  const ciprianOk = ok('zona') && ok('viteza') && ok('structura') && ok('pullback') && ok('adancime') && ok('contractie')
   const trendOk = ok('trend') && ok('strans') && ok('spargere') && p >= tb.level * 0.98
   const microDown = fr.filter(x => ['1h', '4h', '8h'].includes(x.id) && x.dir === 'down').length >= 2
   const cipBuy = !short && ciprianOk && !microDown
