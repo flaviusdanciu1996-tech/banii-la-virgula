@@ -559,3 +559,16 @@ test('crypto radar (Ciprian): panic → lateral low → breakout on volume → c
   assert.equal(top.speed, 3)
   assert.equal(top.zone, 'avoid')
 })
+
+test('crypto radar: "Trend (cărți)" signal — rising, squeezed, breakout on volume — is buy, labelled trend', () => {
+  const cs: Candle[] = Array.from({ length: 400 }, (_, i) => {
+    const c = i < 370 ? 50 + i * 0.25 : 142.5 + Math.sin(i) * 0.8 // rise, then a tight 30-day squeeze
+    const w = i < 370 ? 0.02 : 0.005 // wide daily ranges while rising, narrow in the squeeze
+    return { t: i, o: c * 0.998, h: c * (1 + w), l: c * (1 - w), c, v: 1 }
+  })
+  cs[399] = { t: 399, o: 143, h: 148, l: 142.8, c: 147.5, v: 2.5 } // breakout above the squeeze on volume
+  const r = analyze('TRD', cs)
+  assert.equal(r.rules.find(x => x.id === 'spargere')!.ok, true)
+  assert.equal(r.signal, 'trend')
+  assert.equal(r.zone, 'buy')
+})

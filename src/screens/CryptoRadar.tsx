@@ -4,7 +4,7 @@ import { useStore } from '../store.tsx'
 import { Sheet } from '../ui.tsx'
 import { supabase, DEMO } from '../db.ts'
 import { CryptoChart } from './CryptoChart.tsx'
-import { ZONE_LABEL, STOCK_TOKEN, type RadarRow, type Zone, type Dir } from '../lib/cryptoRadar.ts'
+import { ZONE_LABEL, SIGNAL_LABEL, STOCK_TOKEN, type RadarRow, type Zone, type Dir } from '../lib/cryptoRadar.ts'
 
 const ZONES: Zone[] = ['buy', 'wait', 'watch', 'avoid']
 const ZONE_ORDER: Record<Zone, number> = { buy: 0, wait: 1, watch: 2, avoid: 3 }
@@ -91,7 +91,7 @@ export function CryptoRadarScreen({ notify }: { notify: (m: string) => void }) {
                 <span className="muted small num">{usd(r.price)} USDT · <span className={(r.ch24 ?? 0) >= 0 ? 'in' : 'bad'}>{pctS(r.ch24)}</span></span>
                 <span className="tf-strip" aria-label="Direcția pe 1 oră … 1 an">{r.frames.map(f => <i key={f.id} className={'tf ' + f.dir} title={f.label}><DirIcon d={f.dir} size={10} /></i>)}</span>
               </span>
-              <span className="row-side"><span className={'zone-badge z-' + r.zone}>{ZONE_LABEL[r.zone]}</span><span className="muted small">{r.score}/{r.rules.length} reguli</span></span>
+              <span className="row-side"><span className={'zone-badge z-' + r.zone}>{ZONE_LABEL[r.zone]}</span><span className="muted small">{r.signal ? SIGNAL_LABEL[r.signal] : `${r.score}/${r.rules.length} reguli`}</span></span>
             </button>
           ))}
         </div>
@@ -141,7 +141,7 @@ function RadarSheet({ r, rate, onClose }: { r: RadarRow; rate: number; onClose: 
   const groups: [string, string[]][] = [['Pe termen scurt (intrarea)', ['1h', '4h', '8h']], ['Tendința', ['1d', '2d', '1w']], ['Imaginea mare', ['1M', '3M', '6M', '1y']]]
   return (
     <Sheet title={`${r.coin} · ${usd(r.price)} USDT`} onClose={onClose}>
-      <div className={'verdict z-' + r.zone}><b>{ZONE_LABEL[r.zone]}</b><span>{r.note}</span></div>
+      <div className={'verdict z-' + r.zone}><b>{ZONE_LABEL[r.zone]}{r.signal ? ` · ${SIGNAL_LABEL[r.signal]}` : ''}</b><span>{r.note}</span></div>
       {!DEMO && <button type="button" className="chip" aria-pressed={!!watch} disabled={watch === null} onClick={toggleWatch}>{watch ? '🔔 Te anunț când intră pe „De cumpărat” · oprește' : '🔕 Anunță-mă când intră pe „De cumpărat”'}</button>}
       <CryptoChart coin={r.coin} plan={r} />
       <p className="muted small">≈ {(r.price * rate).toLocaleString('ro-RO', { maximumSignificantDigits: 5 })} lei · 24 h {pctS(r.ch24)} · {r.score}/{r.rules.length} reguli trec{r.breakout ? ' · ⚡ sparge azi' : ''}</p>
