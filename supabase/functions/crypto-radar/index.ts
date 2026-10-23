@@ -3,7 +3,7 @@
 // The app calls it too when the radar is old. Binance public market data, no key.
 import "jsr:@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "npm:@supabase/supabase-js@2";
-import { analyze, toCandles, RADAR_COINS, SKIP, STOCK_TOKEN } from "./radar.ts";
+import { analyze, toCandles, RADAR_COINS, SKIP, STOCK_TOKEN, type Candle } from "./radar.ts";
 
 const cors = {
   "Access-Control-Allow-Origin": "*",
@@ -57,7 +57,28 @@ async function one(coin: string, u: Uni) {
   const t = u.tick[coin];
   const row = analyze(coin, daily, toCandles(h4), t?.ch ?? null, { h1: toCandles(h1), h8: toCandles(h8), w1: toCandles(w1), m1: toCandles(m1) }, t?.vol ?? 0);
   await db.from("crypto_radar").upsert({ coin, d: row, at: row.at });
+  await levelAlerts(coin, toCandles(h4));
   return row;
+}
+
+const ro = (x: number) => x.toLocaleString("ro-RO", { maximumSignificantDigits: 6 });
+/** Level alerts on 4h candles: the last CLOSED candle ends above the level on ≥ vol_mult × the 20-candle average volume. */
+async function levelAlerts(coin: string, h4: Candle[]) {
+  const { data: rows } = await db.from("crypto_level_alerts").select("*").eq("coin", coin).eq("tf", "4h").is("alerted_at", null);
+  if (!rows?.length || h4.length < 23) return;
+  const k = h4.length - 2, x = h4[k]; // h4[last] is still forming
+  const avg = h4.slice(k - 20, k).reduce((a, y) => a + y.v, 0) / 20;
+  let sent = 0;
+  for (const a of rows) {
+    if (!(x.c > Number(a.above) && x.v >= Number(a.vol_mult) * avg)) continue;
+    await db.from("push_alerts").insert({ user_id: a.user_id, urgent: true, tag: `level-${coin}`,
+      title: `📡 SEMNAL · ${coin} a spart ${ro(Number(a.above))} $ pe 4 ore cu volum`,
+      body: `Lumânarea de 4 ore s-a închis la ${ro(x.c)} $, cu volum ${(x.v / avg).toFixed(1)}× normal. Ciprian: nu cumpăra pe loc, așteaptă pullback-ul cu lumânări mici.${a.stop ? ` Stop sub ${ro(Number(a.stop))}` : ""}${a.target ? ` · ținta 1: ${ro(Number(a.target))}` : ""}. Scrie-i lui Claude.` });
+    await db.from("crypto_level_alerts").update({ alerted_at: new Date().toISOString() }).eq("id", a.id);
+    sent++;
+  }
+  if (sent) await fetch(Deno.env.get("SUPABASE_URL") + "/functions/v1/daily-reminder", { method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}` }, body: JSON.stringify({ alerts: true }) }).catch(() => {});
 }
 
 Deno.serve(async (req) => {
@@ -68,7 +89,9 @@ Deno.serve(async (req) => {
   const seen = new Map((have ?? []).map((r: any) => [r.coin, Date.parse(r.at)]));
   // Open positions we watch for stop-loss / target (e.g. TSLAB for Tesla) are refreshed on every call, before the rest.
   const { data: pos } = await db.from("invest_journal").select("watch_symbol").eq("status", "deschis").not("watch_symbol", "is", null);
-  const watch = [...new Set((pos ?? []).map((r: any) => r.watch_symbol as string))];
+  // Coins with a pending 4h level alert are refreshed on every call too.
+  const { data: lv } = await db.from("crypto_level_alerts").select("coin").is("alerted_at", null);
+  const watch = [...new Set([...(pos ?? []).map((r: any) => r.watch_symbol as string), ...(lv ?? []).map((r: any) => r.coin as string)])];
   const rest = [...u.coins].filter(c => !watch.includes(c)).sort((a, b) => (seen.get(a) ?? 0) - (seen.get(b) ?? 0));
   const todo = [...watch, ...rest].slice(0, BATCH);
   let done = 0;
