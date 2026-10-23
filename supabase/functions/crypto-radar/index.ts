@@ -57,23 +57,26 @@ async function one(coin: string, u: Uni) {
   const t = u.tick[coin];
   const row = analyze(coin, daily, toCandles(h4), t?.ch ?? null, { h1: toCandles(h1), h8: toCandles(h8), w1: toCandles(w1), m1: toCandles(m1) }, t?.vol ?? 0);
   await db.from("crypto_radar").upsert({ coin, d: row, at: row.at });
-  await levelAlerts(coin, toCandles(h4));
+  await levelAlerts(coin, { "4h": toCandles(h4), "1d": daily });
   return row;
 }
 
 const ro = (x: number) => x.toLocaleString("ro-RO", { maximumSignificantDigits: 6 });
-/** Level alerts on 4h candles: the last CLOSED candle ends above the level on ≥ vol_mult × the 20-candle average volume. */
-async function levelAlerts(coin: string, h4: Candle[]) {
-  const { data: rows } = await db.from("crypto_level_alerts").select("*").eq("coin", coin).eq("tf", "4h").is("alerted_at", null);
-  if (!rows?.length || h4.length < 23) return;
-  const k = h4.length - 2, x = h4[k]; // h4[last] is still forming
-  const avg = h4.slice(k - 20, k).reduce((a, y) => a + y.v, 0) / 20;
+/** Level alerts on 4h or 1-day candles: the last CLOSED candle ends above the level on ≥ vol_mult × the 20-candle average volume. */
+async function levelAlerts(coin: string, series: Record<string, Candle[]>) {
+  const { data: rows } = await db.from("crypto_level_alerts").select("*").eq("coin", coin).is("alerted_at", null);
+  if (!rows?.length) return;
   let sent = 0;
   for (const a of rows) {
+    const cs = series[a.tf] ?? [];
+    if (cs.length < 23) continue;
+    const k = cs.length - 2, x = cs[k]; // cs[last] is still forming
+    const avg = cs.slice(k - 20, k).reduce((s, y) => s + y.v, 0) / 20;
     if (!(x.c > Number(a.above) && x.v >= Number(a.vol_mult) * avg)) continue;
+    const tfTxt = a.tf === "1d" ? "pe 1 zi" : "pe 4 ore";
     await db.from("push_alerts").insert({ user_id: a.user_id, urgent: true, tag: `level-${coin}`,
-      title: `📡 SEMNAL · ${coin} a spart ${ro(Number(a.above))} $ pe 4 ore cu volum`,
-      body: `Lumânarea de 4 ore s-a închis la ${ro(x.c)} $, cu volum ${(x.v / avg).toFixed(1)}× normal. Ciprian: nu cumpăra pe loc, așteaptă pullback-ul cu lumânări mici.${a.stop ? ` Stop sub ${ro(Number(a.stop))}` : ""}${a.target ? ` · ținta 1: ${ro(Number(a.target))}` : ""}. Scrie-i lui Claude.` });
+      title: `📡 SEMNAL · ${coin} a spart ${ro(Number(a.above))} $ ${tfTxt} cu volum`,
+      body: `Lumânarea ${a.tf === "1d" ? "zilei" : "de 4 ore"} s-a închis la ${ro(x.c)} $, cu volum ${(x.v / avg).toFixed(1)}× normal. Ciprian: nu cumpăra pe loc, așteaptă pullback-ul cu lumânări mici.${a.stop ? ` Stop sub ${ro(Number(a.stop))}` : ""}${a.target ? ` · ținta 1: ${ro(Number(a.target))}` : ""}. Scrie-i lui Claude.` });
     await db.from("crypto_level_alerts").update({ alerted_at: new Date().toISOString() }).eq("id", a.id);
     sent++;
   }
