@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react'
-import { Plus, RefreshCw, ChevronDown, FileUp, Radar as RadarIcon, Sparkles, NotebookPen, CalendarCheck, Landmark } from 'lucide-react'
+import { Plus, RefreshCw, ChevronDown, FileUp, Radar as RadarIcon, Sparkles, NotebookPen, CalendarCheck, Landmark, BookOpen } from 'lucide-react'
 import type { Nav } from '../App.tsx'
 import { useStore } from '../store.tsx'
 import { Donut, LineChart, CatIcon } from '../ui.tsx'
@@ -117,6 +117,7 @@ export function AvereScreen({ scope, openAsset, openGoal, nav }: { scope: 'all' 
                 {s.id === 'invest' && <button type="button" className="row add-line plan-line" onClick={() => nav('plan')}><CalendarCheck size={16} />Planul lunii · ce cumpăr acum</button>}
                 {s.id === 'invest' && <button type="button" className="row add-line" onClick={() => nav('radar')}><RadarIcon size={16} />Radar BVB · scoruri și analize</button>}
                 {s.id === 'invest' && <button type="button" className="row add-line" onClick={() => nav('radar-crypto')}><RadarIcon size={16} />Radar crypto · ~200 monede Binance</button>}
+                {s.id === 'invest' && <button type="button" className="row add-line" onClick={() => nav('manual')}><BookOpen size={16} />Manual de trading · teorie + TradingView</button>}
                 {s.id === 'invest' && <button type="button" className="row add-line" onClick={() => nav('rapoarte', { tab: 'fiscal' })}><Landmark size={16} />Rapoarte și taxe · CASS, impozite</button>}
                 {s.id === 'invest' && <button type="button" className="row add-line" onClick={() => nav('jurnal')}><NotebookPen size={16} />Jurnal de investiții · istoric decizii</button>}
                 {s.id === 'invest' && <button type="button" className="row add-line" onClick={() => nav('asistent')}><Sparkles size={16} />Asistent investiții</button>}

@@ -572,3 +572,13 @@ test('crypto radar: "Trend (cărți)" signal — rising, squeezed, breakout on v
   assert.equal(r.signal, 'trend')
   assert.equal(r.zone, 'buy')
 })
+
+test('TradingView symbols and links', async () => {
+  const { tvSymbol, tvUrl } = await import('./tradingview.ts')
+  assert.equal(tvSymbol('eth'), 'BINANCE:ETHUSDT')
+  assert.equal(tvSymbol('BONKUSDC'), 'BINANCE:BONKUSDC')
+  assert.equal(tvSymbol('tlv', 'bvb'), 'BVB:TLV')
+  assert.equal(tvSymbol('TSLA', 'us'), 'TSLA')
+  assert.equal(tvSymbol('NASDAQ:TSLA', 'crypto'), 'NASDAQ:TSLA')
+  assert.equal(tvUrl('BTC', 'crypto', '240'), 'https://www.tradingview.com/chart/?symbol=BINANCE%3ABTCUSDT&interval=240')
+})

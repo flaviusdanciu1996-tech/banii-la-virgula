@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { RefreshCw, Search, Zap, ArrowUp, ArrowDown, Minus, Check, X } from 'lucide-react'
+import { RefreshCw, Search, Zap, ArrowUp, ArrowDown, Minus, Check, X, ExternalLink, BookOpen } from 'lucide-react'
+import { tvUrl } from '../lib/tradingview.ts'
 import { useStore } from '../store.tsx'
 import { Sheet } from '../ui.tsx'
 import { supabase, DEMO } from '../db.ts'
@@ -20,7 +21,7 @@ const ago = (iso?: string) => {
 }
 const DirIcon = ({ d, size = 13 }: { d: Dir; size?: number }) => d === 'up' ? <ArrowUp size={size} /> : d === 'down' ? <ArrowDown size={size} /> : <Minus size={size} />
 
-export function CryptoRadarScreen({ notify }: { notify: (m: string) => void }) {
+export function CryptoRadarScreen({ notify, openManual }: { notify: (m: string) => void; openManual?: () => void }) {
   const st = useStore()
   const [rows, setRows] = useState<RadarRow[] | null>(null)
   const [total, setTotal] = useState(0)
@@ -65,6 +66,7 @@ export function CryptoRadarScreen({ notify }: { notify: (m: string) => void }) {
           </div>
           <button type="button" className="icon-btn" aria-label="Actualizează" disabled={busy} onClick={() => refresh()}><RefreshCw size={16} className={busy ? 'spin' : ''} /></button>
         </div>
+        {openManual && <button type="button" className="chip" onClick={openManual}><BookOpen size={14} /> Manualul și TradingView</button>}
         <p className="muted small">Verdictul ține cont de tot: orele arată momentul intrării, zilele și săptămânile tendința, lunile și anul imaginea mare. Radarul se actualizează singur, câte 20 de monede la 10 minute.</p>
       </section>
 
@@ -144,6 +146,10 @@ function RadarSheet({ r, rate, onClose }: { r: RadarRow; rate: number; onClose: 
       <div className={'verdict z-' + r.zone}><b>{ZONE_LABEL[r.zone]}{r.signal ? ` · ${SIGNAL_LABEL[r.signal]}` : ''}</b><span>{r.note}</span></div>
       {!DEMO && <button type="button" className="chip" aria-pressed={!!watch} disabled={watch === null} onClick={toggleWatch}>{watch ? '🔔 Te anunț când intră pe „De cumpărat” · oprește' : '🔕 Anunță-mă când intră pe „De cumpărat”'}</button>}
       <CryptoChart coin={r.coin} plan={r} />
+      <div className="chips tv-links">
+        <a className="chip" href={tvUrl(r.coin, 'crypto', '240')} target="_blank" rel="noopener noreferrer"><ExternalLink size={14} /> TradingView 4 ore</a>
+        <a className="chip" href={tvUrl(r.coin, 'crypto', 'D')} target="_blank" rel="noopener noreferrer"><ExternalLink size={14} /> 1 zi</a>
+      </div>
       <p className="muted small">≈ {(r.price * rate).toLocaleString('ro-RO', { maximumSignificantDigits: 5 })} lei · 24 h {pctS(r.ch24)} · {r.score}/{r.rules.length} reguli trec{r.breakout ? ' · ⚡ sparge azi' : ''}</p>
 
       <h3 className="sub-h">De la 1 oră la 1 an</h3>
