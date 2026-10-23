@@ -1,5 +1,6 @@
-// Crypto radar: our rules (Ciprian: trend, contraction, speed; books: Minervini, golden cross, ADX, EMA 5/8/13, MACD, RSI)
-// applied to Binance daily candles, with a concrete plan: where to buy, stop-loss, target.
+// Crypto radar on Binance daily candles, with a concrete plan: where to buy, stop-loss, target.
+// Ciprian's rules decide (area, speed, panic, broken channel/lateral, pullback with small candles);
+// a few book rules (trend, ADX, RSI) are shown for context only.
 // Pure functions, no imports: also deployed with the `crypto-radar` edge function.
 
 export interface Candle { t: number; o: number; h: number; l: number; c: number; v: number }
@@ -15,6 +16,7 @@ export interface RadarRow {
   zone: Zone; score: number; rules: Rule[]
   entryLo: number; entryHi: number; stop: number; target: number; riskPct: number; rewardPct: number
   sma50: number; sma200: number; rsi: number; atr: number; high20: number; low20: number; high52: number; days?: number
+  speed?: Speed; area?: Area; place?: number
   note: string; at: string
 }
 
@@ -121,6 +123,96 @@ export function frames(s: Series): Frame[] {
 }
 const f = (x: number) => (x >= 100 ? Math.round(x).toLocaleString('ro-RO') : x >= 1 ? x.toFixed(2) : x.toPrecision(3))
 
+// ---------- Ciprian, "Contracții, tendințe și viteza unei tendințe" ----------
+export type Speed = 1 | 2 | 3
+export type Area = 'jos' | 'mijloc' | 'sus'
+export interface CiprianRead {
+  speed: Speed; rising: boolean // viteza: 1 = lateral (acumulare), 2 = urcare/coborâre înclinată, 3 = aproape verticală
+  area: Area; place: number // unde e prețul în intervalul pe 1 an
+  climaxAgo: number | null // zile de la ultima panică (lumânare roșie mare, cu volum uriaș, după o scădere)
+  setup: null | { kind: 'canal' | 'lateral'; ago: number; line: number; touches: number }
+  pullback: boolean; smallCandles: boolean; calmVolume: boolean; held: boolean
+  pullbackLow: number; depth: number // retragerea ca parte din impuls (trebuie < 1)
+  validHigh: number | null // ultimul maxim valid peste preț = ținta 1
+}
+
+/** Straight line through the highs of days [a, b], lifted to sit on top of them: a falling channel's upper edge. */
+function upperLine(cs: Candle[], a: number, b: number) {
+  const n = b - a + 1
+  let sx = 0, sy = 0, sxy = 0, sxx = 0
+  for (let k = a; k <= b; k++) { const x = k - a, y = cs[k].h; sx += x; sy += y; sxy += x * y; sxx += x * x }
+  const slope = (n * sxy - sx * sy) / (n * sxx - sx * sx), icpt = (sy - slope * sx) / n
+  let lift = 0
+  for (let k = a; k <= b; k++) lift = Math.max(lift, cs[k].h - (icpt + slope * (k - a)))
+  const at = (k: number) => icpt + lift + slope * (k - a)
+  let touches = 0, last = -99
+  for (let k = a; k <= b; k++) if (cs[k].h >= at(k) * 0.985 && k - last > 3) { touches++; last = k }
+  return { at, touches, fall: (-slope * (b - a)) / (sy / n) }
+}
+
+/** Reads the structure the way Ciprian does: speed, area, panic, broken channel/lateral and the pullback to it. */
+export function readCiprian(cs: Candle[], atr: number): CiprianRead {
+  const i = cs.length - 1, c = cs.map(x => x.c)
+  const avgV = (a: number, b: number) => { let t = 0, n = 0; for (let k = Math.max(0, a); k <= b; k++) { t += cs[k].v; n++ } return n ? t / n : 0 }
+  const avgBody = (a: number, b: number) => { let t = 0, n = 0; for (let k = Math.max(0, a); k <= b; k++) { t += Math.abs(cs[k].c - cs[k].o); n++ } return n ? t / n : 0 }
+  // Speed: the slope of the last 20 closes, as a move measured in daily ranges (ATR).
+  const n = Math.min(20, i), xs = c.slice(i - n + 1)
+  let sx = 0, sy = 0, sxy = 0, sxx = 0
+  xs.forEach((y, x) => { sx += x; sy += y; sxy += x * y; sxx += x * x })
+  const slope = (xs.length * sxy - sx * sy) / (xs.length * sxx - sx * sx || 1)
+  const moveAtr = (slope * (xs.length - 1)) / (atr || 1)
+  const jump10 = Math.abs(c[i] - c[Math.max(0, i - 10)]) / (atr || 1)
+  const speed: Speed = Math.abs(moveAtr) >= 9 || jump10 >= 8 ? 3 : Math.abs(moveAtr) >= 3.5 ? 2 : 1
+  const rising = moveAtr > 0
+  // Area in the 1-year range.
+  const yr = cs.slice(-365), hi = Math.max(...yr.map(x => x.h)), lo = Math.min(...yr.map(x => x.l))
+  const place = (c[i] - lo) / (hi - lo || 1)
+  const area: Area = place < 1 / 3 ? 'jos' : place < 2 / 3 ? 'mijloc' : 'sus'
+  // Panic (selling climax): big red candle on huge volume after a fall, in the last ~5 months.
+  let climaxAgo: number | null = null
+  for (let k = i; k >= Math.max(31, i - 150); k--) {
+    const x = cs[k], body = x.o - x.c, fell = c[k] < c[k - 30] * 0.85
+    if (body > 0 && x.h - x.l >= 2 * atr && x.v >= 2.5 * avgV(k - 20, k - 1) && fell) { climaxAgo = i - k; break }
+  }
+  // Breakout: the most recent first close above a falling channel's upper line, or above a tight lateral, on volume.
+  let setup: CiprianRead['setup'] = null, j0 = -1
+  for (let j = i - 1; j >= Math.max(100, i - 25) && !setup; j--) {
+    const volOk = cs[j].v >= 1.2 * avgV(j - 20, j - 1)
+    if (!volOk) continue
+    const L = upperLine(cs, j - 90, j - 3)
+    if (L.fall >= 0.06 && L.touches >= 3 && c[j] > L.at(j) * 1.01 && c[j - 1] <= L.at(j - 1) * 1.01) { setup = { kind: 'canal', ago: i - j, line: L.at(i), touches: L.touches }; j0 = j; break }
+    const box = cs.slice(j - 30, j), bh = Math.max(...box.map(x => x.h)), bl = Math.min(...box.map(x => x.l))
+    if ((bh - bl) / bl < 0.25 && c[j] > bh * 1.005 && c[j - 1] <= bh) { setup = { kind: 'lateral', ago: i - j, line: bh, touches: 0 }; j0 = j }
+  }
+  // Pullback after the breakout: back near the line, with small candles and quieter volume, still holding above it.
+  let pullback = false, smallCandles = false, calmVolume = false, held = false, pullbackLow = cs[i].l, depth = 1
+  if (setup) {
+    let pk = j0
+    for (let k = j0; k <= i; k++) if (c[k] > c[pk]) pk = k
+    if (pk < i) {
+      pullbackLow = Math.min(...cs.slice(pk + 1).map(x => x.l))
+      const base = Math.min(...cs.slice(j0 - 20, j0 + 1).map(x => x.l))
+      depth = (cs[pk].h - pullbackLow) / (cs[pk].h - base || 1)
+      pullback = pullbackLow <= setup.line + atr && c[i] < c[pk]
+      held = c[i] >= setup.line * 0.98
+      smallCandles = avgBody(pk + 1, i) <= 0.75 * avgBody(j0, pk)
+      calmVolume = avgV(pk + 1, i) < avgV(j0, pk)
+    }
+  }
+  // Last valid high above the price: a swing high clearly apart (≥1 ATR) from the swing high before it.
+  const piv: number[] = []
+  for (let k = Math.max(5, i - 250); k <= i - 5; k++) {
+    const h = cs[k].h
+    let top = true
+    for (let q = k - 5; q <= k + 5 && top; q++) if (q !== k && cs[q].h > h) top = false
+    if (top) piv.push(h)
+  }
+  const valid = piv.filter((h, q) => q === 0 || Math.abs(h - piv[q - 1]) >= atr)
+  const above = valid.filter(h => h > c[i] * 1.02)
+  const validHigh = above.length ? Math.min(...above) : null
+  return { speed, rising, area, place, climaxAgo, setup, pullback, smallCandles, calmVolume, held, pullbackLow, depth, validHigh }
+}
+
 /** Zone + plan for one coin from daily candles (oldest first) and optional 4h candles for the timing. */
 export function analyze(coin: string, daily: Candle[], h4: Candle[] = [], ch24: number | null = null, more: Omit<Series, 'd1' | 'h4'> = {}, volUsd = 0): RadarRow {
   const d = indicators(daily)
@@ -128,59 +220,63 @@ export function analyze(coin: string, daily: Candle[], h4: Candle[] = [], ch24: 
   const vol20 = daily.slice(-21, -1).reduce((a, x) => a + x.v, 0) / 20
   const breakout = daily[daily.length - 1].c > d.high20 && daily[daily.length - 1].v > 1.5 * vol20
   const p = d.close
-  const t4 = h4.length > 30 ? indicators(h4) : null
-  const range20 = pct(d.high20, d.low20)
-  const extended = (p - d.sma20) / d.atr // how many daily moves above the 20-day average
-  // Under 200 days of history there is no real 200-day average and no 1-year high: those rules can't pass.
+  // Under 200 days of history there is no real 200-day average and no 1-year range: we can't judge the area.
   const short = d.days < 200
   const shortTxt = `istoric prea scurt: doar ${d.days} zile (trebuie 200)`
+  const k = readCiprian(daily, d.atr)
+  const speedTxt = k.speed === 1 ? 'viteza 1: lateral (acumulare)' : k.speed === 2 ? `viteza 2: ${k.rising ? 'urcă' : 'coboară'} înclinat` : `viteza 3: ${k.rising ? 'urcă' : 'cade'} aproape vertical`
+  const distribution = k.speed === 3 && k.rising
+  const falling = !k.rising && k.speed >= 2 && !k.setup
+  const areaOk = !short && (k.area === 'jos' || (k.area === 'mijloc' && k.climaxAgo != null))
+  const tp1 = k.validHigh
   const rules: Rule[] = [
+    // Ciprian: these decide.
+    { id: 'zona', label: 'Zona prețului (Ciprian): jos, sau la mijloc doar după panică', ok: areaOk, detail: short ? shortTxt : `zona ${k.area}: la ${Math.round(k.place * 100)}% din intervalul pe 1 an${k.area === 'sus' ? ' · „în zonă înaltă nu cumperi”' : k.area === 'mijloc' && k.climaxAgo == null ? ' · la mijloc e 50/50' : ''}` },
+    { id: 'viteza', label: 'Viteza (Ciprian): nu e viteza 3 în sus (distribuție)', ok: !distribution, detail: speedTxt },
+    { id: 'panica', label: 'Panică (Ciprian): cădere cu volum uriaș în ultimele 5 luni', ok: k.climaxAgo != null, detail: k.climaxAgo != null ? `acum ${k.climaxAgo} zile` : 'nu a fost' },
+    { id: 'structura', label: 'Structura (Ciprian): canal de scădere sau lateral rupt cu volum', ok: k.setup != null, detail: k.setup ? `${k.setup.kind === 'canal' ? `canal de scădere (${k.setup.touches} atingeri)` : 'lateral'} rupt acum ${k.setup.ago} zile · linia la ${f(k.setup.line)}` : 'nicio ruptură în ultimele 25 de zile' },
+    { id: 'pullback', label: 'Pullback (Ciprian): revine la linie cu lumânări mici și volum mic', ok: k.pullback && k.held && k.smallCandles && k.calmVolume, detail: !k.setup ? 'așteaptă întâi ruptura' : !k.pullback ? 'nu a revenit încă la linie' : !k.held ? 'a căzut sub linie: ruptură falsă' : !k.smallCandles ? 'lumânările retragerii sunt mari' : !k.calmVolume ? 'volumul retragerii e mare' : 'lumânări mici, volum mic, ține linia' },
+    { id: 'contractie', label: 'Contracția mai mică decât impulsul (Ciprian)', ok: k.setup != null && k.pullback && k.depth < 1, detail: k.setup && k.pullback ? `retragerea = ${Math.round(k.depth * 100)}% din urcare` : '—' },
+    // Books: shown for context, they don't decide.
     { id: 'trend', label: 'Tendință în sus (preț > media 50 > media 200)', ok: !short && p > d.sma50 && d.sma50 > d.sma200, detail: short ? shortTxt : `media 50: ${f(d.sma50)} · media 200: ${f(d.sma200)}` },
-    { id: 'golden', label: 'Golden cross (media 50 peste 200, în creștere)', ok: !short && d.sma50 > d.sma200 && d.sma50 >= d.sma50prev, detail: short ? shortTxt : d.sma50 > d.sma200 ? 'media 50 e peste 200' : 'media 50 e sub 200' },
     { id: 'adx', label: 'Forța tendinței (ADX ≥ 20, cumpărătorii conduc)', ok: d.adx >= 20 && d.pdi > d.ndi, detail: `ADX ${d.adx.toFixed(0)} · +DI ${d.pdi.toFixed(0)} / −DI ${d.ndi.toFixed(0)}` },
-    { id: 'ema', label: 'Mediile scurte aliniate (5 > 8 > 13)', ok: d.e5 > d.e8 && d.e8 > d.e13, detail: `${f(d.e5)} / ${f(d.e8)} / ${f(d.e13)}` },
-    { id: 'macd', label: 'MACD peste semnal', ok: d.macd > d.signal, detail: `${d.macd > d.signal ? 'peste' : 'sub'} linia de semnal` },
     { id: 'rsi', label: 'RSI sănătos (45–70)', ok: d.rsi >= 45 && d.rsi <= 70, detail: `RSI ${d.rsi.toFixed(0)}${d.rsi > 70 ? ' (prea încins)' : d.rsi < 45 ? ' (slab)' : ''}` },
-    { id: 'contract', label: 'Contracție (Ciprian): prețul se strânge', ok: d.atr < d.atr50 && range20 < 20, detail: `interval 20 zile: ${range20.toFixed(0)}% · volatilitate ${d.atr < d.atr50 ? 'în scădere' : 'în creștere'}` },
-    { id: 'speed', label: 'Viteză (Ciprian): iese peste maximul recent', ok: p > d.high20 || (t4 != null && t4.close > t4.high20), detail: p > d.high20 ? `peste maximul pe 20 de zile${breakout ? ', cu volum mare' : ''}` : t4 && t4.close > t4.high20 ? 'peste maximul pe 4 ore' : `maxim 20 zile: ${f(d.high20)}` },
-    { id: 'high', label: 'Minervini: la cel mult 25% sub maximul pe 1 an', ok: d.days >= 250 && p >= d.high52 * 0.75, detail: d.days < 250 ? `istoric prea scurt: doar ${d.days} zile, nu știm maximul pe 1 an` : `${pct(p, d.high52).toFixed(0)}% față de maximul pe 1 an (${f(d.high52)})` },
   ]
   const score = rules.filter(r => r.ok).length
-  const up = rules[0].ok
-  const down = p < d.sma200 || (p < d.sma50 && d.e5 < d.e8 && d.e8 < d.e13)
-  // Micro (1h–8h) times the entry, medium (1 day–1 week) is the trend we trade, macro (1 month–1 year) is the big picture.
-  const cnt = (ids: string[], dir: Dir) => fr.filter(x => ids.includes(x.id) && x.dir === dir).length
-  const microDown = cnt(['1h', '4h', '8h'], 'down') >= 2
-  const macroDown = cnt(['1M', '3M', '6M', '1y'], 'down') >= 3
-  const macroUp = cnt(['1M', '3M', '6M', '1y'], 'up') >= 2
-  let zone: Zone = 'watch'
-  if (down) zone = 'avoid'
-  else if (up && score >= 6 && extended <= 2 && !macroDown && !microDown) zone = 'buy'
-  else if (up && score >= 4) zone = 'wait'
-  if (zone === 'buy' && !macroUp && cnt(['1d', '2d', '1w'], 'up') < 2) zone = 'wait'
-  if (short && zone !== 'avoid') zone = 'watch' // too little history to judge the big trend
+  const ok = (id: string) => rules.find(r => r.id === id)!.ok
+  const ciprianOk = ok('zona') && ok('viteza') && ok('structura') && ok('pullback') && ok('contractie')
+  const microDown = fr.filter(x => ['1h', '4h', '8h'].includes(x.id) && x.dir === 'down').length >= 2
 
-  // Plan. Buy now (green) or on a pullback to the short averages (yellow / white).
-  const entryHi = zone === 'buy' ? p + 0.25 * d.atr : Math.max(d.e13, d.sma20)
-  const entryLo = zone === 'buy' ? Math.max(p - 0.5 * d.atr, d.e8) : Math.min(d.e13, d.sma20)
+  let zone: Zone = 'watch'
+  if (short) zone = 'watch'
+  else if (distribution || falling) zone = 'avoid'
+  else if (ciprianOk && !microDown) zone = 'buy'
+  else if (k.setup && areaOk) zone = 'wait'
+
+  // Plan. Buy at the pullback to the line; stop under the pullback low; target 1 = last valid high.
+  const lineNow = k.setup?.line ?? d.high20
+  const entryLo = zone === 'buy' ? Math.max(lineNow, p - 0.5 * d.atr) : lineNow
+  const entryHi = zone === 'buy' ? p + 0.25 * d.atr : lineNow + 0.5 * d.atr
   const entry = (entryLo + entryHi) / 2
-  // Stop under the last 10-day low, never more than 2.5 daily moves away (and at least 1).
-  const swingStop = d.low10 - 0.25 * d.atr
-  const stop = Math.min(entry - d.atr, Math.max(swingStop, entry - 2.5 * d.atr))
+  const swingStop = (k.pullback ? k.pullbackLow : Math.min(lineNow, d.low10)) - 0.25 * d.atr
+  const stop = Math.min(entry - d.atr, Math.max(swingStop, entry - 3 * d.atr))
   const risk = entry - stop
-  const target = Math.max(d.high20 > entry * 1.02 ? d.high20 : 0, entry + 2 * risk)
-  const note = short && zone === 'watch' ? `Prea nouă pe Binance (${d.days} zile de istoric): nu avem media pe 200 de zile, deci nu putem judeca tendința mare. Doar urmărește.`
-    : zone === 'buy' ? 'Trece regulile pe zi, iar imaginea mare (luni, an) nu e în jos: se poate intra în intervalul arătat.'
-    : zone === 'wait' ? (extended > 2 ? 'Tendință bună, dar a urcat prea repede: așteaptă să coboare în zona de intrare.'
-      : microDown ? 'Tendință bună pe zi, dar pe ore coboară acum: așteaptă să se întoarcă în sus pe 4 ore.'
-      : macroDown ? 'Pe zi arată bine, dar pe luni și pe an e în jos: e doar o revenire, riscant.'
-      : 'Tendință bună, dar nu trec destule reguli încă: așteaptă confirmarea.')
-    : zone === 'avoid' ? 'Tendință în jos: nu cumpăra până nu revine peste mediile mari.'
-    : 'Fără direcție clară: urmărește, nu cumpăra încă.'
+  const target = tp1 != null && tp1 > entry + risk ? tp1 : entry + 2 * risk
+  const note = short ? `Prea nouă pe Binance (${d.days} zile de istoric): nu știm zona pe 1 an. Doar urmărește.`
+    : distribution ? 'Viteza 3 în sus: e distribuție. Nu cumpăra; dacă ai deja, ia o parte din profit.'
+    : falling ? `Coboară (${speedTxt}). Ciprian așteaptă panica, apoi lateralul jos, apoi ruptura. Nu cumpăra acum.`
+    : zone === 'buy' ? `Structura lui Ciprian e completă: ${k.setup!.kind === 'canal' ? 'canalul de scădere' : 'lateralul'} rupt, pullback la linie cu lumânări mici. Ținta 1 la ultimul maxim valid.`
+    : zone === 'wait' ? (microDown && ciprianOk ? 'Structura e completă pe zi, dar pe ore coboară acum: așteaptă întoarcerea pe 4 ore.'
+      : !k.pullback ? `A rupt linia (${f(lineNow)}). Nu alerga după preț: așteaptă pullback-ul la linie cu lumânări mici.`
+      : 'Pullback-ul nu e curat încă (lumânări sau volum mari): mai așteaptă.')
+    : k.area === 'sus' ? '„În zonă înaltă nu cumperi.” Doar urmărește.'
+    : k.area === 'mijloc' && k.climaxAgo == null ? 'La mijlocul intervalului, fără panică înainte: 50/50. Stai deoparte.'
+    : k.speed === 1 && k.area === 'jos' ? `Acumulare în zona joasă: pune alarmă peste ${f(d.high20)} și așteaptă ruptura.`
+    : 'Fără structura lui Ciprian încă: urmărește.'
   return {
     coin, pair: `${coin}/USDT`, price: p, ch24, frames: fr, breakout, volUsd, zone, score, rules,
     entryLo, entryHi, stop, target, riskPct: (risk / entry) * 100, rewardPct: ((target - entry) / entry) * 100,
-    sma50: d.sma50, sma200: d.sma200, rsi: d.rsi, atr: d.atr, high20: d.high20, low20: d.low20, high52: d.high52, days: d.days,
+    sma50: d.sma50, sma200: d.sma200, rsi: d.rsi, atr: d.atr, high20: d.high20, low20: d.low20, high52: d.high52, days: d.days, speed: k.speed, area: k.area, place: k.place,
     note, at: new Date().toISOString(),
   }
 }

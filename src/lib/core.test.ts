@@ -537,3 +537,25 @@ test('crypto radar: under 200 days of history is never "buy" (no fake 200-day av
   const old = analyze('OLD', mk(400))
   assert.equal(old.rules.find(r => r.id === 'trend')!.ok, true)
 })
+
+test('crypto radar (Ciprian): panic → lateral low → breakout on volume → calm pullback is "buy"; vertical rise is "avoid"', () => {
+  const cs: Candle[] = []
+  const put = (c: number, o: number, v: number) => cs.push({ t: cs.length, o, h: Math.max(o, c) * 1.01, l: Math.min(o, c) * 0.99, c, v })
+  for (let i = 0; i < 255; i++) { const c = 300 - (190 * i) / 254; put(c, c * 1.003, 1) } // long fall
+  put(100, 130, 10) // panic: big red candle, huge volume
+  for (let i = 256; i < 375; i++) { const c = 105 + 5 * Math.sin(i / 4); put(c, c * 0.998, 1.2) } // lateral low (speed 1)
+  put(115, 108, 3) // breakout of the lateral on volume
+  for (let i = 376; i < 386; i++) { const c = 115 + (i - 375); put(c, c - 1.5, 1.1) } // impulse
+  for (let i = 386; i < 400; i++) { const c = 125 - (12 * (i - 385)) / 14; put(c, c + 0.4, 0.8) } // pullback: small candles, low volume
+  const r = analyze('CIP', cs)
+  assert.equal(r.area, 'jos')
+  assert.equal(r.rules.find(x => x.id === 'structura')!.ok, true)
+  assert.equal(r.rules.find(x => x.id === 'pullback')!.ok, true)
+  assert.equal(r.zone, 'buy')
+  assert.ok(r.stop < r.entryLo && r.target > r.entryHi)
+
+  const v: Candle[] = Array.from({ length: 400 }, (_, i) => { const c = i < 385 ? 100 + i * 0.1 : 138 * 1.06 ** (i - 384); return { t: i, o: c * 0.97, h: c * 1.01, l: c * 0.96, c, v: 1 } })
+  const top = analyze('TOP', v)
+  assert.equal(top.speed, 3)
+  assert.equal(top.zone, 'avoid')
+})
