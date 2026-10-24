@@ -582,3 +582,20 @@ test('TradingView symbols and links', async () => {
   assert.equal(tvSymbol('NASDAQ:TSLA', 'crypto'), 'NASDAQ:TSLA')
   assert.equal(tvUrl('BTC', 'crypto', '240'), 'https://www.tradingview.com/chart/?symbol=BINANCE%3ABTCUSDT&interval=240')
 })
+
+test('Ciprian intraday entry: breakout on volume → calm pullback → pullback line broken', async () => {
+  const { ciprianIntraday } = await import('./ciprianIntraday.ts')
+  const cs: { t: number; o: number; h: number; l: number; c: number; v: number }[] = []
+  let t = 0
+  const add = (o: number, c: number, v: number, wick = 0.3) => cs.push({ t: t++, o, c, h: Math.max(o, c) + wick, l: Math.min(o, c) - wick, v })
+  for (let k = 0; k < 70; k++) { const b = 100 + Math.sin(k / 3) * 2; add(b, b + (k % 2 ? 0.5 : -0.5), 100) } // lateral ~98–102.8
+  add(102, 110, 900) // breakout, 9× volume
+  add(110, 112, 300); add(112, 113, 250)
+  for (let k = 0; k < 10; k++) { const b = 113 - k * 0.6; add(b, b - 0.4, 80) } // small falling pullback
+  const before = ciprianIntraday(cs)
+  assert.equal(before, null)
+  add(107.4, 111, 260) // closes above the pullback's falling line on fresh volume
+  const s = ciprianIntraday(cs)
+  assert.ok(s, 'signal expected')
+  assert.ok(s!.stop < 107.4 && s!.tp1 >= 113, `stop ${s!.stop} tp1 ${s!.tp1}`)
+})
