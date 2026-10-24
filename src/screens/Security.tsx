@@ -99,8 +99,9 @@ function MfaEnroll({ onOk }: { onOk: () => void }) {
     ;(async () => {
       // Drop half-finished setups from earlier attempts, then start a fresh one.
       const { data: list } = await supabase.auth.mfa.listFactors()
-      for (const x of list?.all ?? []) if (x.status !== 'verified') await supabase.auth.mfa.unenroll({ factorId: x.id })
-      const { data, error } = await supabase.auth.mfa.enroll({ factorType: 'totp', friendlyName: 'Telefon', issuer: 'Banii la virgulă' })
+      for (const x of list?.all ?? []) if (x.status !== 'verified') await supabase.auth.mfa.unenroll({ factorId: x.id }).catch(() => {})
+      // A unique name: if an old half-finished setup could not be removed, a new one still starts (with a new key).
+      const { data, error } = await supabase.auth.mfa.enroll({ factorType: 'totp', friendlyName: `Telefon ${new Date().toISOString().slice(0, 16)}`, issuer: 'Banii la virgulă' })
       if (error || !data) { setErr(error?.message || 'Nu am putut porni configurarea.'); return }
       setF({ id: data.id, qr: data.totp.qr_code, secret: data.totp.secret, uri: data.totp.uri })
     })()
