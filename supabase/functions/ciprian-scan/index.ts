@@ -66,7 +66,8 @@ Deno.serve(async (req) => {
     if (!error) fresh.push(s);
   }
   if (fresh.length) {
-    const { data: subs } = await db.from("push_subs").select("user_id");
+    // Only people who follow the crypto radar (have at least one coin on watch) get these alerts.
+    const { data: subs } = await db.from("radar_watch").select("user_id");
     const users = [...new Set((subs ?? []).map((x: any) => x.user_id))];
     const tfTxt = tf === "1h" ? "1 oră" : "4 ore";
     for (const s of fresh.sort((a, b) => b.rr1 - a.rr1).slice(0, 3)) {
