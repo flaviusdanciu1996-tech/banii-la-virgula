@@ -73,7 +73,7 @@ Deno.serve(async (req) => {
     for (const s of fresh.sort((a, b) => b.rr1 - a.rr1).slice(0, 3)) {
       const body = `Pullback cu lumânări mici, apoi a spart linia retragerii cu volum ${pct(s.volX)}×. ` +
         `Intrare ~${ro(s.entry)} $ · stop ${ro(s.stop)} (−${pct(s.riskPct)}%) · TP1 ${ro(s.tp1)} (vinzi jumătate, stopul la intrare) · TP2 ${ro(s.tp2)}.` +
-        `${s.area ? ` Zona pe 1 zi: ${s.area}.` : ""} Verifică graficul în TradingView înainte să intri.`;
+        ` Cu risc de 40 lei (1%): poziție de ~${Math.round(40 / (s.riskPct / 100))} lei.${s.area ? ` Zona pe 1 zi: ${s.area}.` : ""} Verifică graficul în TradingView înainte să intri.`;
       for (const u of users) await db.from("push_alerts").insert({ user_id: u, urgent: true, tag: `cip-${tf}-${s.coin}`, title: `⭐ Ciprian · ${s.coin} pe ${tfTxt}: momentul intrării`, body });
     }
     await fetch(Deno.env.get("SUPABASE_URL") + "/functions/v1/daily-reminder", { method: "POST",
