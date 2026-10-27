@@ -11,20 +11,33 @@ import { GROUPS, type Tx } from '../lib/types.ts'
 
 /** Shrink the photo (max 1600 px, JPEG) so it uploads fast on mobile data. */
 export async function compress(file: File): Promise<{ data: string; mime: string; blob: Blob }> {
-  try {
-    const bmp = await createImageBitmap(file)
-    const k = Math.min(1, 1600 / Math.max(bmp.width, bmp.height))
+  const draw = (src: CanvasImageSource, w: number, h: number) => {
+    const k = Math.min(1, 1600 / Math.max(w, h))
     const c = document.createElement('canvas')
-    c.width = Math.round(bmp.width * k); c.height = Math.round(bmp.height * k)
-    c.getContext('2d')!.drawImage(bmp, 0, 0, c.width, c.height)
+    c.width = Math.round(w * k); c.height = Math.round(h * k)
+    c.getContext('2d')!.drawImage(src, 0, 0, c.width, c.height)
+    return c
+  }
+  const out = async (c: HTMLCanvasElement) => {
     const url = c.toDataURL('image/jpeg', 0.82)
     const blob = await new Promise<Blob>(res => c.toBlob(b => res(b!), 'image/jpeg', 0.82))
     return { data: url.split(',')[1], mime: 'image/jpeg', blob }
-  } catch {
-    const buf = new Uint8Array(await file.arrayBuffer())
-    let bin = ''; for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode(...buf.subarray(i, i + 0x8000))
-    return { data: btoa(bin), mime: file.type || 'image/jpeg', blob: file }
   }
+  try {
+    const bmp = await createImageBitmap(file)
+    return await out(draw(bmp, bmp.width, bmp.height))
+  } catch { /* some phones: decode through an <img> instead */ }
+  try {
+    const u = URL.createObjectURL(file)
+    const img = new Image()
+    await new Promise((ok, bad) => { img.onload = ok; img.onerror = bad; img.src = u })
+    URL.revokeObjectURL(u)
+    return await out(draw(img, img.naturalWidth, img.naturalHeight))
+  } catch { /* last resort: the original file */ }
+  if (file.size > 4_000_000) throw new Error('Poza e prea mare și nu am putut-o micșora. Fă poza direct din aplicație (butonul Bon), nu din galerie.')
+  const buf = new Uint8Array(await file.arrayBuffer())
+  let bin = ''; for (let i = 0; i < buf.length; i += 0x8000) bin += String.fromCharCode(...buf.subarray(i, i + 0x8000))
+  return { data: btoa(bin), mime: file.type || 'image/jpeg', blob: file }
 }
 
 const DEMO_RECEIPT: ReadReceipt = { merchant: 'Aral', date: todayIso(), total: 3, currency: 'EUR', items: [{ name: 'WC-Benutzung', name_ro: 'Folosire WC', amount: 1, category: 'WC & dușuri' }, { name: 'Kaffee', name_ro: 'Cafea', amount: 2, category: 'Restaurante & cafenele' }] }
@@ -49,11 +62,14 @@ export function ReceiptButton({ notify, className = 'add receipt' }: { notify: (
         const names = st.categories.filter(c => c.kind === 'out' && !c.archived).map(c => c.name)
         const { data, error } = await supabase.functions.invoke('read-receipt', { body: { image: img.data, mime: img.mime, categories: names } })
         if (error) {
-          let code = ''
-          try { code = (await (error as any).context?.json())?.error || '' } catch { /* ignore */ }
+          // Say exactly what failed, so it can be fixed: no connection, server message, or unreadable photo.
+          if ((error as any).name === 'FunctionsFetchError') throw new Error('Poza nu a ajuns la server (internet slab sau întrerupt). Încearcă din nou când ai semnal.')
+          let code = '', status = 0
+          try { status = (error as any).context?.status ?? 0; code = (await (error as any).context?.json())?.error || '' } catch { /* ignore */ }
           throw new Error(code === 'missing_key' ? 'Citirea bonurilor nu e încă activată (lipsește cheia Gemini).'
             : code === 'rate_limited' ? 'Prea multe bonuri într-un minut. Mai încearcă puțin mai târziu.'
-            : 'Nu am putut citi bonul. Încearcă o poză mai clară, cu tot bonul în cadru.')
+            : code === 'unauthorized' ? 'Sesiunea a expirat. Ieși din cont și intră din nou.'
+            : `Nu am putut citi bonul (cod ${code || status || '?'}). Trimite-i lui Claude o captură cu mesajul.`)
         }
         r = data
       }
