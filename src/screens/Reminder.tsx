@@ -134,8 +134,39 @@ export function ReminderScreen({ notify }: { notify: (m: string) => void }) {
         <button type="button" className="primary" onClick={addQuote}><Plus size={16} /> Adaugă citatul</button>
       </section>
 
+      <TestAlarm notify={notify} />
+
       {err && <p className="err">{err}</p>}
       <p className="hint">Notificările merg cel mai bine cu aplicația instalată pe ecran. Pe unele telefoane trebuie să lași Chrome să trimită notificări și când e în fundal.</p>
     </div>
+  )
+}
+
+/** Sends a real urgent alarm to this account and explains the phone settings that silence alarms at night. */
+function TestAlarm({ notify }: { notify: (m: string) => void }) {
+  const [busy, setBusy] = useState(false)
+  async function send() {
+    if (!supabase) return
+    setBusy(true)
+    try {
+      const { error } = await supabase.rpc('send_test_alarm')
+      if (error) throw error
+      await supabase.functions.invoke('daily-reminder', { body: { alerts: true } })
+      notify('Alarma de test e trimisă. Ar trebui să sune în câteva secunde.')
+    } catch (e: any) { notify(e?.message || 'Nu am putut trimite alarma de test.') }
+    finally { setBusy(false) }
+  }
+  return (
+    <section className="card form">
+      <h2>🔔 Verifică alarmele</h2>
+      <p className="note">Trimite o alarmă adevărată pe telefonul tău. Dacă nu sună, telefonul o oprește. Pe Samsung:</p>
+      <ol className="steps-list">
+        <li>Setări → Aplicații → <b>Chrome</b> (sau Banii la virgulă) → <b>Baterie</b> → <b>Fără restricții</b>.</li>
+        <li>Setări → Baterie → <b>Limite de utilizare în fundal</b>: scoate Chrome din „Aplicații în stare de repaus”.</li>
+        <li>Setări → Notificări → <b>Nu deranja</b> → Excepții → Aplicații: adaugă Chrome, ca semnalele să sune și noaptea.</li>
+        <li>Setări → Aplicații → Chrome → Notificări: lasă pornit și <b>Sunet</b>.</li>
+      </ol>
+      <button type="button" className="primary" disabled={busy} onClick={send}>{busy ? 'Trimit…' : 'Trimite o alarmă de test'}</button>
+    </section>
   )
 }

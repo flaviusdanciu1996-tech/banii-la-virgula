@@ -7,10 +7,50 @@ import { buildContext, askAssistant, Rich } from './Assistant.tsx'
 import { score, dayOf, marketChange, getMarket, LABELS } from '../lib/radar.ts'
 import { riskCalc, dueReviews, ideaReturn, journalStats, monthsSince, ACTIONS, type JournalEntry } from '../lib/journal.ts'
 import { todayIso } from '../lib/period.ts'
+import { supabase, DEMO } from '../db.ts'
 
 const n = (x: number | null | undefined, d = 1) => (x == null ? '–' : x.toLocaleString('ro-RO', { minimumFractionDigits: d, maximumFractionDigits: d }))
 const pct = (x: number | null | undefined) => (x == null ? '–' : `${x >= 0 ? '+' : ''}${n(x)}%`)
 const dmy = (d: string) => d.split('-').reverse().join('.')
+const RISK_LEI = 40 // obiectivul A: risc maxim pe tranzacție
+const GOAL_FROM = '2026-10-25', GOAL_TO = '2026-11-15'
+interface JEvent { kind: 'stop_jos' | 'stop_sus' | 'stop_atins' | 'tinta_atinsa'; symbol: string; old_val: number | null; new_val: number | null; at: string }
+const EV_LABEL: Record<JEvent['kind'], string> = { stop_jos: '⛔ stop coborât', stop_sus: '✅ stop urcat', stop_atins: '🔴 stop atins', tinta_atinsa: '🟢 țintă atinsă' }
+
+/** Objective A (25 oct – 15 nov): rules kept, not money made. Risk per open position, stop moves, pause after 2 stops. */
+function DisciplineCard({ list }: { list: JournalEntry[] }) {
+  const [ev, setEv] = useState<JEvent[] | null>(null)
+  useEffect(() => {
+    if (!supabase || DEMO) { setEv([]); return }
+    supabase.from('journal_events').select('kind, symbol, old_val, new_val, at').gte('at', GOAL_FROM).order('at', { ascending: false }).limit(50)
+      .then(({ data }) => setEv((data ?? []) as JEvent[]))
+  }, [list.length])
+  const open = list.filter(e => e.status === 'deschis' && e.stop_price != null && e.amount != null && e.price_at > 0)
+  const risk = open.map(e => ({ e, lei: Math.max(0, (e.amount! / 100) * (e.price_at - e.stop_price!) / e.price_at) }))
+  const down = (ev ?? []).filter(x => x.kind === 'stop_jos').length
+  const hits = (ev ?? []).filter(x => x.kind === 'stop_atins' || x.kind === 'tinta_atinsa')
+  const pauseUntil = hits.length >= 2 && hits[0].kind === 'stop_atins' && hits[1].kind === 'stop_atins' ? new Date(Date.parse(hits[0].at) + 2 * 864e5) : null
+  const paused = pauseUntil != null && pauseUntil.getTime() > Date.now()
+  const over = risk.filter(r => r.lei > RISK_LEI + 0.5)
+  if (ev === null) return null
+  return (
+    <section className="card discipline">
+      <h2>🎯 Obiectivul A · {dmy(GOAL_FROM).slice(0, 5)} – {dmy(GOAL_TO).slice(0, 5)}</h2>
+      {paused && <p className="note bad">⏸ Pauză până pe {pauseUntil!.toLocaleDateString('ro-RO', { day: 'numeric', month: 'short' })}: ai avut 2 stopuri la rând. Nu intri în nimic nou, recitește Manualul.</p>}
+      <div className="import-sum">
+        <div><span>Stop coborât</span><b className={'num ' + (down ? 'bad' : 'in')}>{down ? `${down}×` : '0 ✓'}</b></div>
+        <div><span>Peste {RISK_LEI} lei risc</span><b className={'num ' + (over.length ? 'bad' : 'in')}>{over.length ? `${over.length} poziții` : '0 ✓'}</b></div>
+        <div><span>Ținte / stopuri</span><b className="num">{hits.filter(h => h.kind === 'tinta_atinsa').length} / {hits.filter(h => h.kind === 'stop_atins').length}</b></div>
+      </div>
+      {risk.length > 0 && <div className="rows">{risk.map(({ e, lei }) => (
+        <div key={e.id} className="row"><span className="row-main"><b>{e.symbol}</b><span className="muted small">stop {n(e.stop_price, e.stop_price! < 1 ? 6 : 2)} · dacă atinge stopul pierzi</span></span>
+          <span className="row-side"><b className={'num ' + (lei > RISK_LEI + 0.5 ? 'bad' : '')}>{lei < 0.5 ? '0 lei' : `−${Math.round(lei)} lei`}</b></span></div>))}</div>}
+      {(ev ?? []).length > 0 && <details className="explain"><summary>Ce s-a întâmplat ({ev!.length})</summary>
+        {ev!.map((x, i) => <p key={i} className="small">{new Date(x.at).toLocaleDateString('ro-RO', { day: 'numeric', month: 'short' })} · <b>{x.symbol}</b> · {EV_LABEL[x.kind]}{x.old_val != null ? ` ${+x.old_val} → ${+x.new_val!}` : ''}</p>)}</details>}
+    </section>
+  )
+}
+
 const lei = (bani: number) => Math.round(bani / 100).toLocaleString('ro-RO')
 
 export function useJournal() {
@@ -53,6 +93,7 @@ export function JournalScreen({ notify, initialSymbol }: { notify: (m: string) =
           {due.map(({ e, cp }) => <button key={e.id + cp} type="button" className="row" onClick={() => setReview({ e, cp })}><span className="row-main"><b>{e.symbol} · {cp} luni</b><span className="muted small">{ACTIONS[e.action]} pe {dmy(e.created_on)} la {n(e.price_at, 2)} lei</span></span><span className="row-side"><b className="num">{pct(priceOf(e.symbol) != null ? ideaReturn(e, priceOf(e.symbol)!) : null)}</b></span></button>)}
         </section>
       )}
+      <DisciplineCard list={list ?? []} />
       <button type="button" className="primary" onClick={() => setEdit('new')}><Plus size={18} />Ipoteză nouă</button>
       {list && !list.length && <EmptyArt icon="inbox" title="Prima ta ipoteză" text="De exemplu: „Cumpăr TLV pentru că P/E e 8,6 și trendul e bun. Mă răzgândesc dacă scade sub media de 200 de zile.” Apoi vezi peste 3 luni dacă ai avut dreptate." />}
       <div className="rows">
@@ -163,6 +204,8 @@ Spune: 1) ce e solid în raționament, 2) ce lipsește sau contrazic datele, 3) 
             {risk.maxShares2 != null && <div><span>Maxim ca să pierzi 2%</span><b className="num">{risk.maxShares2} buc</b></div>}
           </div>
           {risk.warnings.map((w, i) => <p key={i} className="note warn">⚠️ {w}</p>)}
+          {(() => { const a = num(amount) ?? 0, sp = num(stop); const l = sp != null && price && sp < price ? a * (price - sp) / price : null
+            return l != null && l > RISK_LEI ? <p className="note bad">⛔ Riști {Math.round(l)} lei: peste regula ta de {RISK_LEI} lei pe tranzacție. Micșorează suma la ~{Math.floor(RISK_LEI * price! / (price! - sp!))} lei.</p> : null })()}
         </>}
       </div>
 

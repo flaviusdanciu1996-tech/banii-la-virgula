@@ -56,6 +56,25 @@ Deno.serve(async (req) => {
     }));
   }
   if (dry || hist) return Response.json(found);
+  // Live result of past signals (once per run, on the first slice): TP1 or stop first?
+  if (from === 0) {
+    const { data: open } = await db.from("ciprian_signals").select("id, coin, tf, candle_at, entry, stop, tp1").is("outcome", null).gte("candle_at", new Date(Date.now() - 14 * 864e5).toISOString());
+    for (const s of open ?? []) {
+      try {
+        const start = Date.parse(s.candle_at) + 3600e3;
+        const raw: any[] = await (await fetch(`https://data-api.binance.vision/api/v3/klines?symbol=${s.coin}USDT&interval=1h&startTime=${start}&limit=1000`)).json();
+        if (!Array.isArray(raw)) continue;
+        let outcome: string | null = null, at = 0, best = 0;
+        for (const k of raw) {
+          if (Number(k[6]) > Date.now()) break;
+          best = Math.max(best, (+k[2] / +s.entry - 1) * 100);
+          if (+k[3] <= +s.stop) { outcome = "stop"; at = +k[0]; break }
+          if (+k[2] >= +s.tp1) { outcome = "tp1"; at = +k[0]; break }
+        }
+        await db.from("ciprian_signals").update({ best_pct: +best.toFixed(2), ...(outcome ? { outcome, outcome_at: new Date(at).toISOString() } : {}) }).eq("id", s.id);
+      } catch { /* next */ }
+    }
+  }
   // Store once per structure; push only the new ones (max 3 per run, the rest stay visible in the app).
   const fresh: any[] = [];
   for (const s of found) {

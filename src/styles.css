@@ -906,3 +906,5 @@ a.primary { text-decoration: none; }
 .man-code { max-height: 260px; overflow: auto; font-size: 11px; line-height: 1.4; padding: 10px; border-radius: 10px; background: var(--surface-2); white-space: pre; }
 a.chip { text-decoration: none; color: inherit; }
 .tv-links { margin-top: -2px; }
+.discipline .import-sum { display: flex; }
+.star-out { font-size: 12px; font-weight: 600; }

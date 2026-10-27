@@ -7,7 +7,7 @@ import { supabase, DEMO } from '../db.ts'
 import { CryptoChart } from './CryptoChart.tsx'
 import { ZONE_LABEL, SIGNAL_LABEL, STOCK_TOKEN, type RadarRow, type Zone, type Dir } from '../lib/cryptoRadar.ts'
 
-interface StarSignal { coin: string; tf: '1h' | '4h'; candle_at: string; entry: number; stop: number; tp1: number; tp2: number; risk_pct: number; vol_x: number }
+interface StarSignal { coin: string; tf: '1h' | '4h'; candle_at: string; entry: number; stop: number; tp1: number; tp2: number; risk_pct: number; vol_x: number; outcome: 'tp1' | 'stop' | null; best_pct: number | null }
 const ZONES: Zone[] = ['buy', 'wait', 'watch', 'avoid']
 const ZONE_ORDER: Record<Zone, number> = { buy: 0, wait: 1, watch: 2, avoid: 3 }
 /** Price in USDT with sensible decimals (BTC 84.012 · DOT 5,52 · AMP 0,00083). */
@@ -33,7 +33,7 @@ export function CryptoRadarScreen({ notify, openManual }: { notify: (m: string) 
   const [stars, setStars] = useState<StarSignal[]>([])
   useEffect(() => {
     if (!supabase || DEMO) return
-    supabase.from('ciprian_signals').select('coin, tf, candle_at, entry, stop, tp1, tp2, risk_pct, vol_x').gte('created_at', new Date(Date.now() - 3 * 864e5).toISOString()).order('candle_at', { ascending: false }).limit(12)
+    supabase.from('ciprian_signals').select('coin, tf, candle_at, entry, stop, tp1, tp2, risk_pct, vol_x, outcome, best_pct').gte('created_at', new Date(Date.now() - 14 * 864e5).toISOString()).order('candle_at', { ascending: false }).limit(40)
       .then(({ data }) => setStars((data ?? []) as StarSignal[]))
   }, [])
   const mine = useMemo(() => new Set(st.assets.flatMap(a => (a.coins ?? []).map(c => c.coin))), [st.assets])
@@ -80,12 +80,14 @@ export function CryptoRadarScreen({ notify, openManual }: { notify: (m: string) 
       {stars.length > 0 && !q && (
         <section className="card brk">
           <h2>⭐ Momentul intrării (Ciprian, 1 oră · în test)</h2>
-          <p className="muted small">Ruptură cu volum mare → pullback cu lumânări mici → a spart linia retragerii. Ultimele 3 zile. În test 3 săptămâni: întâi pe hârtie, apoi cu bani.</p>
+          <p className="muted small">Ruptură cu volum mare → pullback cu lumânări mici → a spart linia retragerii. Ultimele 2 săptămâni, cu rezultatul real. În test până pe 14 nov: întâi pe hârtie, apoi cu bani.</p>
+          {(() => { const t = stars.filter(x => x.outcome === 'tp1').length, sp = stars.filter(x => x.outcome === 'stop').length
+            return t + sp > 0 ? <p className="small"><b>Până acum: {t} au atins TP1 · {sp} au atins stopul</b>{stars.length - t - sp ? ` · ${stars.length - t - sp} încă deschise` : ''}</p> : null })()}
           <div className="rows">{stars.map(x => (
             <a key={x.coin + x.tf + x.candle_at} className="row radar-row" href={tvUrl(x.coin, 'crypto', x.tf === '1h' ? '60' : '240')} target="_blank" rel="noopener noreferrer">
               <span className="row-main"><b>{x.coin} <span className="muted small">pe {x.tf === '1h' ? '1 oră' : '4 ore'}</span></b>
                 <span className="muted small num">intrare {usd(+x.entry)} · stop {usd(+x.stop)} (−{(+x.risk_pct).toFixed(1).replace('.', ',')}%) · TP1 {usd(+x.tp1)} · TP2 {usd(+x.tp2)}</span></span>
-              <span className="row-side"><span className="muted small">{ago(x.candle_at)}</span><ExternalLink size={14} /></span>
+              <span className="row-side"><span className={'star-out ' + (x.outcome === 'tp1' ? 'in' : x.outcome === 'stop' ? 'bad' : 'muted')}>{x.outcome === 'tp1' ? '🟢 TP1' : x.outcome === 'stop' ? '🔴 stop' : x.best_pct != null ? `deschis · max +${(+x.best_pct).toFixed(1).replace('.', ',')}%` : 'deschis'}</span><span className="muted small">{ago(x.candle_at)}</span></span>
             </a>))}</div>
         </section>
       )}
