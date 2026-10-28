@@ -72,8 +72,17 @@ async function levelAlerts(coin: string, series: Record<string, Candle[]>) {
     if (cs.length < 23) continue;
     const k = cs.length - 2, x = cs[k]; // cs[last] is still forming
     const avg = cs.slice(k - 20, k).reduce((s, y) => s + y.v, 0) / 20;
-    if (!(x.c > Number(a.above) && x.v >= Number(a.vol_mult) * avg)) continue;
     const tfTxt = a.tf === "1d" ? "pe 1 zi" : "pe 4 ore";
+    if (a.below != null) { // warning level: the closed candle ends under it (no volume condition)
+      if (!(x.c < Number(a.below))) continue;
+      await db.from("push_alerts").insert({ user_id: a.user_id, urgent: true, tag: `levelb-${coin}`,
+        title: `⚠️ ${coin} s-a închis sub ${ro(Number(a.below))} $ ${tfTxt}`,
+        body: `Lumânarea ${a.tf === "1d" ? "zilei" : "de 4 ore"} s-a închis la ${ro(x.c)} $. ${a.note ?? "Structura s-a stricat: nu cumpăra, așteaptă acumulare jos."} Scrie-i lui Claude.` });
+      await db.from("crypto_level_alerts").update({ alerted_at: new Date().toISOString() }).eq("id", a.id);
+      sent++;
+      continue;
+    }
+    if (!(x.c > Number(a.above) && x.v >= Number(a.vol_mult) * avg)) continue;
     await db.from("push_alerts").insert({ user_id: a.user_id, urgent: true, tag: `level-${coin}`,
       title: `📡 SEMNAL · ${coin} a spart ${ro(Number(a.above))} $ ${tfTxt} cu volum`,
       body: `Lumânarea ${a.tf === "1d" ? "zilei" : "de 4 ore"} s-a închis la ${ro(x.c)} $, cu volum ${(x.v / avg).toFixed(1)}× normal. Ciprian: nu cumpăra pe loc, așteaptă pullback-ul cu lumânări mici.${a.stop ? ` Stop sub ${ro(Number(a.stop))}` : ""}${a.target ? ` · ținta 1: ${ro(Number(a.target))}` : ""}. Scrie-i lui Claude.` });
