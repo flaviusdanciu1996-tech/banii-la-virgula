@@ -15,6 +15,7 @@ Deno.serve(async (req) => {
   const { data: rows } = await db.from("crypto_radar").select("coin, area:d->>area, zone:d->>zone").in("coin", coins);
   const area = new Map((rows ?? []).map((r: any) => [r.coin, r.area as string | null]));
   const found: any[] = [];
+  const heads: any[] = [];
   for (let i = 0; i < coins.length; i += 10) {
     await Promise.all(coins.slice(i, i + 10).map(async (coin) => {
       try {
@@ -49,6 +50,11 @@ Deno.serve(async (req) => {
           }
           return;
         }
+        if (tf === "1h" && cs.length > 40) { // heads-up: a fresh breakout on heavy volume (not yet an entry)
+          const L = cs.length - 1, prev = cs.slice(L - 30, L), bh = Math.max(...prev.map((x) => x.h));
+          const av = cs.slice(L - 20, L).reduce((a, x) => a + x.v, 0) / 20, vx = cs[L].v / (av || 1);
+          if (cs[L].c > bh * 1.005 && cs[L].c > cs[L].o && vx >= 3) heads.push({ coin, at: cs[L].t, line: bh, price: cs[L].c, volX: vx, area: area.get(coin) ?? null });
+        }
         const s = ciprianIntraday(cs);
         // Backtest Oct 2026 (201 coins, 1h): only setups with TP1 at least 1× the risk away paid off after fees.
         if (s && s.rr1 >= minRR) found.push({ coin, ...s, area: area.get(coin) ?? null });
@@ -75,6 +81,23 @@ Deno.serve(async (req) => {
       } catch { /* next */ }
     }
   }
+  // Heads-up on fresh 1h breakouts (max 3 a day in all): "it broke out, wait for the pullback".
+  if (heads.length) {
+    const day = new Date(); day.setUTCHours(0, 0, 0, 0);
+    const { count } = await db.from("radar_breakouts").select("coin", { count: "exact", head: true }).gte("created_at", day.toISOString());
+    let left = 3 - (count ?? 0);
+    const { data: subs } = await db.from("radar_watch").select("user_id");
+    const users = [...new Set((subs ?? []).map((x: any) => x.user_id))];
+    for (const h of heads.sort((a, b) => b.volX - a.volX)) {
+      if (left <= 0) break;
+      const { error } = await db.from("radar_breakouts").insert({ coin: h.coin, tf, candle_at: new Date(h.at).toISOString(), price: h.price, line: h.line, vol_x: h.volX });
+      if (error) continue; // already announced (same candle) or a recent one for this coin
+      left--;
+      for (const u of users) await db.from("push_alerts").insert({ user_id: u, urgent: false, tag: `brk-${h.coin}`,
+        title: `👀 ${h.coin} a spart cu volum ${pct(h.volX)}× pe 1 oră`,
+        body: `A ieșit peste ${ro(h.line)} $ (maximul ultimelor 30 de ore) și e la ${ro(h.price)} $. Nu cumpăra acum: Ciprian așteaptă pullback-ul cu lumânări mici. Dacă vine momentul intrării, primești ⭐.${h.area ? ` Zona pe 1 zi: ${h.area}.` : ""}` });
+    }
+  }
   // Store once per structure; push only the new ones (max 3 per run, the rest stay visible in the app).
   const fresh: any[] = [];
   for (const s of found) {
@@ -84,7 +107,7 @@ Deno.serve(async (req) => {
     });
     if (!error) fresh.push(s);
   }
-  if (fresh.length) {
+  if (fresh.length || heads.length) {
     // Only people who follow the crypto radar (have at least one coin on watch) get these alerts.
     const { data: subs } = await db.from("radar_watch").select("user_id");
     const users = [...new Set((subs ?? []).map((x: any) => x.user_id))];
