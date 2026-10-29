@@ -110,6 +110,8 @@ export function guessMerchant(title: string, details: string): string {
   // Transfers: "C.I.F.:…;details;…;NAME S R L;IBAN;…"
   const name = parts.find(p => /[A-Z]{3,}/.test(p) && !/^C\.I\.F|^RO\d{2}[A-Z]{4}|^BTRL|^REF|^CURS|^\d+$/.test(p) && p.length > 3 && p !== title)
   if (/Constituire depozit/i.test(title)) return 'Depozit BT'
+  if (/Desfiintare depozit|Lichidare depozit/i.test(title)) return 'Depozit BT închis'
+  if (/unitati de fond|Colectare automata fonduri/i.test(title)) return 'Fond BT Asset Management'
   if (/Retragere/i.test(title)) return 'Retragere numerar'
   if (/Comision|Taxa/i.test(title)) return 'Comision bancar'
   return tidy(name || title)
@@ -122,6 +124,7 @@ const tidy = (s: string) => short(s).replace(/\s{2,}/g, ' ').replace(/\b(\w)(\w*
 /** Keyword → default category name. First match wins; learned rules are checked before these. */
 export const KEYWORDS: [RegExp, string][] = [
   [/constituire depozit|depunere economii/i, 'Economii'],
+  [/unitati de fond|colectare automata fonduri|cv unit\./i, 'Investiții'],
   [/\b(tankstelle|tankstation|autohof|truck ?stop|benzin\w*|fuel|shell|omv|petrom|mol|lukoil|rompetrol|socar|st1|circle ?k|aral|total|esso|q8|bp |eni|agip|orlen|jet |avia|tamoil|repsol|ok benzin|preem|ingo|uno-x|statoil|gulf|dkv|as24)\b/i, 'Combustibil'],
   [/\b(lidl|kaufland|carrefour|mega ?image|profi|penny|auchan|aldi|netto|rewe|edeka|city gross|ica |coop|willys|hemk[oö]p|spar|billa|tesco|lidl|selgros|metro|cora|la doi pasi|rema 1000|kiwi|meny|bunnpris|norma|plus |jumbo|albert heijn|biedronka|intermarche|leclerc|mercadona|conad|esselunga|migros|hofer|penny)\b/i, 'Mâncare acasă'],
   [/\b(mcdonald|kfc|burger king|starbucks|subway|pizza|restaurant|bistro|cafe|caf[eé]|coffee|kebab|grill|trattoria|pub|bar |sushi|glovo|tazz|bolt food|wolt|foodpanda|max hamburgare|espresso house|rasthof|autogrill)\b/i, 'Restaurante & cafenele'],
@@ -152,7 +155,7 @@ export function isOwnTransfer(tx: ParsedTx, rules: Rule[]): boolean {
   const key = merchantKey(tx.merchant)
   const r = key ? rules.find(x => x.pattern === key) : undefined
   if (r) return !!r.skip
-  return /transfer intern|intre conturi proprii|între conturi proprii|transfer propriu/i.test(`${tx.merchant} ${tx.title} ${tx.details}`)
+  return /transfer intern|intre conturi proprii|între conturi proprii|transfer propriu|desfiintare depozit|lichidare depozit|schimb valutar/i.test(`${tx.merchant} ${tx.title} ${tx.details}`)
 }
 
 /** Normalised key used to remember the user's choice for a merchant. */

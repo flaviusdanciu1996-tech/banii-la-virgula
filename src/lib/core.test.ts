@@ -607,3 +607,12 @@ test('import: money moved between own accounts is recognised, and the learned ch
   assert.equal(isOwnTransfer({ ...tx, merchant: 'Lidl', title: 'Plata la POS' }, []), false)
   assert.equal(isOwnTransfer({ ...tx, merchant: 'Ion Pop', title: 'Plata' }, [{ pattern: 'ion pop', category_id: null, skip: true }]), true)
 })
+
+test('import: deposits and fund purchases are savings, deposit closing and currency exchange are own moves', () => {
+  const base = { ref: 'r', date: '2026-10-13', kind: 'out', amount: 100000, currency: 'RON', ron: null, details: '', original: '' } as any
+  const cats = [{ id: 'e', name: 'Economii', kind: 'out', archived: false }, { id: 'i', name: 'Investiții', kind: 'out', archived: false }]
+  assert.equal(categorize({ ...base, merchant: 'Depozit BT', title: 'Constituire depozit' }, [], cats), 'e')
+  assert.equal(categorize({ ...base, merchant: 'Fond', title: 'Colectare automata fonduri BTAM' }, [], cats), 'i')
+  assert.equal(isOwnTransfer({ ...base, kind: 'in', merchant: 'Depozit BT închis', title: 'Desfiintare depozit' }, []), true)
+  assert.equal(isOwnTransfer({ ...base, merchant: 'Schimb', title: 'Schimb valutar - canal electronic' }, []), true)
+})
