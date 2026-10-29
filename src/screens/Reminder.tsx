@@ -3,6 +3,7 @@ import { Bell, Sparkles, Plus } from 'lucide-react'
 import { useStore } from '../store.tsx'
 import { supabase } from '../db.ts'
 import { ConfirmButton } from '../ui.tsx'
+import { AlarmSwitch } from '../AlarmSwitch.tsx'
 import type { Quote } from '../lib/quotes.ts'
 
 const VAPID_PUBLIC = 'BHijNx8w9dKhabJ0d_oogzCO4qI61LBL-L7x_LHZHFxXI35AT3HJDaE9bt8fPeK6EitI9miZjAL0406NUsQc_FA'
@@ -100,6 +101,7 @@ export function ReminderScreen({ notify }: { notify: (m: string) => void }) {
 
   return (
     <div className="screen">
+      <AlarmSwitch notify={notify} />
       <section className="card form">
         <h2><Sparkles size={18} style={{ verticalAlign: '-3px', marginRight: 6 }} />Citatul zilei</h2>
         <p className="note">În fiecare dimineață, o doză de motivație: despre bani, disciplină, curaj și viață.</p>

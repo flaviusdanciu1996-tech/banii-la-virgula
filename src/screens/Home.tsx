@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import { History, LayoutGrid, ArrowLeftRight, Lightbulb, ChevronRight, ChevronLeft, Plus, Minus, CalendarCheck } from 'lucide-react'
+import { History, LayoutGrid, ArrowLeftRight, Lightbulb, ChevronRight, ChevronLeft, Plus, Minus, CalendarCheck, BellRing, BellOff } from 'lucide-react'
 import { useStore } from '../store.tsx'
 import { Ring, Bar, Seg, CountUp, EmptyArt } from '../ui.tsx'
 import { TxRow, catColor } from '../helpers.tsx'
@@ -15,6 +15,13 @@ import { summarize, netWorth, snapshotAt } from '../lib/calc.ts'
 import type { Tx, Recurring, Goal } from '../lib/types.ts'
 import { CUR_LABEL } from '../lib/money.ts'
 import type { Nav } from '../App.tsx'
+import { AlarmSwitch, useAlarmPause } from '../AlarmSwitch.tsx'
+
+function AlarmBell({ onClick }: { onClick: () => void }) {
+  const { until, ready } = useAlarmPause()
+  if (!ready) return null
+  return <button type="button" className={'alarm-bell' + (until ? ' off' : '')} aria-label={until ? 'Alarmele sunt oprite' : 'Alarmele sunt pornite'} onClick={onClick}>{until ? <BellOff size={20} /> : <BellRing size={20} />}</button>
+}
 
 export function HomeScreen({ nav, period, setPeriod, scope, setScope, openTx, openRecurring, openGoal, notify }: {
   nav: Nav; period: Period; setPeriod: (n: number) => void; scope: 'all' | 'me'; setScope: (s: 'all' | 'me') => void
@@ -59,7 +66,9 @@ export function HomeScreen({ nav, period, setPeriod, scope, setScope, openTx, op
           <h1>Salut{firstName ? `, ${firstName}` : ''}!</h1>
           <p className="muted">Iată situația ta financiară</p>
         </div>
+        <AlarmBell onClick={() => nav('notificari')} />
       </header>
+      <AlarmSwitch notify={notify} compact />
 
       <button type="button" className="quote-card" onClick={() => nav('notificari')}>
         <span className="quote-eyebrow">✨ Doza zilei</span>

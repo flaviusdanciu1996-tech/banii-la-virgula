@@ -911,3 +911,11 @@ a.chip { text-decoration: none; color: inherit; }
 .imp-hint{display:block;overflow-wrap:anywhere;line-height:1.35;margin:2px 0}
 
 .num.invest { color: #C9A8FF; } .card.budget .trio .invest, .ring-stats .invest { color: #D4B8FF; }
+.hello { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; }
+.alarm-bell { flex: none; width: 42px; height: 42px; border-radius: 50%; display: grid; place-items: center; border: 1px solid var(--line); background: var(--card); color: var(--accent); }
+.alarm-bell.off { color: var(--bad); border-color: color-mix(in srgb, var(--bad) 45%, transparent); }
+.alarm-banner { display: flex; align-items: center; gap: 8px; width: 100%; padding: 10px 14px; border-radius: 14px; border: 1px solid color-mix(in srgb, var(--bad) 40%, transparent); background: color-mix(in srgb, var(--bad) 12%, transparent); color: inherit; text-align: left; font: inherit; }
+.alarm-banner span { flex: 1; min-width: 0; }
+.alarm-banner b { color: var(--accent); }
+.alarm-switch.off { border-color: color-mix(in srgb, var(--bad) 40%, transparent); }
+.alarm-switch .chips { display: flex; flex-wrap: wrap; gap: 8px; }
