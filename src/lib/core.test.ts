@@ -625,3 +625,9 @@ test('import: payment hint keeps who was paid and drops personal codes and IBANs
   assert.equal(guessMerchant(tx.title, tx.details), 'Fpf Pensia Mea')
   assert.equal(categorize({ ...tx, merchant: 'Fpf Pensia Mea' }, [], [{ id: 'i', name: 'Investiții', kind: 'out', archived: false }]), 'i')
 })
+
+test('import: hint skips the bank title, and an empty learned rule does not hide own transfers', () => {
+  const tx = { ref: 'r', date: '2026-10-10', kind: 'out', amount: 90000, currency: 'RON', ron: null, merchant: 'Transfer Intern -', title: 'Transfer intern - canal electronic', details: 'Transfer intern - canal electronic Transfer BT PAY; DANCIU FLAVIUS-PAUL; REF: 901ECIT26282A7C9', original: '' } as any
+  assert.equal(detailHint(tx), 'Transfer BT PAY · DANCIU FLAVIUS-PAUL')
+  assert.equal(isOwnTransfer(tx, [{ pattern: 'transfer intern', category_id: null, skip: false }]), true)
+})

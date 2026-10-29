@@ -81,7 +81,6 @@ export function ImportScreen({ notify }: { notify: (m: string) => void }) {
         if (!key || r.dup || r.own === r.ownSuggested) continue
         try {
           if (r.own) await st.repo.upsert('import_rules', { household_id: st.householdId, pattern: key, category_id: null, skip: true }, 'household_id,pattern')
-          else if (!r.cat) await st.repo.upsert('import_rules', { household_id: st.householdId, pattern: key, category_id: null, skip: false }, 'household_id,pattern')
         } catch { /* non-critical */ }
       }
       for (const r of chosen) {

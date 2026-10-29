@@ -153,14 +153,14 @@ export interface Rule { pattern: string; category_id: string | null; skip?: bool
 /** Money moved between the user's own accounts: not an expense or income. Learned rule first, then the bank's wording. */
 export function isOwnTransfer(tx: ParsedTx, rules: Rule[]): boolean {
   const key = merchantKey(tx.merchant)
-  const r = key ? rules.find(x => x.pattern === key) : undefined
+  const r = key ? rules.find(x => x.pattern === key && (x.skip || x.category_id)) : undefined
   if (r) return !!r.skip
   return /transfer intern|intre conturi proprii|între conturi proprii|transfer propriu|desfiintare depozit|lichidare depozit|schimb valutar/i.test(`${tx.merchant} ${tx.title} ${tx.details}`)
 }
 
 /** A short, safe clue from the bank's details (who/what was paid), without IBANs, personal codes or bank references. */
 export function detailHint(tx: ParsedTx): string {
-  return `${tx.details}`
+  return tx.details.replace(tx.title, '').replace(/^\s*-?\s*canal electronic/i, '')
     .replace(/RO\d{2}[A-Z]{4}[0-9A-Z]{10,16}/g, '')
     .replace(/\/ROC\/[^;]*/g, '')
     .replace(/\b\d{13}\b/g, '')
