@@ -111,7 +111,7 @@ test('goal maths', () => {
   assert.equal(monthlyNeeded(100000, 0, '2026-10-18', '2026-10-01'), 100000)
 })
 
-import { parseBT, categorize, parseBtAmount, isOwnTransfer, detailHint, guessMerchant } from './btImport.ts'
+import { parseBT, categorize, parseBtAmount, isOwnTransfer, detailHint, guessMerchant, holderName, sameName } from './btImport.ts'
 
 test('BT statement parsing and categories', () => {
   assert.equal(parseBtAmount('4,690.93'), 469093)
@@ -669,5 +669,23 @@ test('money brought back from investments lowers Investiții and is not income',
   assert.equal(sum.invested, -1000)
   assert.equal(sum.income, 500000)
   const cat = [{ id: 'w', name: 'Retras din investiții', kind: 'in', archived: false }, { id: 'a', name: 'Alte venituri', kind: 'in', archived: false }]
-  assert.equal(categorize({ ref: 'r', date: '2026-10-20', kind: 'in', amount: 11000, currency: 'RON', ron: null, merchant: 'Revolut Bank Uab', title: 'Incasare OP', details: 'REVOLUT BANK UAB', original: '' } as any, [], cat), 'w')
+  assert.equal(categorize({ ref: 'r', date: '2026-10-20', kind: 'in', amount: 11000, currency: 'RON', ron: null, merchant: 'Binance', title: 'Incasare OP', details: 'BINANCE', original: '' } as any, [], cat), 'w')
+})
+
+test('import: money from a person via Revolut is not an investment withdrawal, money from my own Revolut is a move between my accounts', () => {
+  const holder = holderName([{ page: 1, x: 10, y: 700, str: 'DANCIU FLAVIUS-PAUL' }, { page: 1, x: 400, y: 700, str: 'Client: 4959706' }])
+  assert.equal(holder, 'DANCIU FLAVIUS-PAUL')
+  assert.ok(sameName('DANCIU FLAVIUS-PAUL', 'CV UNIT./ FLAVIUS-PAUL DANCIU/ x'))
+  const base = { ref: 'r', date: '2026-10-20', kind: 'in', amount: 10000, currency: 'RON', ron: null, title: 'Incasare OP - canal electronic', original: '' } as any
+  const fromHer = { ...base, merchant: 'Nicola Mihaela', details: 'NICOLA MIHAELA-GABRIELA; REVOLUT BANK UAB' }
+  const fromMe = { ...base, merchant: 'Danciu Flavius', details: 'DANCIU FLAVIUS-PAUL; REVOLUT BANK UAB' }
+  const toHer = { ...base, kind: 'out', title: 'P2P BTPay', merchant: 'P2p Btpay Transfer', details: 'Transfer din card 2329 DANCIU FLAVIUS-PAUL catre NICOLA MIHAELA- GABRIELA reprezentand : Transfer BT PAY' }
+  const fund = { ...base, kind: 'out', title: 'Achizitie unitati de fond', merchant: 'Fond', details: 'CV UNIT./ FLAVIUS-PAUL DANCIU/ 8227618/ BTR' }
+  assert.equal(isOwnTransfer(fromHer, [], holder), false)
+  assert.equal(isOwnTransfer(fromMe, [], holder), true)
+  assert.equal(isOwnTransfer(toHer, [], holder), false)
+  assert.equal(isOwnTransfer(fund, [], holder), false)
+  const cats = [{ id: 'w', name: 'Retras din investiții', kind: 'in', archived: false }, { id: 'a', name: 'Alte venituri', kind: 'in', archived: false }]
+  assert.equal(categorize(fromHer, [], cats), 'a')
+  assert.equal(categorize({ ...base, merchant: 'Binance', details: 'BINANCE' }, [], cats), 'w')
 })

@@ -5,7 +5,7 @@ import { CatIcon, EmptyArt } from '../ui.tsx'
 import { catColor } from '../helpers.tsx'
 import { fmt, fmtNum } from '../lib/money.ts'
 import { shortDayLabel } from '../lib/period.ts'
-import { parseBT, categorize, isOwnTransfer, detailHint, merchantKey, isDepositOpen, isDepositClose, matchDeposits, IGNORE_REF, type ParsedTx, type PdfItem, type Rule, type OpenDeposit } from '../lib/btImport.ts'
+import { parseBT, categorize, isOwnTransfer, holderName, detailHint, merchantKey, isDepositOpen, isDepositClose, matchDeposits, IGNORE_REF, type ParsedTx, type PdfItem, type Rule, type OpenDeposit } from '../lib/btImport.ts'
 import { GROUPS } from '../lib/types.ts'
 import { pendingReceipts, receiptForImport, type PendingReceipt } from '../lib/receipt.ts'
 
@@ -41,6 +41,7 @@ export function ImportScreen({ notify }: { notify: (m: string) => void }) {
       if (!/\.pdf$/i.test(f.name) && f.type !== 'application/pdf') throw new Error('Alege extrasul în format PDF, descărcat din BT Pay sau BT24.')
       const items = await readPdf(f)
       const txs = parseBT(items)
+      const holder = holderName(items)
       if (!txs.length) throw new Error('N-am găsit tranzacții în fișier. E un extras de cont BT (Banca Transilvania)?')
       const rules = await st.repo.list<Rule>('import_rules', st.householdId).catch(() => [] as Rule[])
       const known = new Set([...st.txs.map(t => t.import_ref), ...rules.filter(r => r.pattern.startsWith(IGNORE_REF)).map(r => r.pattern.slice(IGNORE_REF.length))].filter(Boolean))
@@ -50,7 +51,7 @@ export function ImportScreen({ notify }: { notify: (m: string) => void }) {
         const dup = known.has(tx.ref)
         const receipt = dup || tx.kind === 'in' ? null : receiptForImport(tx, pending)
         if (receipt) pending.splice(pending.indexOf(receipt), 1)
-        const own = !dup && isOwnTransfer(tx, rules)
+        const own = !dup && isOwnTransfer(tx, rules, holder)
         return { tx, cat: own ? '' : c, suggested: c, include: !dup && !receipt && !own, dup, receipt, own, ownSuggested: own }
       })
       // Broken deposits: the money coming back cancels the deposit it ends, so savings are not counted twice.

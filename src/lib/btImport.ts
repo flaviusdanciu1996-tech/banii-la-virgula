@@ -142,8 +142,11 @@ export const KEYWORDS: [RegExp, string][] = [
   [/comision|taxa administrare|taxa lunara/i, 'Cumpărături diverse'],
 ]
 
+/** Investment platforms only. Revolut is left out on purpose: it is also a bank (money from a person or from his own Revolut account). */
+export const INVEST_PLATFORM = /binance|tradeville|\bxtb\b|etoro|interactive brokers|bt capital partners|bt asset management|trading ?212|bitpanda|kraken|coinbase|revolut x|revolut securities|revolut trading/i
+
 export const INCOME_KEYWORDS: [RegExp, string][] = [
-  [/revolut|binance|tradeville|\bxtb\b|etoro|interactive brokers|bt capital partners|bt asset management|trading 212|bitpanda|kraken|coinbase/i, 'Retras din investiții'],
+  [INVEST_PLATFORM, 'Retras din investiții'],
   [/salariu|salar|wage|salary/i, 'Salariu'],
   [/decont|diurna|diurnă|deplasare/i, 'Diurnă'],
   [/bonus|prima/i, 'Bonus'],
@@ -152,11 +155,33 @@ export const INCOME_KEYWORDS: [RegExp, string][] = [
 export interface Rule { pattern: string; category_id: string | null; skip?: boolean }
 
 /** Money moved between the user's own accounts: not an expense or income. Learned rule first, then the bank's wording. */
-export function isOwnTransfer(tx: ParsedTx, rules: Rule[]): boolean {
+export function isOwnTransfer(tx: ParsedTx, rules: Rule[], holder?: string | null): boolean {
   const key = merchantKey(tx.merchant)
   const r = key ? rules.find(x => x.pattern === key && (x.skip || x.category_id)) : undefined
   if (r) return !!r.skip
+  // Money from/to the account holder himself at another bank (e.g. his Revolut) is a move between his accounts,
+  // unless it goes to or comes from an investment platform.
+  if (holder && !INVEST_PLATFORM.test(`${tx.merchant} ${tx.details}`) && !/cv unit|unitati de fond|fonduri btam|pensi|depozit/i.test(`${tx.title} ${tx.details}`)) {
+    const to = tx.details.match(/c[aă]tre\s+(.+?)(?:\s+reprezentand|;|$)/i)?.[1]
+    if (to ? sameName(holder, to) : sameName(holder, tx.details)) return true
+  }
   return /transfer intern|intre conturi proprii|între conturi proprii|transfer propriu|desfiintare depozit|lichidare depozit|schimb valutar/i.test(`${tx.merchant} ${tx.title} ${tx.details}`)
+}
+
+/** The account holder's name, from the statement header ("NAME SURNAME   Client: 123"). */
+export function holderName(items: PdfItem[]): string | null {
+  for (const l of toLines(items).slice(0, 40)) {
+    const m = l.text.match(/^(.+?)\s+Client:\s*\d+/)
+    if (m && /[A-Z]{3,}/.test(m[1])) return m[1].trim()
+  }
+  return null
+}
+const fold = (s: string) => s.toUpperCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+/** True when every word of the holder's name appears in the text, in any order ("DANCIU FLAVIUS-PAUL" = "FLAVIUS-PAUL DANCIU"). */
+export function sameName(holder: string, text: string): boolean {
+  const words = fold(holder).split(/[\s-]+/).filter(w => w.length > 2)
+  const hay = ' ' + fold(text).replace(/[^A-Z]+/g, ' ') + ' '
+  return words.length >= 2 && words.every(w => hay.includes(' ' + w + ' '))
 }
 
 /* ---------------- Broken (closed) deposits ---------------- */
