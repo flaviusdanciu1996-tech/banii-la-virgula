@@ -165,7 +165,8 @@ begin
     (h,'Salariu','in',null,'wallet',40),
     (h,'Diurnă','in',null,'truck',41),
     (h,'Bonus','in',null,'sparkles',42),
-    (h,'Alte venituri','in',null,'circle-plus',43);
+    (h,'Alte venituri','in',null,'circle-plus',43),
+    (h,'Retras din investiții','in',null,'trending-down',44);
 end $$;
 
 create or replace function ensure_household(p_name text default '') returns uuid

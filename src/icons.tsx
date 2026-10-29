@@ -1,4 +1,4 @@
-import {
+import { TrendingDown,
   Home, Plug, ShoppingCart, Bus, Fuel, HeartPulse, Smartphone, Shirt, Sofa, GraduationCap, Gift, Shield,
   Utensils, Wine, Dumbbell, PartyPopper, Repeat, ShoppingBag, PiggyBank, TrendingUp, LifeBuoy, Wallet, Truck,
   Sparkles, CirclePlus, Circle, Landmark, Banknote, LineChart, Bitcoin, Scroll, PieChart, Car, Trees, Package,
@@ -11,7 +11,7 @@ export const ICONS: Record<string, LucideIcon> = {
   home: Home, plug: Plug, 'shopping-cart': ShoppingCart, bus: Bus, fuel: Fuel, 'heart-pulse': HeartPulse,
   smartphone: Smartphone, shirt: Shirt, sofa: Sofa, 'graduation-cap': GraduationCap, gift: Gift, shield: Shield,
   utensils: Utensils, wine: Wine, dumbbell: Dumbbell, 'party-popper': PartyPopper, repeat: Repeat,
-  'shopping-bag': ShoppingBag, 'piggy-bank': PiggyBank, 'trending-up': TrendingUp, 'life-buoy': LifeBuoy,
+  'shopping-bag': ShoppingBag, 'piggy-bank': PiggyBank, 'trending-up': TrendingUp, 'trending-down': TrendingDown, 'life-buoy': LifeBuoy,
   wallet: Wallet, truck: Truck, sparkles: Sparkles, 'circle-plus': CirclePlus, circle: Circle,
   landmark: Landmark, banknote: Banknote, 'line-chart': LineChart, bitcoin: Bitcoin, scroll: Scroll,
   'pie-chart': PieChart, car: Car, trees: Trees, package: Package, 'file-text': FileText,

@@ -143,6 +143,7 @@ export const KEYWORDS: [RegExp, string][] = [
 ]
 
 export const INCOME_KEYWORDS: [RegExp, string][] = [
+  [/revolut|binance|tradeville|\bxtb\b|etoro|interactive brokers|bt capital partners|bt asset management|trading 212|bitpanda|kraken|coinbase/i, 'Retras din investiții'],
   [/salariu|salar|wage|salary/i, 'Salariu'],
   [/decont|diurna|diurnă|deplasare/i, 'Diurnă'],
   [/bonus|prima/i, 'Bonus'],

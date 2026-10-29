@@ -661,3 +661,13 @@ test('summary keeps investments apart from savings', () => {
   assert.equal(sum.saved, 519216)
   assert.equal(sum.invested, 36665)
 })
+
+test('money brought back from investments lowers Investiții and is not income', () => {
+  const cats = [{ id: 'i', name: 'Investiții', kind: 'out', grp: 'economii' }, { id: 'w', name: 'Retras din investiții', kind: 'in', grp: null }, { id: 's', name: 'Salariu', kind: 'in', grp: null }] as any
+  const txs = [{ kind: 'out', amount: 10000, category_id: 'i', date: '2026-10-02' }, { kind: 'in', amount: 11000, category_id: 'w', date: '2026-10-20' }, { kind: 'in', amount: 500000, category_id: 's', date: '2026-10-10' }] as any
+  const sum = summarize(txs, cats, null, { start: '2026-10-01', end: '2026-10-31' } as any, '2026-10-29')
+  assert.equal(sum.invested, -1000)
+  assert.equal(sum.income, 500000)
+  const cat = [{ id: 'w', name: 'Retras din investiții', kind: 'in', archived: false }, { id: 'a', name: 'Alte venituri', kind: 'in', archived: false }]
+  assert.equal(categorize({ ref: 'r', date: '2026-10-20', kind: 'in', amount: 11000, currency: 'RON', ron: null, merchant: 'Revolut Bank Uab', title: 'Incasare OP', details: 'REVOLUT BANK UAB', original: '' } as any, [], cat), 'w')
+})

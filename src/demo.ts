@@ -18,7 +18,7 @@ const CATS: [string, 'in' | 'out', string | null, string, number][] = [
   ['Abonamente', 'out', 'optional', 'repeat', 8000], ['Cumpărături diverse', 'out', 'optional', 'shopping-bag', 0],
   ['Economii', 'out', 'economii', 'piggy-bank', 200000], ['Investiții', 'out', 'economii', 'trending-up', 100000],
   ['Fond de urgență', 'out', 'economii', 'life-buoy', 0], ['Salariu', 'in', null, 'wallet', 0], ['Diurnă', 'in', null, 'truck', 0],
-  ['Bonus', 'in', null, 'sparkles', 0], ['Alte venituri', 'in', null, 'circle-plus', 0],
+  ['Bonus', 'in', null, 'sparkles', 0], ['Alte venituri', 'in', null, 'circle-plus', 0], ['Retras din investiții', 'in', null, 'trending-down', 0],
 ]
 
 export function demoSeed(): Record<Table, any[]> {
