@@ -27,7 +27,7 @@ export const RADAR_COINS = ['BTC', 'ETH', 'BNB', 'SOL', 'XRP', 'ADA', 'LINK', 'D
 /** Stablecoins, wrapped and leveraged tokens: no point analysing them. */
 export const SKIP = /^(USDC|FDUSD|TUSD|USDP|DAI|BUSD|EUR|EURI|AEUR|USDE|USD1|PYUSD|RLUSD|BFUSD|XUSD|GBP|TRY|BRL|WBTC|WBETH|BETH|PAXG|XAUT)$|(UP|DOWN|BULL|BEAR)$/
 /** Tokenized stocks on Binance (TSLAB, MSTRB…): shares, not crypto. */
-export const STOCK_TOKEN = /^(TSLA|MSTR|CRCL|NVDA|AAPL|COIN|HOOD|GOOGL|GOOG|AMZN|META|MSFT|SPY|QQQ|NFLX|AMD|PLTR|GME|AVGO|ORCL|BABA|SBET|BMNR|IBIT)B$/
+export const STOCK_TOKEN = /^(SOXL|TQQQ|SQQQ|NVDL|TSLL|SPXL|UPRO|LABU|TNA|FNGU|MSTU|CONL|TSLA|MSTR|CRCL|NVDA|AAPL|COIN|HOOD|GOOGL|GOOG|AMZN|META|MSFT|SPY|QQQ|NFLX|AMD|PLTR|GME|AVGO|ORCL|BABA|SBET|BMNR|IBIT)B$/
 export const ZONE_LABEL: Record<Zone, string> = { buy: 'De cumpărat', wait: 'Așteaptă retragerea', watch: 'Doar urmărește', avoid: 'Evită' }
 
 const sma = (xs: number[], n: number, i = xs.length - 1) => { let s = 0; for (let k = i - n + 1; k <= i; k++) s += xs[k]; return s / n }
