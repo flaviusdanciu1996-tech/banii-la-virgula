@@ -631,3 +631,25 @@ test('import: hint skips the bank title, and an empty learned rule does not hide
   assert.equal(detailHint(tx), 'Transfer BT PAY · DANCIU FLAVIUS-PAUL')
   assert.equal(isOwnTransfer(tx, [{ pattern: 'transfer intern', category_id: null, skip: false }]), true)
 })
+
+import { matchDeposits, isDepositClose, isDepositOpen } from './btImport.ts'
+
+test('import: a broken deposit cancels the deposit it ends', () => {
+  const tx = (ref: string, date: string, kind: string, amount: number, title: string, currency = 'RON') => ({ ref, date, kind, amount, currency, ron: null, title, merchant: '', original: '', details: '' }) as any
+  const close = tx('c1', '2026-10-20', 'in', 100000, 'Desfiintare depozit')
+  assert.equal(isDepositClose(close), true)
+  assert.equal(isDepositOpen(tx('d', '2026-10-13', 'out', 100000, 'Constituire depozit')), true)
+  // 1.000 lei deposit from 13 Oct is closed; the 900 lei one from 27 Oct is not (opened later, other amount).
+  const open = [
+    { key: 'a', date: '2026-10-13', amount: 100000, currency: 'RON' },
+    { key: 'b', date: '2026-10-27', amount: 90000, currency: 'RON' },
+    { key: 'e', date: '2026-10-07', amount: 100000, currency: 'EUR' },
+  ]
+  assert.deepEqual(matchDeposits([{ i: 0, tx: close }], open), [{ close: 0, deposit: 'a', interest: 0 }])
+  // A little interest on top is fine; too much difference is not the same deposit.
+  assert.deepEqual(matchDeposits([{ i: 0, tx: { ...close, amount: 100150 } }], open), [{ close: 0, deposit: 'a', interest: 150 }])
+  assert.deepEqual(matchDeposits([{ i: 0, tx: { ...close, amount: 110000 } }], open), [])
+  // Each deposit closes once; currencies never mix.
+  assert.equal(matchDeposits([{ i: 0, tx: close }, { i: 1, tx: { ...close, ref: 'c2' } }], open).length, 1)
+  assert.deepEqual(matchDeposits([{ i: 0, tx: { ...close, currency: 'EUR' } }], open), [{ close: 0, deposit: 'e', interest: 0 }])
+})

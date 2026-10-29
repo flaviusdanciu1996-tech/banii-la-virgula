@@ -5,11 +5,13 @@ import { CatIcon, EmptyArt } from '../ui.tsx'
 import { catColor } from '../helpers.tsx'
 import { fmt, fmtNum } from '../lib/money.ts'
 import { shortDayLabel } from '../lib/period.ts'
-import { parseBT, categorize, isOwnTransfer, detailHint, merchantKey, type ParsedTx, type PdfItem, type Rule } from '../lib/btImport.ts'
+import { parseBT, categorize, isOwnTransfer, detailHint, merchantKey, isDepositOpen, isDepositClose, matchDeposits, IGNORE_REF, type ParsedTx, type PdfItem, type Rule, type OpenDeposit } from '../lib/btImport.ts'
 import { GROUPS } from '../lib/types.ts'
 import { pendingReceipts, receiptForImport, type PendingReceipt } from '../lib/receipt.ts'
 
-interface Row { tx: ParsedTx; include: boolean; cat: string; suggested: string; dup: boolean; receipt: PendingReceipt | null; own: boolean; ownSuggested: boolean }
+/** A broken deposit: the closing line cancels a deposit already in the app (depositId) or one in this same statement (depositRow). */
+interface Closes { depositId?: string; depositRow?: number; depositRef?: string | null; label: string; interest: number }
+interface Row { tx: ParsedTx; include: boolean; cat: string; suggested: string; dup: boolean; receipt: PendingReceipt | null; own: boolean; ownSuggested: boolean; closes?: Closes; closedBy?: number }
 const OWN = '__own__'
 
 async function readPdf(file: File): Promise<PdfItem[]> {
@@ -41,16 +43,40 @@ export function ImportScreen({ notify }: { notify: (m: string) => void }) {
       const txs = parseBT(items)
       if (!txs.length) throw new Error('N-am găsit tranzacții în fișier. E un extras de cont BT (Banca Transilvania)?')
       const rules = await st.repo.list<Rule>('import_rules', st.householdId).catch(() => [] as Rule[])
-      const known = new Set(st.txs.map(t => t.import_ref).filter(Boolean))
+      const known = new Set([...st.txs.map(t => t.import_ref), ...rules.filter(r => r.pattern.startsWith(IGNORE_REF)).map(r => r.pattern.slice(IGNORE_REF.length))].filter(Boolean))
       const pending = pendingReceipts(st.txs)
-      setRows(txs.map(tx => {
+      const built: Row[] = txs.map(tx => {
         const c = categorize(tx, rules, st.categories) || ''
         const dup = known.has(tx.ref)
         const receipt = dup || tx.kind === 'in' ? null : receiptForImport(tx, pending)
         if (receipt) pending.splice(pending.indexOf(receipt), 1)
         const own = !dup && isOwnTransfer(tx, rules)
         return { tx, cat: own ? '' : c, suggested: c, include: !dup && !receipt && !own, dup, receipt, own, ownSuggested: own }
-      }))
+      })
+      // Broken deposits: the money coming back cancels the deposit it ends, so savings are not counted twice.
+      const depCat = new Set(st.categories.filter(x => x.grp === 'economii').map(x => x.id))
+      const open: OpenDeposit[] = [
+        ...st.txs.filter(t => t.kind === 'out' && depCat.has(t.category_id) && /^depozit bt$/i.test(t.note.trim()))
+          .map(t => ({ key: t.id, date: t.date, amount: t.orig_currency ? (t.orig_amount ?? 0) : t.amount, currency: t.orig_currency || 'RON' })),
+        ...built.map((r, i) => ({ r, i })).filter(({ r }) => !r.dup && isDepositOpen(r.tx))
+          .map(({ r, i }) => ({ key: `row:${i}`, date: r.tx.date, amount: r.tx.amount, currency: r.tx.currency })),
+      ]
+      const closes = built.map((r, i) => ({ i, tx: r.tx })).filter(({ i, tx }) => !built[i].dup && isDepositClose(tx))
+      for (const m of matchDeposits(closes, open)) {
+        const cur = (c: string) => (c === 'RON' ? 'lei' : c === 'EUR' ? '€' : c)
+        const close = built[m.close]
+        const money = `${fmtNum(close.tx.amount - m.interest)} ${cur(close.tx.currency)}`
+        if (m.deposit.startsWith('row:')) {
+          const j = Number(m.deposit.slice(4))
+          built[j] = { ...built[j], include: false, closedBy: m.close }
+          close.closes = { depositRow: j, depositRef: built[j].tx.ref, label: `depozit spart: anulează depunerea de ${money} din acest extras`, interest: m.interest }
+        } else {
+          const d = st.txs.find(t => t.id === m.deposit)!
+          close.closes = { depositId: d.id, depositRef: d.import_ref ?? null, label: `depozit spart: anulează depunerea de ${money} din ${shortDayLabel(d.date)}`, interest: m.interest }
+        }
+        Object.assign(close, { own: true, include: false, cat: '' })
+      }
+      setRows(built)
     } catch (e: any) { setErr(e?.message || 'Nu am putut citi fișierul.') }
     finally { setBusy(false) }
   }
@@ -58,6 +84,7 @@ export function ImportScreen({ notify }: { notify: (m: string) => void }) {
   const chosen = rows?.filter(r => r.include) ?? []
   const dupCount = rows?.filter(r => r.dup).length ?? 0
   const missing = chosen.filter(r => !r.cat).length
+  const fixes = rows?.filter(r => r.closes && r.own).length ?? 0
   const totals = useMemo(() => chosen.reduce((a, r) => {
     const v = r.tx.ron ?? st.toRonNow(r.tx.amount, (['RON', 'EUR', 'USD'].includes(r.tx.currency) ? r.tx.currency : 'RON') as any)
     if (r.tx.kind === 'in') a.in += v; else a.out += v
@@ -68,12 +95,34 @@ export function ImportScreen({ notify }: { notify: (m: string) => void }) {
     if (!rows) return
     if (missing) return setErr(`Alege categoria pentru ${missing} ${missing === 1 ? 'tranzacție' : 'tranzacții'} (cele marcate cu galben) sau debifează-le.`)
     setErr(''); setBusy(true)
-    let n = 0
+    let n = 0, fixed = 0
     try {
       // Bank lines already covered by a photographed receipt: link them so they never import twice.
       for (const r of rows.filter(x => x.receipt && !x.include)) {
         const first = r.receipt!.txs[0]
         try { await st.saveTx({ id: first.id, import_ref: r.tx.ref, orig_note: r.tx.original || null }) } catch { /* retry next import */ }
+      }
+      // Broken deposits: drop the cancelled deposit, remember both bank lines so they never come back, book any interest as income.
+      const ignore = (ref: string | null | undefined) => ref ? st.repo.upsert('import_rules', { household_id: st.householdId, pattern: IGNORE_REF + ref, category_id: null, skip: true }, 'household_id,pattern') : Promise.resolve()
+      for (const r of rows.filter(x => x.closes && x.own)) {
+        const k = r.closes!
+        if (k.depositRow != null && rows[k.depositRow].include) continue // the user chose to keep that deposit after all
+        await ignore(k.depositRef)
+        await ignore(r.tx.ref)
+        if (k.depositId) await st.deleteTx(k.depositId)
+        if (k.interest > 0) {
+          const ins = st.categories.filter(x => x.kind === 'in' && !x.archived)
+          const cat = ins.find(x => /dob[aâ]n/i.test(x.name)) || ins.find(x => /alte venituri/i.test(x.name)) || ins[0]
+          const cur = r.tx.currency
+          const fx = cur === 'EUR' || cur === 'USD'
+          if (cat) {
+            try {
+              await st.saveTx({ kind: 'in', amount: fx ? st.toRonNow(k.interest, cur as any) : k.interest, category_id: cat.id, date: r.tx.date, note: 'Dobândă depozit BT', asset_id: null,
+                orig_amount: fx ? k.interest : null, orig_currency: fx ? (cur as any) : null, import_ref: `${r.tx.ref}-dobanda`, orig_note: null })
+            } catch (e: any) { if (!/duplicate|unique/i.test(e?.message || '')) throw e }
+          }
+        }
+        fixed++
       }
       // Remember "between my accounts" choices (and their undoing) for the next statements.
       for (const r of rows) {
@@ -101,7 +150,7 @@ export function ImportScreen({ notify }: { notify: (m: string) => void }) {
           try { await st.repo.upsert('import_rules', { household_id: st.householdId, pattern: key, category_id: r.cat, skip: false }, 'household_id,pattern') } catch { /* non-critical */ }
         }
       }
-      notify(`${n} tranzacții importate`)
+      notify(`${n} tranzacții importate${fixed ? ` · ${fixed} ${fixed === 1 ? 'depozit spart corectat' : 'depozite sparte corectate'}` : ''}`)
       setRows(null); setFileName('')
     } catch (e: any) { setErr(e?.message || 'Importul s-a oprit. Încearcă din nou: ce s-a importat deja nu se dublează.') }
     finally { setBusy(false) }
@@ -145,7 +194,7 @@ export function ImportScreen({ notify }: { notify: (m: string) => void }) {
                 <span className="row-main">
                   <b>{r.tx.merchant || r.tx.title}</b>
                   {detailHint(r.tx) && <span className="muted small imp-hint">🔎 {detailHint(r.tx)}</span>}
-                  <span className="muted small">{shortDayLabel(r.tx.date)}{r.tx.original ? ` · ${r.tx.original}` : ''}{r.dup ? ' · deja importată' : ''}{r.own ? ' · ↔ între conturile tale, nu se numără' : ''}{r.receipt ? ' · acoperită de bon 🧾' : ''}</span>
+                  <span className="muted small">{shortDayLabel(r.tx.date)}{r.tx.original ? ` · ${r.tx.original}` : ''}{r.dup ? ' · deja importată' : ''}{r.closes && r.own ? ` · 🔁 ${r.closes.label}` : r.own ? ' · ↔ între conturile tale, nu se numără' : ''}{r.closedBy != null && !r.include ? ' · 🔁 depozit spart în aceeași lună, nu se numără' : ''}{r.receipt ? ' · acoperită de bon 🧾' : ''}</span>
                   <span className="imp-cat">
                     <CatIcon icon={c?.icon || 'circle'} color={catColor(c)} size={26} />
                     <select aria-label="Categoria" value={r.own ? OWN : r.cat} onChange={e => e.target.value === OWN ? set(i, { own: true, cat: '', include: false }) : set(i, { cat: e.target.value, include: true, own: false })}>
@@ -165,7 +214,7 @@ export function ImportScreen({ notify }: { notify: (m: string) => void }) {
           })}
         </div>
         <p className="hint">Când schimbi categoria unui comerciant, aplicația ține minte alegerea pentru extrasele viitoare. Banii mutați între conturile tale („↔ Între conturile mele”) nu sunt nici cheltuială, nici venit: nu se importă, iar aplicația ține minte și asta.</p>
-        <button type="button" className="primary" disabled={busy || !chosen.length} onClick={doImport}>{busy ? 'Import…' : `Importă ${chosen.length} ${chosen.length === 1 ? 'tranzacție' : 'tranzacții'}`}</button>
+        <button type="button" className="primary" disabled={busy || (!chosen.length && !fixes)} onClick={doImport}>{busy ? 'Import…' : chosen.length ? `Importă ${chosen.length} ${chosen.length === 1 ? 'tranzacție' : 'tranzacții'}` : 'Corectează depozitul spart'}</button>
       </>)}
     </div>
   )

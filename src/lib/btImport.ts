@@ -158,6 +158,38 @@ export function isOwnTransfer(tx: ParsedTx, rules: Rule[]): boolean {
   return /transfer intern|intre conturi proprii|între conturi proprii|transfer propriu|desfiintare depozit|lichidare depozit|schimb valutar/i.test(`${tx.merchant} ${tx.title} ${tx.details}`)
 }
 
+/* ---------------- Broken (closed) deposits ---------------- */
+
+export const isDepositOpen = (tx: ParsedTx) => tx.kind === 'out' && /constituire depozit/i.test(tx.title)
+export const isDepositClose = (tx: ParsedTx) => tx.kind === 'in' && /desfiintare depozit|lichidare depozit/i.test(`${tx.title} ${tx.details}`)
+
+/** A deposit still counted as savings: one already in the app (key = its id) or one in the statement being imported (key = "row:<i>"). */
+export interface OpenDeposit { key: string; date: string; amount: number; currency: string }
+export interface DepositMatch { close: number; deposit: string; interest: number }
+
+/**
+ * When a deposit is broken, BT gives the money back as "Desfiintare/Lichidare depozit".
+ * Pair each such line with the deposit it ends: same currency, opened on or before that day,
+ * principal equal to the amount returned or slightly less (the rest is interest, at most 2%).
+ * The closest amount wins, then the newest deposit. Each deposit is closed once.
+ */
+export function matchDeposits(closes: { i: number; tx: ParsedTx }[], open: OpenDeposit[]): DepositMatch[] {
+  const used = new Set<string>()
+  const out: DepositMatch[] = []
+  for (const { i, tx } of [...closes].sort((a, b) => a.tx.date.localeCompare(b.tx.date))) {
+    const best = open
+      .filter(d => !used.has(d.key) && d.currency === tx.currency && d.date <= tx.date && d.amount <= tx.amount && tx.amount - d.amount <= Math.ceil(d.amount * 0.02))
+      .sort((a, b) => (tx.amount - a.amount) - (tx.amount - b.amount) || b.date.localeCompare(a.date))[0]
+    if (!best) continue
+    used.add(best.key)
+    out.push({ close: i, deposit: best.key, interest: tx.amount - best.amount })
+  }
+  return out
+}
+
+/** Import rules with this prefix hold bank references that must never be imported again (a deposit cancelled by its closing, and the closing itself). */
+export const IGNORE_REF = 'ref:'
+
 /** A short, safe clue from the bank's details (who/what was paid), without IBANs, personal codes or bank references. */
 export function detailHint(tx: ParsedTx): string {
   return tx.details.replace(tx.title, '').replace(/^\s*-?\s*canal electronic/i, '')
