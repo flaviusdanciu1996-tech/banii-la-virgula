@@ -56,6 +56,7 @@ export function ImportScreen({ notify }: { notify: (m: string) => void }) {
   }
 
   const chosen = rows?.filter(r => r.include) ?? []
+  const dupCount = rows?.filter(r => r.dup).length ?? 0
   const missing = chosen.filter(r => !r.cat).length
   const totals = useMemo(() => chosen.reduce((a, r) => {
     const v = r.tx.ron ?? st.toRonNow(r.tx.amount, (['RON', 'EUR', 'USD'].includes(r.tx.currency) ? r.tx.currency : 'RON') as any)
@@ -126,12 +127,14 @@ export function ImportScreen({ notify }: { notify: (m: string) => void }) {
 
       {rows && (rows.length === 0 ? <EmptyArt icon="inbox" title="Nimic de importat" text="Fișierul nu conține plăți sau încasări." /> : <>
         <div className="card import-sum">
-          <div><span>Selectate</span><b className="num">{chosen.length} din {rows.length}</b></div>
+          <div><span>Selectate</span><b className="num">{chosen.length} din {rows.length - dupCount}</b></div>
           <div><span>Cheltuieli</span><b className="num">{fmtNum(totals.out)}</b></div>
           <div><span>Încasări</span><b className="num in">{fmtNum(totals.in)}</b></div>
         </div>
+        {dupCount > 0 && <p className="hint">{dupCount === rows.length ? 'Toate tranzacțiile din acest extras sunt deja în aplicație. Nu ai nimic de făcut.' : `${dupCount} ${dupCount === 1 ? 'tranzacție e' : 'tranzacții sunt'} deja în aplicație și nu mai apar aici. Vezi doar ce lipsește.`}</p>}
         <div className="rows">
           {rows.map((r, i) => {
+            if (r.dup) return null
             const c = st.categories.find(x => x.id === r.cat)
             const cats = st.categories.filter(x => x.kind === r.tx.kind && !x.archived)
             return (
