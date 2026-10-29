@@ -145,15 +145,23 @@ export const INCOME_KEYWORDS: [RegExp, string][] = [
   [/bonus|prima/i, 'Bonus'],
 ]
 
-export interface Rule { pattern: string; category_id: string }
+export interface Rule { pattern: string; category_id: string | null; skip?: boolean }
+
+/** Money moved between the user's own accounts: not an expense or income. Learned rule first, then the bank's wording. */
+export function isOwnTransfer(tx: ParsedTx, rules: Rule[]): boolean {
+  const key = merchantKey(tx.merchant)
+  const r = key ? rules.find(x => x.pattern === key) : undefined
+  if (r) return !!r.skip
+  return /transfer intern|intre conturi proprii|între conturi proprii|transfer propriu/i.test(`${tx.merchant} ${tx.title} ${tx.details}`)
+}
 
 /** Normalised key used to remember the user's choice for a merchant. */
 export const merchantKey = (m: string) => m.toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/[^a-z ]/g, ' ').split(/\s+/).filter(w => w.length > 1).slice(0, 2).join(' ')
 
 export function categorize(tx: ParsedTx, rules: Rule[], cats: { id: string; name: string; kind: string; archived: boolean }[]): string | null {
   const key = merchantKey(tx.merchant)
-  const learned = key ? rules.find(r => r.pattern === key && cats.some(c => c.id === r.category_id && c.kind === tx.kind)) : undefined
-  if (learned) return learned.category_id
+  const learned = key ? rules.find(r => r.pattern === key && !r.skip && cats.some(c => c.id === r.category_id && c.kind === tx.kind)) : undefined
+  if (learned?.category_id) return learned.category_id
   const byName = (n: string) => cats.find(c => c.name === n && c.kind === tx.kind && !c.archived)?.id ?? null
   const hay = `${tx.merchant} ${tx.title} ${tx.details}`
   for (const [re, name] of tx.kind === 'in' ? INCOME_KEYWORDS : KEYWORDS) if (re.test(hay)) { const id = byName(name); if (id) return id }

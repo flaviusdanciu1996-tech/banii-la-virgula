@@ -111,7 +111,7 @@ test('goal maths', () => {
   assert.equal(monthlyNeeded(100000, 0, '2026-10-18', '2026-10-01'), 100000)
 })
 
-import { parseBT, categorize, parseBtAmount } from './btImport.ts'
+import { parseBT, categorize, parseBtAmount, isOwnTransfer } from './btImport.ts'
 
 test('BT statement parsing and categories', () => {
   assert.equal(parseBtAmount('4,690.93'), 469093)
@@ -598,4 +598,12 @@ test('Ciprian intraday entry: breakout on volume → calm pullback → pullback 
   const s = ciprianIntraday(cs)
   assert.ok(s, 'signal expected')
   assert.ok(s!.stop < 107.4 && s!.tp1 >= 113, `stop ${s!.stop} tp1 ${s!.tp1}`)
+})
+
+test('import: money moved between own accounts is recognised, and the learned choice wins', () => {
+  const tx = { ref: 'r1', date: '2026-10-09', kind: 'out', amount: 5000, currency: 'RON', ron: null, merchant: 'Transfer Intern -', title: 'Transfer intern', details: '', original: '' } as any
+  assert.equal(isOwnTransfer(tx, []), true)
+  assert.equal(isOwnTransfer(tx, [{ pattern: 'transfer intern', category_id: 'c1', skip: false }]), false)
+  assert.equal(isOwnTransfer({ ...tx, merchant: 'Lidl', title: 'Plata la POS' }, []), false)
+  assert.equal(isOwnTransfer({ ...tx, merchant: 'Ion Pop', title: 'Plata' }, [{ pattern: 'ion pop', category_id: null, skip: true }]), true)
 })

@@ -5,11 +5,12 @@ import { CatIcon, EmptyArt } from '../ui.tsx'
 import { catColor } from '../helpers.tsx'
 import { fmt, fmtNum } from '../lib/money.ts'
 import { shortDayLabel } from '../lib/period.ts'
-import { parseBT, categorize, merchantKey, type ParsedTx, type PdfItem, type Rule } from '../lib/btImport.ts'
+import { parseBT, categorize, isOwnTransfer, merchantKey, type ParsedTx, type PdfItem, type Rule } from '../lib/btImport.ts'
 import { GROUPS } from '../lib/types.ts'
 import { pendingReceipts, receiptForImport, type PendingReceipt } from '../lib/receipt.ts'
 
-interface Row { tx: ParsedTx; include: boolean; cat: string; suggested: string; dup: boolean; receipt: PendingReceipt | null }
+interface Row { tx: ParsedTx; include: boolean; cat: string; suggested: string; dup: boolean; receipt: PendingReceipt | null; own: boolean; ownSuggested: boolean }
+const OWN = '__own__'
 
 async function readPdf(file: File): Promise<PdfItem[]> {
   const pdfjs = await import('pdfjs-dist')
@@ -47,7 +48,8 @@ export function ImportScreen({ notify }: { notify: (m: string) => void }) {
         const dup = known.has(tx.ref)
         const receipt = dup || tx.kind === 'in' ? null : receiptForImport(tx, pending)
         if (receipt) pending.splice(pending.indexOf(receipt), 1)
-        return { tx, cat: c, suggested: c, include: !dup && !receipt, dup, receipt }
+        const own = !dup && isOwnTransfer(tx, rules)
+        return { tx, cat: own ? '' : c, suggested: c, include: !dup && !receipt && !own, dup, receipt, own, ownSuggested: own }
       }))
     } catch (e: any) { setErr(e?.message || 'Nu am putut citi fișierul.') }
     finally { setBusy(false) }
@@ -72,6 +74,15 @@ export function ImportScreen({ notify }: { notify: (m: string) => void }) {
         const first = r.receipt!.txs[0]
         try { await st.saveTx({ id: first.id, import_ref: r.tx.ref, orig_note: r.tx.original || null }) } catch { /* retry next import */ }
       }
+      // Remember "between my accounts" choices (and their undoing) for the next statements.
+      for (const r of rows) {
+        const key = merchantKey(r.tx.merchant)
+        if (!key || r.dup || r.own === r.ownSuggested) continue
+        try {
+          if (r.own) await st.repo.upsert('import_rules', { household_id: st.householdId, pattern: key, category_id: null, skip: true }, 'household_id,pattern')
+          else if (!r.cat) await st.repo.upsert('import_rules', { household_id: st.householdId, pattern: key, category_id: null, skip: false }, 'household_id,pattern')
+        } catch { /* non-critical */ }
+      }
       for (const r of chosen) {
         const cur = r.tx.currency
         const known = cur === 'RON' || cur === 'EUR' || cur === 'USD'
@@ -86,8 +97,8 @@ export function ImportScreen({ notify }: { notify: (m: string) => void }) {
         } catch (e: any) { if (!/duplicate|unique/i.test(e?.message || '')) throw e }
         // Remember the choice for this merchant when it differs from (or there was no) suggestion.
         const key = merchantKey(r.tx.merchant)
-        if (key && r.cat !== r.suggested) {
-          try { await st.repo.upsert('import_rules', { household_id: st.householdId, pattern: key, category_id: r.cat }, 'household_id,pattern') } catch { /* non-critical */ }
+        if (key && (r.cat !== r.suggested || r.ownSuggested)) {
+          try { await st.repo.upsert('import_rules', { household_id: st.householdId, pattern: key, category_id: r.cat, skip: false }, 'household_id,pattern') } catch { /* non-critical */ }
         }
       }
       notify(`${n} tranzacții importate`)
@@ -126,16 +137,17 @@ export function ImportScreen({ notify }: { notify: (m: string) => void }) {
             return (
               <div key={r.tx.ref + i} className={'row import-row' + (r.include ? '' : ' off') + (r.include && !r.cat ? ' need' : '')}>
                 <label className="imp-check" aria-label="Include">
-                  <input type="checkbox" checked={r.include} onChange={e => set(i, { include: e.target.checked })} />
+                  <input type="checkbox" checked={r.include} onChange={e => set(i, { include: e.target.checked, ...(e.target.checked ? { own: false } : {}) })} />
                   <span>{r.include && <Check size={14} />}</span>
                 </label>
                 <span className="row-main">
                   <b>{r.tx.merchant || r.tx.title}</b>
-                  <span className="muted small">{shortDayLabel(r.tx.date)}{r.tx.original ? ` · ${r.tx.original}` : ''}{r.dup ? ' · deja importată' : ''}{r.receipt ? ' · acoperită de bon 🧾' : ''}</span>
+                  <span className="muted small">{shortDayLabel(r.tx.date)}{r.tx.original ? ` · ${r.tx.original}` : ''}{r.dup ? ' · deja importată' : ''}{r.own ? ' · ↔ între conturile tale, nu se numără' : ''}{r.receipt ? ' · acoperită de bon 🧾' : ''}</span>
                   <span className="imp-cat">
                     <CatIcon icon={c?.icon || 'circle'} color={catColor(c)} size={26} />
-                    <select aria-label="Categoria" value={r.cat} onChange={e => set(i, { cat: e.target.value, include: true })}>
+                    <select aria-label="Categoria" value={r.own ? OWN : r.cat} onChange={e => e.target.value === OWN ? set(i, { own: true, cat: '', include: false }) : set(i, { cat: e.target.value, include: true, own: false })}>
                       <option value="">Alege categoria…</option>
+                      <option value={OWN}>↔ Între conturile mele (nu se numără)</option>
                       {r.tx.kind === 'in' ? cats.map(x => <option key={x.id} value={x.id}>{x.name}</option>)
                         : GROUPS.map(g => <optgroup key={g.id} label={g.name}>{cats.filter(x => x.grp === g.id).map(x => <option key={x.id} value={x.id}>{x.name}</option>)}</optgroup>)}
                     </select>
@@ -149,7 +161,7 @@ export function ImportScreen({ notify }: { notify: (m: string) => void }) {
             )
           })}
         </div>
-        <p className="hint">Când schimbi categoria unui comerciant, aplicația ține minte alegerea pentru extrasele viitoare.</p>
+        <p className="hint">Când schimbi categoria unui comerciant, aplicația ține minte alegerea pentru extrasele viitoare. Banii mutați între conturile tale („↔ Între conturile mele”) nu sunt nici cheltuială, nici venit: nu se importă, iar aplicația ține minte și asta.</p>
         <button type="button" className="primary" disabled={busy || !chosen.length} onClick={doImport}>{busy ? 'Import…' : `Importă ${chosen.length} ${chosen.length === 1 ? 'tranzacție' : 'tranzacții'}`}</button>
       </>)}
     </div>
