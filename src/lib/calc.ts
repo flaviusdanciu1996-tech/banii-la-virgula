@@ -6,7 +6,8 @@ import { toRon, pct } from './money.ts'
 export interface PeriodSummary {
   income: number
   spent: number // expenses excluding the Economii group
-  saved: number // Economii group
+  saved: number // Economii group, without investments
+  invested: number // investment categories (funds, pension, stocks, crypto)
   byCat: Map<string, number>
   totalBudget: number
   left: number // totalBudget - spent
@@ -16,6 +17,9 @@ export interface PeriodSummary {
   txs: Tx[]
 }
 
+/** Investments are kept apart from savings so the two are never mixed. */
+export const isInvestCat = (c: { name: string }) => /investi|pensi|bursa|bursă|crypto|actiuni|acțiuni|fond/i.test(c.name) && !/urgen/i.test(c.name)
+
 export function totalBudget(cats: Category[], s: Settings | null): number {
   if (s?.total_budget && s.total_budget > 0) return s.total_budget
   return cats.filter(c => c.kind === 'out' && !c.archived && c.grp !== 'economii').reduce((a, c) => a + (c.allocated || 0), 0)
@@ -24,17 +28,19 @@ export function totalBudget(cats: Category[], s: Settings | null): number {
 export function summarize(txs: Tx[], cats: Category[], s: Settings | null, p: Period, today: string): PeriodSummary {
   const catById = new Map(cats.map(c => [c.id, c]))
   const list = txs.filter(t => inPeriod(t.date, p))
-  let income = 0, spent = 0, saved = 0
+  let income = 0, spent = 0, saved = 0, invested = 0
   const byCat = new Map<string, number>()
   for (const t of list) {
     if (t.kind === 'in') { income += t.amount; continue }
     byCat.set(t.category_id, (byCat.get(t.category_id) || 0) + t.amount)
-    if (catById.get(t.category_id)?.grp === 'economii') saved += t.amount
+    const c = catById.get(t.category_id)
+    if (c?.grp === 'economii' && isInvestCat(c)) invested += t.amount
+    else if (c?.grp === 'economii') saved += t.amount
     else spent += t.amount
   }
   const tb = totalBudget(cats, s)
   return {
-    income, spent, saved, byCat,
+    income, spent, saved, invested, byCat,
     totalBudget: tb,
     left: tb - spent,
     spentPct: tb ? Math.round((spent / tb) * 100) : 0,

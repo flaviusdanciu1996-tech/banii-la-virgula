@@ -100,6 +100,7 @@ export function HomeScreen({ nav, period, setPeriod, scope, setScope, openTx, op
               <div><span>Cheltuit</span><b className="num">{fmtNum(sum.spent)}</b><small>din {fmtNum(sum.totalBudget).replace(',00', '')}</small></div>
               <div><span>Venituri</span><b className="num in">{fmtNum(sum.income)}</b></div>
               <div><span>Economii</span><b className="num save">{fmtNum(sum.saved)}</b></div>
+              <div><span>Investiții</span><b className="num invest">{fmtNum(sum.invested)}</b></div>
             </div>
             <div className="ring-foot">
               <div className="legend"><span><i style={{ background: over ? 'var(--bad)' : 'var(--accent)' }} />cheltuit {sum.spentPct}%</span><span><i style={{ background: 'var(--time)' }} />trecut din lună {sum.elapsedPct}%</span>{sum.daysLeft > 0 && <span className="muted">mai sunt {sum.daysLeft} {sum.daysLeft === 1 ? 'zi' : 'zile'}</span>}</div>
@@ -115,6 +116,7 @@ export function HomeScreen({ nav, period, setPeriod, scope, setScope, openTx, op
             <div><span>Venituri</span><b className="num in">{fmtNum(sum.income)}</b></div>
             <div><span>Cheltuieli</span><b className="num">{fmtNum(sum.spent)}</b></div>
             <div><span>Economii</span><b className="num save">{fmtNum(sum.saved)}</b></div>
+            <div><span>Investiții</span><b className="num invest">{fmtNum(sum.invested)}</b></div>
           </div>
         </>}
       </section>

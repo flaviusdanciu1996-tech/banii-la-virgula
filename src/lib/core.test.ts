@@ -653,3 +653,11 @@ test('import: a broken deposit cancels the deposit it ends', () => {
   assert.equal(matchDeposits([{ i: 0, tx: close }, { i: 1, tx: { ...close, ref: 'c2' } }], open).length, 1)
   assert.deepEqual(matchDeposits([{ i: 0, tx: { ...close, currency: 'EUR' } }], open), [{ close: 0, deposit: 'e', interest: 0 }])
 })
+
+test('summary keeps investments apart from savings', () => {
+  const cats = [{ id: 's', name: 'Economii', kind: 'out', grp: 'economii' }, { id: 'i', name: 'Investiții', kind: 'out', grp: 'economii' }, { id: 'u', name: 'Fond de urgență', kind: 'out', grp: 'economii' }] as any
+  const txs = [{ kind: 'out', amount: 518216, category_id: 's', date: '2026-10-07' }, { kind: 'out', amount: 36665, category_id: 'i', date: '2026-10-16' }, { kind: 'out', amount: 1000, category_id: 'u', date: '2026-10-16' }] as any
+  const sum = summarize(txs, cats, null, { start: '2026-10-01', end: '2026-10-31' } as any, '2026-10-29')
+  assert.equal(sum.saved, 519216)
+  assert.equal(sum.invested, 36665)
+})
