@@ -5,7 +5,7 @@ import { CatIcon, EmptyArt } from '../ui.tsx'
 import { catColor } from '../helpers.tsx'
 import { fmt, fmtNum } from '../lib/money.ts'
 import { shortDayLabel } from '../lib/period.ts'
-import { parseBT, categorize, isOwnTransfer, merchantKey, type ParsedTx, type PdfItem, type Rule } from '../lib/btImport.ts'
+import { parseBT, categorize, isOwnTransfer, detailHint, merchantKey, type ParsedTx, type PdfItem, type Rule } from '../lib/btImport.ts'
 import { GROUPS } from '../lib/types.ts'
 import { pendingReceipts, receiptForImport, type PendingReceipt } from '../lib/receipt.ts'
 
@@ -145,6 +145,7 @@ export function ImportScreen({ notify }: { notify: (m: string) => void }) {
                 </label>
                 <span className="row-main">
                   <b>{r.tx.merchant || r.tx.title}</b>
+                  {detailHint(r.tx) && <span className="muted small imp-hint">🔎 {detailHint(r.tx)}</span>}
                   <span className="muted small">{shortDayLabel(r.tx.date)}{r.tx.original ? ` · ${r.tx.original}` : ''}{r.dup ? ' · deja importată' : ''}{r.own ? ' · ↔ între conturile tale, nu se numără' : ''}{r.receipt ? ' · acoperită de bon 🧾' : ''}</span>
                   <span className="imp-cat">
                     <CatIcon icon={c?.icon || 'circle'} color={catColor(c)} size={26} />

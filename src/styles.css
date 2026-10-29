@@ -908,3 +908,4 @@ a.chip { text-decoration: none; color: inherit; }
 .tv-links { margin-top: -2px; }
 .discipline .import-sum { display: flex; }
 .star-out { font-size: 12px; font-weight: 600; }
+.imp-hint{display:block;overflow-wrap:anywhere;line-height:1.35;margin:2px 0}

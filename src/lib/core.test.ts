@@ -111,7 +111,7 @@ test('goal maths', () => {
   assert.equal(monthlyNeeded(100000, 0, '2026-10-18', '2026-10-01'), 100000)
 })
 
-import { parseBT, categorize, parseBtAmount, isOwnTransfer } from './btImport.ts'
+import { parseBT, categorize, parseBtAmount, isOwnTransfer, detailHint, guessMerchant } from './btImport.ts'
 
 test('BT statement parsing and categories', () => {
   assert.equal(parseBtAmount('4,690.93'), 469093)
@@ -615,4 +615,13 @@ test('import: deposits and fund purchases are savings, deposit closing and curre
   assert.equal(categorize({ ...base, merchant: 'Fond', title: 'Colectare automata fonduri BTAM' }, [], cats), 'i')
   assert.equal(isOwnTransfer({ ...base, kind: 'in', merchant: 'Depozit BT închis', title: 'Desfiintare depozit' }, []), true)
   assert.equal(isOwnTransfer({ ...base, merchant: 'Schimb', title: 'Schimb valutar - canal electronic' }, []), true)
+})
+
+test('import: payment hint keeps who was paid and drops personal codes and IBANs', () => {
+  const tx = { ref: 'r', date: '2026-10-05', kind: 'out', amount: 7000, currency: 'RON', ron: null, merchant: '', title: 'Plata OP inter - canal electronic', details: '/ROC/1234567890123;M8Fs;FPF Pensia Mea; RO49AAAA1B31007593840000;BRDEROBU; REF: 013ZEXA262780D38', original: '' } as any
+  const h = detailHint(tx)
+  assert.ok(h.includes('FPF Pensia Mea'))
+  assert.ok(!/\d{13}|RO49|REF|BRDEROBU/.test(h))
+  assert.equal(guessMerchant(tx.title, tx.details), 'Fpf Pensia Mea')
+  assert.equal(categorize({ ...tx, merchant: 'Fpf Pensia Mea' }, [], [{ id: 'i', name: 'Investiții', kind: 'out', archived: false }]), 'i')
 })

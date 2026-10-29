@@ -108,7 +108,7 @@ export function guessMerchant(title: string, details: string): string {
   if (pos) return tidy(pos[1].replace(/\s+[A-Z]{2}$/, ''))
   const parts = details.split(';').map(s => s.trim()).filter(Boolean)
   // Transfers: "C.I.F.:…;details;…;NAME S R L;IBAN;…"
-  const name = parts.find(p => /[A-Z]{3,}/.test(p) && !/^C\.I\.F|^RO\d{2}[A-Z]{4}|^BTRL|^REF|^CURS|^\d+$/.test(p) && p.length > 3 && p !== title)
+  const name = parts.find(p => /[A-Z]{3,}/.test(p) && !/^C\.I\.F|^RO\d{2}[A-Z]{4}|^BTRL|^REF|^CURS|^\d+$|^\/|\d{6,}|^[A-Z]{4}RO[A-Z0-9]{2,5}$/.test(p) && /\s/.test(p) && p.length > 3 && p !== title)
   if (/Constituire depozit/i.test(title)) return 'Depozit BT'
   if (/Desfiintare depozit|Lichidare depozit/i.test(title)) return 'Depozit BT închis'
   if (/unitati de fond|Colectare automata fonduri/i.test(title)) return 'Fond BT Asset Management'
@@ -124,7 +124,7 @@ const tidy = (s: string) => short(s).replace(/\s{2,}/g, ' ').replace(/\b(\w)(\w*
 /** Keyword → default category name. First match wins; learned rules are checked before these. */
 export const KEYWORDS: [RegExp, string][] = [
   [/constituire depozit|depunere economii/i, 'Economii'],
-  [/unitati de fond|colectare automata fonduri|cv unit\./i, 'Investiții'],
+  [/unitati de fond|colectare automata fonduri|cv unit\.|pensia mea|pensii facultative|fond de pensii|pilon ?(3|iii)/i, 'Investiții'],
   [/\b(tankstelle|tankstation|autohof|truck ?stop|benzin\w*|fuel|shell|omv|petrom|mol|lukoil|rompetrol|socar|st1|circle ?k|aral|total|esso|q8|bp |eni|agip|orlen|jet |avia|tamoil|repsol|ok benzin|preem|ingo|uno-x|statoil|gulf|dkv|as24)\b/i, 'Combustibil'],
   [/\b(lidl|kaufland|carrefour|mega ?image|profi|penny|auchan|aldi|netto|rewe|edeka|city gross|ica |coop|willys|hemk[oö]p|spar|billa|tesco|lidl|selgros|metro|cora|la doi pasi|rema 1000|kiwi|meny|bunnpris|norma|plus |jumbo|albert heijn|biedronka|intermarche|leclerc|mercadona|conad|esselunga|migros|hofer|penny)\b/i, 'Mâncare acasă'],
   [/\b(mcdonald|kfc|burger king|starbucks|subway|pizza|restaurant|bistro|cafe|caf[eé]|coffee|kebab|grill|trattoria|pub|bar |sushi|glovo|tazz|bolt food|wolt|foodpanda|max hamburgare|espresso house|rasthof|autogrill)\b/i, 'Restaurante & cafenele'],
@@ -156,6 +156,19 @@ export function isOwnTransfer(tx: ParsedTx, rules: Rule[]): boolean {
   const r = key ? rules.find(x => x.pattern === key) : undefined
   if (r) return !!r.skip
   return /transfer intern|intre conturi proprii|între conturi proprii|transfer propriu|desfiintare depozit|lichidare depozit|schimb valutar/i.test(`${tx.merchant} ${tx.title} ${tx.details}`)
+}
+
+/** A short, safe clue from the bank's details (who/what was paid), without IBANs, personal codes or bank references. */
+export function detailHint(tx: ParsedTx): string {
+  return `${tx.details}`
+    .replace(/RO\d{2}[A-Z]{4}[0-9A-Z]{10,16}/g, '')
+    .replace(/\/ROC\/[^;]*/g, '')
+    .replace(/\b\d{13}\b/g, '')
+    .replace(/REF:?\s*\S+/gi, '')
+    .replace(/\b[A-Z]{4}RO[A-Z0-9]{2,5}\b/g, '')
+    .replace(/C\.I\.F\.?:?\s*\d+/gi, '')
+    .split(/[;\n]/).map(x => x.trim()).filter(x => x.length > 2 && !/^[A-Za-z0-9]{2,5}$/.test(x)).join(' · ')
+    .replace(/\s{2,}/g, ' ').trim().slice(0, 140)
 }
 
 /** Normalised key used to remember the user's choice for a merchant. */
