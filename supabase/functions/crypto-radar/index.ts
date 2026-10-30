@@ -86,7 +86,7 @@ async function levelAlerts(coin: string, series: Record<string, Candle[]>) {
       if (!(x.c < Number(a.below))) continue;
       await db.from("push_alerts").insert({ user_id: a.user_id, urgent: true, tag: `levelb-${coin}`,
         title: `⚠️ ${coin} s-a închis sub ${ro(Number(a.below))} $ ${tfTxt}`,
-        body: `Lumânarea ${a.tf === "1d" ? "zilei" : "de 4 ore"} s-a închis la ${ro(x.c)} $. ${a.note ?? "Structura s-a stricat: nu cumpăra, așteaptă acumulare jos."} Scrie-i lui Claude.` });
+        body: `Lumânarea ${a.tf === "1d" ? "zilei" : a.tf === "1h" ? "de 1 oră" : "de 4 ore"} s-a închis la ${ro(x.c)} $. ${a.note ?? "Structura s-a stricat: nu cumpăra, așteaptă acumulare jos."} Scrie-i lui Claude.` });
       await db.from("crypto_level_alerts").update({ alerted_at: new Date().toISOString() }).eq("id", a.id);
       sent++;
       continue;
@@ -94,7 +94,7 @@ async function levelAlerts(coin: string, series: Record<string, Candle[]>) {
     if (!(x.c > Number(a.above) && x.v >= Number(a.vol_mult) * avg)) continue;
     await db.from("push_alerts").insert({ user_id: a.user_id, urgent: true, tag: `level-${coin}`,
       title: `📡 SEMNAL · ${coin} a spart ${ro(Number(a.above))} $ ${tfTxt} cu volum`,
-      body: `Lumânarea ${a.tf === "1d" ? "zilei" : a.tf === "1h" ? "de 1 oră" : "de 4 ore"} s-a închis la ${ro(x.c)} $, cu volum ${(x.v / avg).toFixed(1)}× normal. Ciprian: nu cumpăra pe loc, așteaptă pullback-ul cu lumânări mici.${a.stop ? ` Stop sub ${ro(Number(a.stop))}` : ""}${a.target ? ` · ținta 1: ${ro(Number(a.target))}` : ""}. Scrie-i lui Claude.` });
+      body: `Lumânarea ${a.tf === "1d" ? "zilei" : a.tf === "1h" ? "de 1 oră" : "de 4 ore"} s-a închis la ${ro(x.c)} $, cu volum ${(x.v / avg).toFixed(1)}× normal. ${a.note ?? "Ciprian: nu cumpăra pe loc, așteaptă pullback-ul cu lumânări mici."}${a.stop ? ` Stop sub ${ro(Number(a.stop))}` : ""}${a.target ? ` · ținta 1: ${ro(Number(a.target))}` : ""}. Scrie-i lui Claude.` });
     await db.from("crypto_level_alerts").update({ alerted_at: new Date().toISOString() }).eq("id", a.id);
     sent++;
   }
