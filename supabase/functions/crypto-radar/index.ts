@@ -66,7 +66,7 @@ async function one(coin: string, u: Uni) {
   const t = u.tick[coin];
   const row = analyze(coin, daily, toCandles(h4), t?.ch ?? null, { h1: toCandles(h1), h8: toCandles(h8), w1: toCandles(w1), m1: toCandles(m1) }, t?.vol ?? 0);
   await db.from("crypto_radar").upsert({ coin, d: row, at: row.at });
-  await levelAlerts(coin, { "4h": toCandles(h4), "1d": daily });
+  await levelAlerts(coin, { "1h": toCandles(h1), "4h": toCandles(h4), "1d": daily });
   return row;
 }
 
@@ -81,7 +81,7 @@ async function levelAlerts(coin: string, series: Record<string, Candle[]>) {
     if (cs.length < 23) continue;
     const k = cs.length - 2, x = cs[k]; // cs[last] is still forming
     const avg = cs.slice(k - 20, k).reduce((s, y) => s + y.v, 0) / 20;
-    const tfTxt = a.tf === "1d" ? "pe 1 zi" : "pe 4 ore";
+    const tfTxt = a.tf === "1d" ? "pe 1 zi" : a.tf === "1h" ? "pe 1 oră" : "pe 4 ore";
     if (a.below != null) { // warning level: the closed candle ends under it (no volume condition)
       if (!(x.c < Number(a.below))) continue;
       await db.from("push_alerts").insert({ user_id: a.user_id, urgent: true, tag: `levelb-${coin}`,
@@ -94,7 +94,7 @@ async function levelAlerts(coin: string, series: Record<string, Candle[]>) {
     if (!(x.c > Number(a.above) && x.v >= Number(a.vol_mult) * avg)) continue;
     await db.from("push_alerts").insert({ user_id: a.user_id, urgent: true, tag: `level-${coin}`,
       title: `📡 SEMNAL · ${coin} a spart ${ro(Number(a.above))} $ ${tfTxt} cu volum`,
-      body: `Lumânarea ${a.tf === "1d" ? "zilei" : "de 4 ore"} s-a închis la ${ro(x.c)} $, cu volum ${(x.v / avg).toFixed(1)}× normal. Ciprian: nu cumpăra pe loc, așteaptă pullback-ul cu lumânări mici.${a.stop ? ` Stop sub ${ro(Number(a.stop))}` : ""}${a.target ? ` · ținta 1: ${ro(Number(a.target))}` : ""}. Scrie-i lui Claude.` });
+      body: `Lumânarea ${a.tf === "1d" ? "zilei" : a.tf === "1h" ? "de 1 oră" : "de 4 ore"} s-a închis la ${ro(x.c)} $, cu volum ${(x.v / avg).toFixed(1)}× normal. Ciprian: nu cumpăra pe loc, așteaptă pullback-ul cu lumânări mici.${a.stop ? ` Stop sub ${ro(Number(a.stop))}` : ""}${a.target ? ` · ținta 1: ${ro(Number(a.target))}` : ""}. Scrie-i lui Claude.` });
     await db.from("crypto_level_alerts").update({ alerted_at: new Date().toISOString() }).eq("id", a.id);
     sent++;
   }
