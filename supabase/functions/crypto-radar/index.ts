@@ -38,10 +38,19 @@ async function universe(force: boolean): Promise<Uni> {
     .map((t: any) => ({ coin: t.symbol.slice(0, -4), ch: Number(t.priceChangePercent), vol: Number(t.quoteVolume), n: Number(t.count) }))
     .filter(t => t.coin && !SKIP.test(t.coin) && !STOCK_TOKEN.test(t.coin) && t.vol > 0 && t.n > 0)
     .sort((a, b) => b.vol - a.vol);
-  const top = rows.slice(0, TOP);
-  for (const c of RADAR_COINS) if (!top.some(t => t.coin === c)) { const r = rows.find(t => t.coin === c); if (r) top.push(r); }
+  // Only coins Flavius can buy on Revolut X (list kept in the '__revx__' row), all of them; else the top 200 by volume.
+  const { data: rx } = await db.from("crypto_radar").select("d").eq("coin", "__revx__").maybeSingle();
+  const revx = new Set<string>(rx?.d?.coins ?? []);
+  const top = revx.size ? rows.filter(t => revx.has(t.coin)) : rows.slice(0, TOP);
+  for (const c of RADAR_COINS) if ((!revx.size || revx.has(c)) && !top.some(t => t.coin === c)) { const r = rows.find(t => t.coin === c); if (r) top.push(r); }
   const u: Uni = { coins: top.map(t => t.coin), tick: Object.fromEntries(top.map(t => [t.coin, { ch: t.ch, vol: t.vol }])), at: new Date().toISOString() };
   await db.from("crypto_radar").upsert({ coin: "__universe__", d: u, at: u.at });
+  // Drop coins that left the list, so the app only shows what can be bought.
+  if (u.coins.length > 50) {
+    const { data: pos } = await db.from("invest_journal").select("watch_symbol").eq("status", "deschis").not("watch_symbol", "is", null);
+    const keep = ["__universe__", "__revx__", ...u.coins, ...(pos ?? []).map((r: any) => r.watch_symbol as string)];
+    await db.from("crypto_radar").delete().not("coin", "in", `(${keep.map(c => `"${c}"`).join(",")})`);
+  }
   return u;
 }
 
