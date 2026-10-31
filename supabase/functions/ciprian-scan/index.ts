@@ -12,8 +12,10 @@ Deno.serve(async (req) => {
   if (tf !== "1h" && tf !== "4h") return Response.json({ error: "tf" }, { status: 400 });
   const { data: uni } = await db.from("crypto_radar").select("d").eq("coin", "__universe__").maybeSingle();
   const coins: string[] = (uni?.d?.coins ?? []).slice(from, to);
-  const { data: rows } = await db.from("crypto_radar").select("coin, area:d->>area, zone:d->>zone").in("coin", coins);
+  const { data: rows } = await db.from("crypto_radar").select("coin, area:d->>area, zone:d->>zone, price:d->>price, sma200:d->>sma200, d1:d->frames->3->>dir").in("coin", coins);
   const area = new Map((rows ?? []).map((r: any) => [r.coin, r.area as string | null]));
+  // The big picture on 1 day (Ciprian: "mergem cu mediile într-un timeframe mai mare"): above the 200-day average and not falling.
+  const dayOk = new Map((rows ?? []).map((r: any) => [r.coin, r.d1 == null ? null : r.d1 !== "down" && !(Number(r.price) < Number(r.sma200))]));
   const found: any[] = [];
   const heads: any[] = [];
   for (let i = 0; i < coins.length; i += 10) {
@@ -103,7 +105,7 @@ Deno.serve(async (req) => {
   for (const s of found) {
     const { error } = await db.from("ciprian_signals").insert({
       coin: s.coin, tf, skey: s.key, candle_at: new Date(s.at).toISOString(), entry: s.entry, stop: s.stop, tp1: s.tp1, tp2: s.tp2,
-      line: s.line, pullback_low: s.pullbackLow, top: s.top, risk_pct: s.riskPct, rr1: s.rr1, vol_x: s.volX, area: s.area,
+      line: s.line, pullback_low: s.pullbackLow, top: s.top, risk_pct: s.riskPct, rr1: s.rr1, vol_x: s.volX, area: s.area, day_ok: dayOk.get(s.coin) ?? null,
     });
     if (!error) fresh.push(s);
   }
@@ -115,7 +117,7 @@ Deno.serve(async (req) => {
     for (const s of fresh.sort((a, b) => b.rr1 - a.rr1).slice(0, 3)) {
       const body = `Pullback cu lumânări mici, apoi a spart linia retragerii cu volum ${pct(s.volX)}×. ` +
         `Intrare ~${ro(s.entry)} $ · stop ${ro(s.stop)} (−${pct(s.riskPct)}%) · TP1 ${ro(s.tp1)} (vinzi jumătate, stopul la intrare) · TP2 ${ro(s.tp2)}.` +
-        ` Cu risc de 40 lei (1%): poziție de ~${Math.round(40 / (s.riskPct / 100))} lei.${s.area ? ` Zona pe 1 zi: ${s.area}.` : ""} Verifică graficul în TradingView înainte să intri.`;
+        ` Cu risc de 40 lei (1%): poziție de ~${Math.round(40 / (s.riskPct / 100))} lei.${s.area ? ` Zona pe 1 zi: ${s.area}.` : ""}${dayOk.get(s.coin) === true ? " Pe 1 zi: peste medii ✅ (intri normal)." : dayOk.get(s.coin) === false ? " Pe 1 zi: sub medii / în jos ⚠️ risc mai mare: scrie-i întâi lui Claude, doar cu jumătate din sumă." : ""} Verifică graficul în TradingView înainte să intri.`;
       for (const u of users) await db.from("push_alerts").insert({ user_id: u, urgent: true, tag: `cip-${tf}-${s.coin}`, title: `⭐ Ciprian · ${s.coin} pe ${tfTxt}: momentul intrării`, body });
     }
     await fetch(Deno.env.get("SUPABASE_URL") + "/functions/v1/daily-reminder", { method: "POST",
