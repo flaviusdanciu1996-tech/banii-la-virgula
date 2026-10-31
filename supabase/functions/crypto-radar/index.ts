@@ -58,7 +58,7 @@ async function one(coin: string, u: Uni) {
   const s = `${coin}USDT`;
   const [d1, h1, h4, h8, w1, m1] = await Promise.all([
     bn(`/api/v3/klines?symbol=${s}&interval=1d&limit=400`), bn(`/api/v3/klines?symbol=${s}&interval=1h&limit=120`),
-    bn(`/api/v3/klines?symbol=${s}&interval=4h&limit=120`), bn(`/api/v3/klines?symbol=${s}&interval=8h&limit=120`),
+    bn(`/api/v3/klines?symbol=${s}&interval=4h&limit=240`), bn(`/api/v3/klines?symbol=${s}&interval=8h&limit=120`),
     bn(`/api/v3/klines?symbol=${s}&interval=1w&limit=120`), bn(`/api/v3/klines?symbol=${s}&interval=1M&limit=60`),
   ]);
   const daily = toCandles(d1);
@@ -67,7 +67,53 @@ async function one(coin: string, u: Uni) {
   const row = analyze(coin, daily, toCandles(h4), t?.ch ?? null, { h1: toCandles(h1), h8: toCandles(h8), w1: toCandles(w1), m1: toCandles(m1) }, t?.vol ?? 0);
   await db.from("crypto_radar").upsert({ coin, d: row, at: row.at });
   await levelAlerts(coin, { "1h": toCandles(h1), "4h": toCandles(h4), "1d": daily });
+  await golasaAlerts(coin, { "4h": toCandles(h4), "1d": daily }, row.area ?? null);
   return row;
+}
+
+/**
+ * Ciprian's "lumânare golașă" (an upthrust that ends an accumulation) on the last CLOSED candle:
+ * small body, long upper wick, short lower wick (≤ 1/3 of the upper one), any colour,
+ * the biggest volume of the last 40 candles, and the upper wick reaching MA 100 or MA 200.
+ * Returns the moving average it touched, or null.
+ */
+export function golasa(cs: Candle[], k = cs.length - 2): { ma: 100 | 200; level: number } | null {
+  if (k < 200) return null;
+  const x = cs[k], range = x.h - x.l;
+  if (!(range > 0)) return null;
+  const top = Math.max(x.o, x.c), bot = Math.min(x.o, x.c);
+  const upper = x.h - top, lower = bot - x.l, body = top - bot;
+  if (upper < 0.5 * range || body > 0.35 * range || lower > upper / 3) return null;
+  for (let q = k - 40; q < k; q++) if (cs[q].v >= x.v) return null;
+  const sma = (n: number) => { let t = 0; for (let q = k - n + 1; q <= k; q++) t += cs[q].c; return t / n; };
+  for (const n of [100, 200] as const) {
+    const m = sma(n);
+    if (m >= top * 0.995 && m <= x.h * 1.01) return { ma: n, level: m };
+  }
+  return null;
+}
+
+async function golasaAlerts(coin: string, series: Record<string, Candle[]>, area: string | null) {
+  for (const tf of ["4h", "1d"]) {
+    const cs = series[tf] ?? [];
+    const g = golasa(cs);
+    if (!g) continue;
+    const x = cs[cs.length - 2];
+    const { error } = await db.from("radar_golasa").insert({ coin, tf, candle_at: new Date(x.t).toISOString(), price: x.c, ma: g.ma, area });
+    if (error) continue; // already announced
+    if (area === "sus") continue; // "în zonă înaltă nu cumperi": kept in the table, no push
+    const day = new Date(); day.setUTCHours(0, 0, 0, 0);
+    const { count } = await db.from("radar_golasa").select("coin", { count: "exact", head: true }).gte("created_at", day.toISOString()).neq("area", "sus");
+    if ((count ?? 0) > 3) continue;
+    const { data: subs } = await db.from("radar_watch").select("user_id");
+    const avgV = cs.slice(-42, -2).reduce((s, y) => s + y.v, 0) / 40;
+    for (const u of new Set((subs ?? []).map((r: any) => r.user_id as string)))
+      await db.from("push_alerts").insert({ user_id: u, urgent: false, tag: `gol-${coin}`,
+        title: `🕯️ ${coin}: lumânare golașă pe ${tf === "1d" ? "1 zi" : "4 ore"}`,
+        body: `Fitil lung sus până la media ${g.ma}, cel mai mare volum din ultimele 40 de lumânări (${(x.v / avgV).toFixed(1)}× media). Ciprian: semn că se termină acumularea, urmează impuls, pullback, impuls. Nu cumpăra pe loc: așteaptă ruptura și pullback-ul.${area ? ` Zona pe 1 zi: ${area}.` : ""} Scrie-i lui Claude.` });
+    await fetch(Deno.env.get("SUPABASE_URL") + "/functions/v1/daily-reminder", { method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: `Bearer ${Deno.env.get("SUPABASE_ANON_KEY")}` }, body: JSON.stringify({ alerts: true }) }).catch(() => {});
+  }
 }
 
 const ro = (x: number) => x.toLocaleString("ro-RO", { maximumSignificantDigits: 6 });
@@ -105,6 +151,14 @@ async function levelAlerts(coin: string, series: Record<string, Candle[]>) {
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: cors });
   const body = await req.json().catch(() => ({} as any));
+  if (body.golasa_test) { // count past golașe candles and what price did 6 candles later
+    const out: any[] = [];
+    for (const c of body.golasa_test as string[]) for (const tf of ["4h", "1d"]) {
+      const cs = toCandles(await bn(`/api/v3/klines?symbol=${c}USDT&interval=${tf}&limit=1000`));
+      for (let k = 201; k < cs.length - 7; k++) { const g = golasa(cs, k); if (g) out.push({ c, tf, t: new Date(cs[k].t).toISOString().slice(0, 10), ma: g.ma, up6: +((Math.max(...cs.slice(k + 1, k + 7).map(y => y.h)) / cs[k].c - 1) * 100).toFixed(1), dn6: +((Math.min(...cs.slice(k + 1, k + 7).map(y => y.l)) / cs[k].c - 1) * 100).toFixed(1), ch6: +((cs[k + 6].c / cs[k].c - 1) * 100).toFixed(1) }); }
+    }
+    return json(out);
+  }
   const u = await universe(!!body.refresh_list);
   const { data: have } = await db.from("crypto_radar").select("coin, at").neq("coin", "__universe__");
   const seen = new Map((have ?? []).map((r: any) => [r.coin, Date.parse(r.at)]));
