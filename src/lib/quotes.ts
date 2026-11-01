@@ -80,6 +80,26 @@ export const QUOTES: Quote[] = [
   { t: 'Curajul nu e lipsa fricii, ci mersul înainte cu ea de mână.', a: 'Banii la virgulă' },
   { t: 'Ce semeni, aceea culegi.', a: 'Proverb' },
   { t: 'Ordinea în bani aduce ordine în minte.', a: 'Banii la virgulă' },
+  // James Clear, „Atomic Habits” (short lines, in Romanian)
+  { t: 'Obiceiurile sunt dobânda compusă a dezvoltării personale.', a: 'James Clear, „Atomic Habits”' },
+  { t: 'Nu te ridici la nivelul obiectivelor tale. Cobori la nivelul sistemelor tale.', a: 'James Clear, „Atomic Habits”' },
+  { t: 'Fiecare acțiune pe care o faci e un vot pentru omul care vrei să devii.', a: 'James Clear, „Atomic Habits”' },
+  { t: 'Cu 1% mai bine în fiecare zi: după un an ești de aproape 37 de ori mai bun.', a: 'James Clear, „Atomic Habits”' },
+  { t: 'Nu rata niciodată de două ori. O zi pierdută e un accident, două sunt începutul unui obicei nou.', a: 'James Clear, „Atomic Habits”' },
+  { t: 'Fă-l evident, fă-l atractiv, fă-l ușor, fă-l satisfăcător.', a: 'James Clear, „Atomic Habits”' },
+  { t: 'Succesul e produsul obiceiurilor de zi cu zi, nu al unei transformări o dată în viață.', a: 'James Clear, „Atomic Habits”' },
+  { t: 'Concentrează-te nu pe ce vrei să obții, ci pe cine vrei să devii.', a: 'James Clear, „Atomic Habits”' },
+  { t: 'Un obicei nou începe în două minute. Fă pasul mic azi, pe cel mare îl aduce repetiția.', a: 'James Clear, „Atomic Habits”' },
+  { t: 'Obiectivele îți dau direcția. Sistemele te duc acolo.', a: 'James Clear, „Atomic Habits”' },
+  // Jay Shetty, „Gândește ca un călugăr” (ideas from the book, in our words)
+  { t: 'Rostul tău e acolo unde pasiunea și priceperea ta ajută pe alții.', a: 'Jay Shetty, idee din „Gândește ca un călugăr”' },
+  { t: 'Comparația ucide iubirea.', a: 'Jay Shetty, „Gândește ca un călugăr”' },
+  { t: 'Tu nu ești gândurile tale. Ești cel care le observă.', a: 'Jay Shetty, idee din „Gândește ca un călugăr”' },
+  { t: 'Detașarea nu înseamnă să nu ai nimic, ci ca nimic să nu te stăpânească pe tine.', a: 'Citat din „Gândește ca un călugăr”, Jay Shetty' },
+  { t: 'Observă gândul negativ, oprește-te, apoi alege altul. Nu-l lupta, înlocuiește-l.', a: 'Jay Shetty, idee din „Gândește ca un călugăr”' },
+  { t: 'Începe ziua cu recunoștință, nu cu telefonul.', a: 'Jay Shetty, idee din „Gândește ca un călugăr”' },
+  { t: 'O minte care nu se oprește niciodată nu vede nimic limpede. Fă-ți loc de liniște.', a: 'Jay Shetty, idee din „Gândește ca un călugăr”' },
+  { t: 'Cea mai scurtă cale spre un sens e să fii de folos altora.', a: 'Jay Shetty, idee din „Gândește ca un călugăr”' },
 ]
 
 /** Same quote for everyone on a given local date; cycles through the list without repeats. */
