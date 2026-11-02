@@ -186,12 +186,149 @@ export const QUOTES: Quote[] = [
   { t: 'Datoria e plata unei bucurii din trecut cu banii viitorului tău.', a: 'Mike Michalowicz, idee din „The Money Habit”' },
   { t: 'Nu e nevoie de mai mulți bani ca să începi. E nevoie de un obicei.', a: 'Mike Michalowicz, idee din „The Money Habit”' },
   { t: 'Profitul vieții tale e ce păstrezi, nu ce câștigi.', a: 'Mike Michalowicz, idee din „The Money Habit”' },
+  // Ray Dalio, „Principii de adaptare la ordinea mondială în schimbare” (lessons in our words)
+  { t: 'Istoria se mișcă în cicluri. Cine le studiază le vede venind.', a: 'Ray Dalio, idee din „Principii de adaptare la ordinea mondială în schimbare”' },
+  { t: 'Țările cresc prin educație, muncă și inovație și decad prin datorii și conflicte interne.', a: 'Ray Dalio, idee din „Principii de adaptare la ordinea mondială în schimbare”' },
+  { t: 'Datoria împrumută prosperitate din viitor. La un moment dat, vine și factura.', a: 'Ray Dalio, idee din „Principii de adaptare la ordinea mondială în schimbare”' },
+  { t: 'Când tipărirea banilor ia locul muncii, banii își pierd valoarea.', a: 'Ray Dalio, idee din „Principii de adaptare la ordinea mondială în schimbare”' },
+  { t: 'Banii ținuți în cont par siguri, dar inflația îi topește pe nesimțite.', a: 'Ray Dalio, idee din „Principii de adaptare la ordinea mondială în schimbare”' },
+  { t: 'Nu ține toată averea într-o singură monedă, țară sau activ.', a: 'Ray Dalio, idee din „Principii de adaptare la ordinea mondială în schimbare”' },
+  { t: 'Ce a mers în ultimii 10 ani rar merge și în următorii 10.', a: 'Ray Dalio, idee din „Principii de adaptare la ordinea mondială în schimbare”' },
+  { t: 'Cea mai mare greșeală e să crezi că viitorul va semăna cu trecutul recent.', a: 'Ray Dalio, idee din „Principii de adaptare la ordinea mondială în schimbare”' },
+  { t: 'Productivitatea e sursa reală a bogăției pe termen lung.', a: 'Ray Dalio, idee din „Principii de adaptare la ordinea mondială în schimbare”' },
+  { t: 'Marile schimbări vin încet, apoi dintr-odată.', a: 'Ray Dalio, idee din „Principii de adaptare la ordinea mondială în schimbare”' },
+  { t: 'O monedă puternică e un privilegiu care se pierde când datoriile cresc prea mult.', a: 'Ray Dalio, idee din „Principii de adaptare la ordinea mondială în schimbare”' },
+  { t: 'Când încrederea în bani scade, oamenii fug spre aur.', a: 'Ray Dalio, idee din „Principii de adaptare la ordinea mondială în schimbare”' },
+  { t: 'Pregătește-te pentru mai multe scenarii, nu doar pentru cel pe care îl speri.', a: 'Ray Dalio, idee din „Principii de adaptare la ordinea mondială în schimbare”' },
+  { t: 'Uită-te la date, nu la povești.', a: 'Ray Dalio, idee din „Principii de adaptare la ordinea mondială în schimbare”' },
+  { t: 'Ruptura dintre bogați și săraci slăbește orice țară din interior.', a: 'Ray Dalio, idee din „Principii de adaptare la ordinea mondială în schimbare”' },
+  // Grant Cardone, „Regula 10X” (lessons in our words)
+  { t: 'Pune-ți obiective de 10 ori mai mari și pune de 10 ori mai multă acțiune.', a: 'Grant Cardone, idee din „Regula 10X”' },
+  { t: 'Cei mai mulți nu greșesc țintind prea sus, ci țintind prea jos.', a: 'Grant Cardone, idee din „Regula 10X”' },
+  { t: 'Ai patru alegeri: nimic, retragere, acțiune normală sau acțiune masivă. Alege-o pe ultima.', a: 'Grant Cardone, idee din „Regula 10X”' },
+  { t: 'Mediocritatea nu e un loc sigur. E locul unde pierzi cel mai încet.', a: 'Grant Cardone, idee din „Regula 10X”' },
+  { t: 'Succesul e datoria ta, nu o opțiune.', a: 'Grant Cardone, idee din „Regula 10X”' },
+  { t: 'Obsesia pentru obiectivul tău nu e o boală, e combustibil.', a: 'Grant Cardone, idee din „Regula 10X”' },
+  { t: 'Nu te întrece cu alții. Fă atât de mult încât să nu mai ai concurență.', a: 'Grant Cardone, idee din „Regula 10X”' },
+  { t: 'Fă mai mult decât îți cere oricine.', a: 'Grant Cardone, idee din „Regula 10X”' },
+  { t: 'Problemele sunt semnul că ești în mișcare.', a: 'Grant Cardone, idee din „Regula 10X”' },
+  { t: 'Frica îți arată exact ce ai de făcut.', a: 'Grant Cardone, idee din „Regula 10X”' },
+  { t: 'Să fii necunoscut e o problemă mai mare decât să fii criticat.', a: 'Grant Cardone, idee din „Regula 10X”' },
+  { t: 'Scrie-ți obiectivele dimineața și seara.', a: 'Grant Cardone, idee din „Regula 10X”' },
+  { t: 'Nimic nu se întâmplă până nu acționezi.', a: 'Grant Cardone, idee din „Regula 10X”' },
+  { t: 'Socotește că vei avea nevoie de mai mult timp, bani și efort decât crezi.', a: 'Grant Cardone, idee din „Regula 10X”' },
+  { t: 'Ce nu crește, se micșorează. Nu te opri la „suficient”.', a: 'Grant Cardone, idee din „Regula 10X”' },
+  // Mike Michalowicz, „Clockwork” (lessons in our words)
+  { t: 'O afacere bună merge și când tu nu ești acolo.', a: 'Mike Michalowicz, idee din „Clockwork”' },
+  { t: 'Mută-ți timpul de la „fac totul” spre „proiectez cum se face”.', a: 'Mike Michalowicz, idee din „Clockwork”' },
+  { t: 'Găsește rolul cel mai important al afacerii și protejează-l mai presus de orice.', a: 'Mike Michalowicz, idee din „Clockwork”' },
+  { t: 'Fă ce faci cel mai bine. Restul îl predai.', a: 'Mike Michalowicz, idee din „Clockwork”' },
+  { t: 'Nu poți crește dacă tu ești blocajul.', a: 'Mike Michalowicz, idee din „Clockwork”' },
+  { t: 'Scrie pașii pe măsură ce lucrezi. Așa îi poți preda altcuiva.', a: 'Mike Michalowicz, idee din „Clockwork”' },
+  { t: 'Testul suprem: o vacanță lungă. Ce se strică în lipsa ta, acolo e de lucru.', a: 'Mike Michalowicz, idee din „Clockwork”' },
+  { t: 'Eficiența întregii echipe contează mai mult decât viteza ta.', a: 'Mike Michalowicz, idee din „Clockwork”' },
+  { t: 'Ia o decizie o singură dată, apoi transform-o în regulă.', a: 'Mike Michalowicz, idee din „Clockwork”' },
+  { t: 'Clienții tăi preferați îți arată ce afacere vrei de fapt.', a: 'Mike Michalowicz, idee din „Clockwork”' },
+  { t: 'Delegarea începe când accepți că altul o face la 80% din cum ai face-o tu.', a: 'Mike Michalowicz, idee din „Clockwork”' },
+  { t: 'Libertatea antreprenorului vine din sisteme, nu din ore lucrate.', a: 'Mike Michalowicz, idee din „Clockwork”' },
+  { t: 'Pentru orice sarcină nouă întreabă: o fac, o elimin, o deleg sau o automatizez?', a: 'Mike Michalowicz, idee din „Clockwork”' },
+  { t: 'Mai puțin „trebuie să fiu eu”, mai mult „cine altcineva poate?”.', a: 'Mike Michalowicz, idee din „Clockwork”' },
+  { t: 'Sistemele bune îți dau înapoi timpul pentru familie.', a: 'Mike Michalowicz, idee din „Clockwork”' },
+  // Jack Stack, „Marele joc al afacerilor” (lessons in our words)
+  { t: 'Arată-le tuturor cifrele. Oamenii care înțeleg afacerea iau decizii mai bune.', a: 'Jack Stack, idee din „Marele joc al afacerilor”' },
+  { t: 'Transformă munca într-un joc cu reguli clare și scor vizibil.', a: 'Jack Stack, idee din „Marele joc al afacerilor”' },
+  { t: 'Fiecare om trebuie să știe cum contribuie la profit.', a: 'Jack Stack, idee din „Marele joc al afacerilor”' },
+  { t: 'Ce se măsoară și se vede, se îmbunătățește.', a: 'Jack Stack, idee din „Marele joc al afacerilor”' },
+  { t: 'Oamenii vor să câștige. Arată-le cum.', a: 'Jack Stack, idee din „Marele joc al afacerilor”' },
+  { t: 'Educația financiară a echipei e cea mai bună investiție.', a: 'Jack Stack, idee din „Marele joc al afacerilor”' },
+  { t: 'Când împarți câștigul, angajații devin parteneri.', a: 'Jack Stack, idee din „Marele joc al afacerilor”' },
+  { t: 'Nu ascunde problemele. Pune-le pe masă și rezolvați-le împreună.', a: 'Jack Stack, idee din „Marele joc al afacerilor”' },
+  { t: 'O ședință scurtă cu cifre bate un discurs lung.', a: 'Jack Stack, idee din „Marele joc al afacerilor”' },
+  { t: 'Siguranța locului de muncă vine din profit, nu din promisiuni.', a: 'Jack Stack, idee din „Marele joc al afacerilor”' },
+  { t: 'Fiecare are nevoie de o miză în rezultat.', a: 'Jack Stack, idee din „Marele joc al afacerilor”' },
+  { t: 'Gândește ca un proprietar, chiar dacă nu ești încă.', a: 'Jack Stack, idee din „Marele joc al afacerilor”' },
+  { t: 'Bilanțul spune povestea afacerii. Învață să-l citești.', a: 'Jack Stack, idee din „Marele joc al afacerilor”' },
+  { t: 'Banii sunt scorul, nu jocul.', a: 'Jack Stack, idee din „Marele joc al afacerilor”' },
+  { t: 'Cel mai mare risc e ca oamenii să nu știe de ce fac ce fac.', a: 'Jack Stack, idee din „Marele joc al afacerilor”' },
+  // Charles G. Koch, „Profit bun” (lessons in our words)
+  { t: 'Profitul bun vine din valoare reală creată pentru alții.', a: 'Charles G. Koch, idee din „Profit bun”' },
+  { t: 'Profitul din favoruri sau păcăleală nu e profit bun.', a: 'Charles G. Koch, idee din „Profit bun”' },
+  { t: 'Folosește orice resursă ca și cum ar fi a ta.', a: 'Charles G. Koch, idee din „Profit bun”' },
+  { t: 'Valorile vin înaintea rezultatelor. Integritatea e prima.', a: 'Charles G. Koch, idee din „Profit bun”' },
+  { t: 'Oamenii cresc când au și libertatea, și răspunderea de a decide.', a: 'Charles G. Koch, idee din „Profit bun”' },
+  { t: 'Experimentează mult, învață din eșec, renunță repede la ce nu merge.', a: 'Charles G. Koch, idee din „Profit bun”' },
+  { t: 'La fiecare decizie întreabă-te: cum creez valoare?', a: 'Charles G. Koch, idee din „Profit bun”' },
+  { t: 'Cunoașterea e împrăștiată în oameni. Las-o să urce de jos în sus.', a: 'Charles G. Koch, idee din „Profit bun”' },
+  { t: 'Răsplătește după contribuție, nu după vechime.', a: 'Charles G. Koch, idee din „Profit bun”' },
+  { t: 'Prosperitatea durabilă vine din a îmbunătăți viața altora.', a: 'Charles G. Koch, idee din „Profit bun”' },
+  { t: 'Dacă nu te reinventezi tu, o va face altcineva în locul tău.', a: 'Charles G. Koch, idee din „Profit bun”' },
+  { t: 'Fii mai curios decât sigur pe tine.', a: 'Charles G. Koch, idee din „Profit bun”' },
+  { t: 'Alege oamenii întâi după valori, apoi după talent.', a: 'Charles G. Koch, idee din „Profit bun”' },
+  { t: 'Spune adevărul și atunci când doare.', a: 'Charles G. Koch, idee din „Profit bun”' },
+  { t: 'Risipa e un furt din viitor.', a: 'Charles G. Koch, idee din „Profit bun”' },
+  // Dan Heath, „În amonte” (lessons in our words)
+  { t: 'Repară problema înainte să se întâmple, nu după.', a: 'Dan Heath, idee din „În amonte”' },
+  { t: 'Mulți scot oamenii din râu. Puțini merg în amonte să vadă de ce cad.', a: 'Dan Heath, idee din „În amonte”' },
+  { t: 'Ne obișnuim cu problemele până nu le mai vedem.', a: 'Dan Heath, idee din „În amonte”' },
+  { t: 'Dacă nu e treaba nimănui, devine problema tuturor.', a: 'Dan Heath, idee din „În amonte”' },
+  { t: 'Prea ocupat cu urgențele ca să previi următoarea: așa se repetă crizele.', a: 'Dan Heath, idee din „În amonte”' },
+  { t: 'Caută punctul unde un efort mic schimbă mult.', a: 'Dan Heath, idee din „În amonte”' },
+  { t: 'Semnele de avertizare timpurie valorează aur.', a: 'Dan Heath, idee din „În amonte”' },
+  { t: 'Măsoară corect, altfel îmbunătățești ce nu trebuie.', a: 'Dan Heath, idee din „În amonte”' },
+  { t: 'Prevenția nu primește aplauze, dar aduce rezultate.', a: 'Dan Heath, idee din „În amonte”' },
+  { t: 'Ai grijă la efectele secundare ale propriilor soluții.', a: 'Dan Heath, idee din „În amonte”' },
+  { t: 'Strânge oamenii în jurul problemei, nu în jurul vinei.', a: 'Dan Heath, idee din „În amonte”' },
+  { t: 'Schimbă sistemul, nu doar obiceiul.', a: 'Dan Heath, idee din „În amonte”' },
+  { t: 'Un fond de urgență e gândire „în amonte” aplicată banilor.', a: 'Dan Heath, idee din „În amonte”' },
+  { t: 'Cea mai bună criză e cea care nu se întâmplă.', a: 'Dan Heath, idee din „În amonte”' },
+  { t: 'Întreabă-te ce problemă de azi va deveni urgența de mâine.', a: 'Dan Heath, idee din „În amonte”' },
+  // Laurence J. Peter, „Principiul lui Peter” (lessons in our words)
+  { t: 'Într-o ierarhie, fiecare urcă până la nivelul la care devine incompetent.', a: 'Laurence J. Peter, idee din „Principiul lui Peter”' },
+  { t: 'Cu timpul, fiecare post ajunge ocupat de cineva prea slab pentru el.', a: 'Laurence J. Peter, idee din „Principiul lui Peter”' },
+  { t: 'Treaba o fac cei care încă n-au ajuns la nivelul lor de incompetență.', a: 'Laurence J. Peter, idee din „Principiul lui Peter”' },
+  { t: 'Să fii bun într-un rol nu înseamnă că vei fi bun și în următorul.', a: 'Laurence J. Peter, idee din „Principiul lui Peter”' },
+  { t: 'Nu orice promovare e un câștig. Uneori e o capcană.', a: 'Laurence J. Peter, idee din „Principiul lui Peter”' },
+  { t: 'Învață să spui „nu” unei promovări care nu ți se potrivește.', a: 'Laurence J. Peter, idee din „Principiul lui Peter”' },
+  { t: 'Liniștea vine din a lucra acolo unde ești bun.', a: 'Laurence J. Peter, idee din „Principiul lui Peter”' },
+  { t: 'Organizațiile premiază des aparența de competență.', a: 'Laurence J. Peter, idee din „Principiul lui Peter”' },
+  { t: 'Judecă rezultatele, nu titlurile.', a: 'Laurence J. Peter, idee din „Principiul lui Peter”' },
+  { t: 'Creșterea adevărată e în pricepere, nu în funcție.', a: 'Laurence J. Peter, idee din „Principiul lui Peter”' },
+  { t: 'Mai bine excelent la nivelul tău decât mediocru mai sus.', a: 'Laurence J. Peter, idee din „Principiul lui Peter”' },
+  { t: 'Pregătește-te pentru rolul următor înainte să-l primești.', a: 'Laurence J. Peter, idee din „Principiul lui Peter”' },
+  { t: 'Incompetența de la vârf se ascunde în hârtii și reguli.', a: 'Laurence J. Peter, idee din „Principiul lui Peter”' },
+  { t: 'Cunoaște-ți limitele și construiește în jurul lor.', a: 'Laurence J. Peter, idee din „Principiul lui Peter”' },
+  { t: 'Ambiția fără pricepere urcă repede și cade greu.', a: 'Laurence J. Peter, idee din „Principiul lui Peter”' },
+  // Edgar H. Schein, „O abordare respectuoasă” (lessons in our words)
+  { t: 'Întreabă din curiozitate reală, nu ca să demonstrezi ceva.', a: 'Edgar H. Schein, idee din „O abordare respectuoasă”' },
+  { t: 'Spunem prea mult și întrebăm prea puțin.', a: 'Edgar H. Schein, idee din „O abordare respectuoasă”' },
+  { t: 'Relațiile bune se construiesc întrebând, nu explicând.', a: 'Edgar H. Schein, idee din „O abordare respectuoasă”' },
+  { t: 'Când întrebi, recunoști că ai nevoie de celălalt, iar asta creează încredere.', a: 'Edgar H. Schein, idee din „O abordare respectuoasă”' },
+  { t: 'Liderii care întreabă află problemele înainte să explodeze.', a: 'Edgar H. Schein, idee din „O abordare respectuoasă”' },
+  { t: 'Ascultarea e o formă de respect.', a: 'Edgar H. Schein, idee din „O abordare respectuoasă”' },
+  { t: 'Nu presupune că știi răspunsul. Lasă-l pe celălalt să te surprindă.', a: 'Edgar H. Schein, idee din „O abordare respectuoasă”' },
+  { t: 'Funcția ne oprește să întrebăm. Smerenia trece peste ea.', a: 'Edgar H. Schein, idee din „O abordare respectuoasă”' },
+  { t: 'O întrebare bună deschide. Una proastă judecă.', a: 'Edgar H. Schein, idee din „O abordare respectuoasă”' },
+  { t: 'Uneori cea mai puternică întrebare e „Ce se întâmplă?”.', a: 'Edgar H. Schein, idee din „O abordare respectuoasă”' },
+  { t: 'În munca de azi, toți depindem unii de alții.', a: 'Edgar H. Schein, idee din „O abordare respectuoasă”' },
+  { t: 'În meseriile cu risc, și cel mai nou din echipă trebuie să poată spune „stop”.', a: 'Edgar H. Schein, idee din „O abordare respectuoasă”' },
+  { t: 'Construiește relațiile înainte să ai nevoie de ele.', a: 'Edgar H. Schein, idee din „O abordare respectuoasă”' },
+  { t: 'Întreabă ca să înveți, nu ca să convingi.', a: 'Edgar H. Schein, idee din „O abordare respectuoasă”' },
+  { t: 'Azi depind de tine ca să reușesc. Asta e smerenia de aici și acum.', a: 'Edgar H. Schein, idee din „O abordare respectuoasă”' },
 ]
 
-/** Same quote for everyone on a given local date; cycles through the list without repeats. */
-export function quoteFor(dateIso: string, extra: Quote[] = []): Quote {
+/** Two quotes a day (morning and evening), the same for everyone; cycles through the list without repeats. */
+export function quoteFor(dateIso: string, extra: Quote[] = [], evening = false): Quote {
   const all = [...QUOTES, ...extra]
   const [y, m, d] = dateIso.split('-').map(Number)
-  const day = Math.floor(Date.UTC(y, m - 1, d) / 86400000)
-  return all[((day % all.length) + all.length) % all.length]
+  const n = Math.floor(Date.UTC(y, m - 1, d) / 86400000) * 2 + (evening ? 1 : 0)
+  return all[((n % all.length) + all.length) % all.length]
+}
+
+/** Which quote the home card shows now: the evening one from 22:00 until the morning one at 11:00. */
+export function quoteNow(now: Date, extra: Quote[] = []): { q: Quote; evening: boolean } {
+  const iso = (x: Date) => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`
+  const h = now.getHours()
+  if (h >= 22) return { q: quoteFor(iso(now), extra, true), evening: true }
+  if (h < 11) return { q: quoteFor(iso(new Date(now.getTime() - 864e5)), extra, true), evening: true }
+  return { q: quoteFor(iso(now), extra), evening: false }
 }

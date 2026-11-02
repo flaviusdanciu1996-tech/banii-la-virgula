@@ -7,7 +7,7 @@ import { upcomingList, UpcomingRows } from './Plans.tsx'
 import { DreamStrip } from './Dreams.tsx'
 import { useMyQuotes, asQuotes } from './Reminder.tsx'
 import { ReceiptButton } from './Receipt.tsx'
-import { quoteFor } from '../lib/quotes.ts'
+import { quoteNow } from '../lib/quotes.ts'
 import { Icon } from '../icons.tsx'
 import { fmt, fmtNum, fmtSigned, pct } from '../lib/money.ts'
 import { periodLabel, shortDayLabel, todayIso, type Period } from '../lib/period.ts'
@@ -46,7 +46,7 @@ export function HomeScreen({ nav, period, setPeriod, scope, setScope, openTx, op
   }, [st.txs, st.user.id])
   const upcoming = upcomingList(st.recurring, today, 10)
   const [mine] = useMyQuotes()
-  const quote = quoteFor(today, asQuotes(mine))
+  const { q: quote, evening } = quoteNow(new Date(), asQuotes(mine))
 
   const nw = netWorth(st.assets, st.rates)
   const monthAgo = snapshotAt(st.snapshots, new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10))
@@ -71,7 +71,7 @@ export function HomeScreen({ nav, period, setPeriod, scope, setScope, openTx, op
       <AlarmSwitch notify={notify} compact />
 
       <button type="button" className="quote-card" onClick={() => nav('notificari')}>
-        <span className="quote-eyebrow">✨ Doza zilei</span>
+        <span className="quote-eyebrow">{evening ? '🌙 Gândul de seară' : '✨ Doza zilei'}</span>
         <span className="quote-text">„{quote.t}”</span>
         <span className="quote-author">— {quote.a}</span>
       </button>
