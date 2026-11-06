@@ -317,18 +317,23 @@ export const QUOTES: Quote[] = [
 ]
 
 /** Two quotes a day (morning and evening), the same for everyone; cycles through the list without repeats. */
-export function quoteFor(dateIso: string, extra: Quote[] = [], evening = false): Quote {
+/** Each person starts at a different place in the list, so two people see different quotes on the same day. */
+export function userShift(userId = ''): number {
+  return parseInt(userId.replace(/-/g, '').slice(0, 8) || '0', 16) || 0
+}
+
+export function quoteFor(dateIso: string, extra: Quote[] = [], evening = false, userId = ''): Quote {
   const all = [...QUOTES, ...extra]
   const [y, m, d] = dateIso.split('-').map(Number)
-  const n = Math.floor(Date.UTC(y, m - 1, d) / 86400000) * 2 + (evening ? 1 : 0)
+  const n = Math.floor(Date.UTC(y, m - 1, d) / 86400000) * 2 + (evening ? 1 : 0) + (userShift(userId) % all.length)
   return all[((n % all.length) + all.length) % all.length]
 }
 
 /** Which quote the home card shows now: the evening one from 22:00 until the morning one at 11:00. */
-export function quoteNow(now: Date, extra: Quote[] = []): { q: Quote; evening: boolean } {
+export function quoteNow(now: Date, extra: Quote[] = [], userId = ''): { q: Quote; evening: boolean } {
   const iso = (x: Date) => `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`
   const h = now.getHours()
-  if (h >= 22) return { q: quoteFor(iso(now), extra, true), evening: true }
-  if (h < 11) return { q: quoteFor(iso(new Date(now.getTime() - 864e5)), extra, true), evening: true }
-  return { q: quoteFor(iso(now), extra), evening: false }
+  if (h >= 22) return { q: quoteFor(iso(now), extra, true, userId), evening: true }
+  if (h < 11) return { q: quoteFor(iso(new Date(now.getTime() - 864e5)), extra, true, userId), evening: true }
+  return { q: quoteFor(iso(now), extra, false, userId), evening: false }
 }

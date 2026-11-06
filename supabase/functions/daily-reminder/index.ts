@@ -15,10 +15,12 @@ function localParts(tz: string) {
   return { date: `${p.year}-${p.month}-${p.day}`, hm: `${p.hour === "24" ? "00" : p.hour}:${p.minute}` };
 }
 // Same order as quoteFor in src/lib/quotes.ts: two quotes a day, morning then evening.
-function quoteFor(base: { t: string; a: string }[], date: string, extra: { t: string; a: string }[], evening = false) {
+// Each person starts at a different place in the list (same shift as userShift in the app).
+function quoteFor(base: { t: string; a: string }[], date: string, extra: { t: string; a: string }[], evening = false, userId = "") {
   const all = [...base, ...extra];
   const [y, m, d] = date.split("-").map(Number);
-  const n = Math.floor(Date.UTC(y, m - 1, d) / 86400000) * 2 + (evening ? 1 : 0);
+  const shift = parseInt(userId.replace(/-/g, "").slice(0, 8) || "0", 16) || 0;
+  const n = Math.floor(Date.UTC(y, m - 1, d) / 86400000) * 2 + (evening ? 1 : 0) + (shift % all.length);
   return all[((n % all.length) + all.length) % all.length];
 }
 
@@ -72,7 +74,7 @@ Deno.serve(async () => {
 
     if (s.quote_on && s.quote_last !== lp.date && lp.hm >= String(s.quote_at).slice(0, 5)) {
       const { data: mine } = await db.from("my_quotes").select("text, author").eq("user_id", s.user_id).order("created_at");
-      const q = quoteFor(quotes, lp.date, (mine ?? []).map((x: any) => ({ t: x.text, a: x.author || "Citatul tău" })));
+      const q = quoteFor(quotes, lp.date, (mine ?? []).map((x: any) => ({ t: x.text, a: x.author || "Citatul tău" })), false, s.user_id);
       const r = await send(s, { title: "Doza zilei ✨", body: `„${q.t}” — ${q.a}`, url: "./", tag: "daily-quote" });
       if (r === null) continue;
       await db.from("push_subs").update({ quote_last: lp.date }).eq("endpoint", s.endpoint);
@@ -80,7 +82,7 @@ Deno.serve(async () => {
     // Evening quote at 22:00, to sleep on.
     if (s.quote_on && s.quote_last_pm !== lp.date && lp.hm >= "22:00") {
       const { data: mine } = await db.from("my_quotes").select("text, author").eq("user_id", s.user_id).order("created_at");
-      const q = quoteFor(quotes, lp.date, (mine ?? []).map((x: any) => ({ t: x.text, a: x.author || "Citatul tău" })), true);
+      const q = quoteFor(quotes, lp.date, (mine ?? []).map((x: any) => ({ t: x.text, a: x.author || "Citatul tău" })), true, s.user_id);
       const r = await send(s, { title: "Gândul de seară 🌙", body: `„${q.t}” — ${q.a}`, url: "./", tag: "evening-quote" });
       if (r === null) continue;
       await db.from("push_subs").update({ quote_last_pm: lp.date }).eq("endpoint", s.endpoint);

@@ -46,7 +46,7 @@ export function HomeScreen({ nav, period, setPeriod, scope, setScope, openTx, op
   }, [st.txs, st.user.id])
   const upcoming = upcomingList(st.recurring, today, 10)
   const [mine] = useMyQuotes()
-  const { q: quote, evening } = quoteNow(new Date(), asQuotes(mine))
+  const { q: quote, evening } = quoteNow(new Date(), asQuotes(mine), st.user.id)
 
   const nw = netWorth(st.assets, st.rates)
   const monthAgo = snapshotAt(st.snapshots, new Date(Date.now() - 30 * 864e5).toISOString().slice(0, 10))
